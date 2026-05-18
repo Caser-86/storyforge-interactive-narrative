@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Npc, PersistedChoice, ArtPrompt, BgmCue, Safety } from "@/lib/schemas";
-import { CreateGameResponseSchema, ChoiceResponseSchema } from "@/lib/api-contracts";
+import { CreateGameResponseSchema, ChoiceResponseSchema, GetSessionResponseSchema } from "@/lib/api-contracts";
 
 async function apiFetch<T>(
   url: string,
@@ -328,7 +328,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   loadSession: async (targetSessionId, token) => {
     const ownerToken = token || get().ownerToken;
-    set({ status: "generating", errorMessage: null });
+    set({ status: "generating", errorMessage: null, lastAction: null });
 
     try {
       const headers: Record<string, string> = {};
@@ -346,7 +346,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           choiceLabel?: string; choice_label?: string;
         }>;
         assets?: { imageJobId?: string; imageStatus?: string; imageUrl?: string };
-      }>(`/api/games/${targetSessionId}`, { headers });
+      }>(`/api/games/${targetSessionId}`, { headers }, GetSessionResponseSchema);
       const session = data.session;
       const scenes = data.scenes || [];
 

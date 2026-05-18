@@ -106,3 +106,32 @@ export const ShareReplayResponseSchema = z.object({
 });
 
 export type ShareReplayResponse = z.infer<typeof ShareReplayResponseSchema>;
+
+export const GetSessionResponseSchema = z.object({
+  session: z.object({
+    id: z.string(),
+    seedPrompt: z.string(),
+    genre: z.string(),
+    language: z.string(),
+    rating: z.string(),
+    status: z.string(),
+    currentSceneId: z.string(),
+    state: z.unknown(),
+    createdAt: z.union([z.string(), z.date()]),
+    updatedAt: z.union([z.string(), z.date()]),
+  }),
+  scenes: z.array(ApiSceneSchema.extend({
+    turn: z.number(),
+    createdAt: z.union([z.string(), z.date()]).optional(),
+    choices: z.array(PersistedChoiceSchema.extend({
+      chosen: z.boolean(),
+    })),
+  })),
+  assets: z.object({
+    imageJobId: z.string().nullable(),
+    imageStatus: z.string(),
+    imageUrl: z.string().nullable(),
+  }),
+});
+
+export type GetSessionResponse = z.infer<typeof GetSessionResponseSchema>;

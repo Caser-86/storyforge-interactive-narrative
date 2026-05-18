@@ -1,9 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { useGameStore } from "@/lib/store";
 
 export default function ErrorScreen() {
   const { errorMessage, errorTraceId, reset, retryLast, lastAction } = useGameStore();
+  const [traceCopied, setTraceCopied] = useState(false);
+
+  const handleCopyTrace = async () => {
+    if (!errorTraceId) return;
+    try {
+      await navigator.clipboard.writeText(errorTraceId);
+      setTraceCopied(true);
+      setTimeout(() => setTraceCopied(false), 2000);
+    } catch {}
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#16213e] px-4">
@@ -14,9 +25,13 @@ export default function ErrorScreen() {
           {errorMessage || "发生了未知错误，请重试"}
         </p>
         {errorTraceId && (
-          <p className="text-xs text-gray-600 mb-6 font-mono">
-            trace: {errorTraceId}
-          </p>
+          <button
+            onClick={handleCopyTrace}
+            className="text-xs text-gray-600 mb-6 font-mono hover:text-gray-400 transition-colors cursor-pointer"
+            title="点击复制 traceId"
+          >
+            trace: {errorTraceId} {traceCopied ? "✓ 已复制" : "📋"}
+          </button>
         )}
         <div className="space-y-3">
           {lastAction && (
