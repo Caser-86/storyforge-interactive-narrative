@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const text = searchParams.get("text") || "Loading...";
+  const rawText = searchParams.get("text") || "Loading...";
+  const text = rawText.slice(0, 100).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
     <defs>

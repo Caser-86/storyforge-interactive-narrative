@@ -1,33 +1,52 @@
 {
-  "name": "narrative-game",
+  "name": "storyforge-interactive-narrative",
   "version": "0.1.0",
   "private": true,
+  "description": "StoryForge - 基于 LLM 的互动叙事生成器",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Caser-86/storyforge-interactive-narrative.git"
+  },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "db:init": "tsx src/scripts/init-db.ts",
+    "db:smoke": "tsx src/scripts/db-smoke-test.ts",
+    "llm:smoke": "tsx src/scripts/llm-smoke-test.ts",
+    "worker": "tsx src/scripts/asset-worker.ts",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "bullmq": "^5.76.8",
-    "ioredis": "^5.10.1",
+    "@aws-sdk/client-s3": "^3.1048.0",
+    "bullmq": "^5",
+    "ioredis": "^5",
     "next": "16.2.6",
-    "openai": "^6.38.0",
-    "pg": "^8.20.0",
+    "openai": "^4",
+    "pg": "^8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "uuid": "^14.0.0",
-    "zod": "^4.4.3",
-    "zustand": "^5.0.13"
+    "uuid": "^11",
+    "zod": "^3",
+    "zustand": "^5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.6"
   }
 }

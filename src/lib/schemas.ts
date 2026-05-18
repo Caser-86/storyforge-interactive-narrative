@@ -9,14 +9,26 @@ export const NpcSchema = z.object({
   hiddenIntent: z.string().min(10).max(180),
 });
 
-export const ChoiceSchema = z.object({
+export const ModelChoiceSchema = z.object({
   id: z.string().regex(/^choice_[a-c]$/),
   label: z.string().min(4).max(42),
   intent: z.string().min(10).max(120),
   risk: z.enum(["low", "medium", "high"]),
   preview: z.string().min(10).max(100),
-  stateEffects: z.record(z.number().min(-20).max(20)),
+  stateEffects: z.record(z.string(), z.number().min(-20).max(20)),
 });
+
+export const PersistedChoiceSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(4).max(42),
+  intent: z.string().min(10).max(120),
+  risk: z.enum(["low", "medium", "high"]),
+  preview: z.string().min(10).max(100),
+  stateEffects: z.record(z.string(), z.number().min(-20).max(20)),
+  modelChoiceId: z.string().regex(/^choice_[a-c]$/).optional(),
+});
+
+export const ChoiceSchema = ModelChoiceSchema;
 
 export const ArtPromptSchema = z.object({
   prompt: z.string().min(60).max(900),
@@ -56,12 +68,14 @@ export const SafetySchema = z.object({
 
 export const NarrativeOutputSchema = z.object({
   scene: SceneSchema,
-  statePatch: z.record(z.union([z.string(), z.number(), z.boolean(), z.array(z.unknown()), z.object({}), z.null()])),
+  statePatch: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.unknown()), z.object({}), z.null()])),
   safety: SafetySchema,
 });
 
 export type Npc = z.infer<typeof NpcSchema>;
-export type Choice = z.infer<typeof ChoiceSchema>;
+export type ModelChoice = z.infer<typeof ModelChoiceSchema>;
+export type PersistedChoice = z.infer<typeof PersistedChoiceSchema>;
+export type Choice = ModelChoice;
 export type ArtPrompt = z.infer<typeof ArtPromptSchema>;
 export type BgmCue = z.infer<typeof BgmCueSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
@@ -81,6 +95,9 @@ export interface StoryState {
   inventory: string[];
   knownFacts: string[];
   unresolvedThreads: string[];
+  flags: Record<string, boolean>;
+  npcRelations: Record<string, number>;
+  endingPotential: number;
   styleBible: {
     visualStyle: string;
     musicStyle: string;

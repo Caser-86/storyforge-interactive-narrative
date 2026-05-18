@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
-import { generateImage } from "@/lib/asset-service";
+import { enqueueAssetJob } from "@/lib/asset-queue";
+import { verifyStreamToken } from "@/lib/crypto";
+import { apiError, ErrorCodes } from "@/lib/api-errors";
 import type { ArtPrompt } from "@/lib/schemas";
 
 let dbInitialized = false;
@@ -20,77 +22,95 @@ export async function GET(
     await ensureDb();
 
     const { sessionId } = await params;
+    const url = new URL(request.url);
+    const streamToken = url.searchParams.get("streamToken");
+
+    if (!streamToken) {
+      return apiError(ErrorCodes.FORBIDDEN, "streamToken query parameter required", 403);
+    }
+
+    const verification = verifyStreamToken(streamToken, sessionId);
+    if (!verification.valid) {
+      return apiError(ErrorCodes.FORBIDDEN, verification.reason || "Invalid stream token", 403);
+    }
 
     const encoder = new TextEncoder();
+    let closed = false;
+    const notifiedIds = new Set<string>();
+
     const stream = new ReadableStream({
       async start(controller) {
         const sendEvent = (event: string, data: unknown) => {
-          controller.enqueue(
-            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-          );
+          if (closed) return;
+          try {
+            controller.enqueue(
+              encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+            );
+          } catch {
+            closed = true;
+          }
         };
 
-        const pollAssets = async () => {
+        const queuedJobs = await query(
+          `SELECT id, status, prompt_json, provider, session_id, scene_id FROM asset_jobs WHERE session_id = $1 AND status = 'queued'`,
+          [sessionId]
+        );
+
+        for (const job of queuedJobs.rows) {
+          try {
+            await enqueueAssetJob({
+              assetJobId: job.id,
+              sessionId: job.session_id,
+              sceneId: job.scene_id,
+              promptJson: typeof job.prompt_json === "string"
+                ? JSON.parse(job.prompt_json) as ArtPrompt
+                : job.prompt_json as ArtPrompt,
+              provider: job.provider,
+            });
+          } catch (queueErr) {
+            console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
+          }
+        }
+
+        const pollStatus = async () => {
           const res = await query(
-            `SELECT id, status, url, type, provider, error, prompt_json FROM asset_jobs WHERE session_id = $1 AND status IN ('queued', 'generating')`,
+            `SELECT id, status, url, type, provider, error FROM asset_jobs WHERE session_id = $1 AND status IN ('completed', 'failed')`,
             [sessionId]
           );
 
           for (const job of res.rows) {
-            try {
-              await query(
-                `UPDATE asset_jobs SET status = 'generating' WHERE id = $1 AND status = 'queued'`,
-                [job.id]
-              );
+            if (notifiedIds.has(job.id)) continue;
+            notifiedIds.add(job.id);
 
-              sendEvent("asset.updated", { assetJobId: job.id, status: "generating" });
-
-              const promptJson: ArtPrompt = typeof job.prompt_json === "string"
-                ? JSON.parse(job.prompt_json)
-                : job.prompt_json;
-
-              const result = await generateImage({
-                prompt: promptJson.prompt,
-                negativePrompt: promptJson.negativePrompt,
-                aspectRatio: promptJson.aspectRatio,
-                seed: promptJson.seedHint,
-                styleLock: promptJson.styleLock,
-                quality: "draft",
-              });
-
-              await query(
-                `UPDATE asset_jobs SET status = 'completed', url = $1, completed_at = NOW() WHERE id = $2`,
-                [result.imageUrl || null, job.id]
-              );
-
+            if (job.status === "completed") {
               sendEvent("asset.completed", {
                 assetJobId: job.id,
-                url: result.imageUrl,
-                provider: result.provider,
+                url: job.url,
+                provider: job.provider,
               });
-            } catch (genError) {
-              await query(
-                `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-                [genError instanceof Error ? genError.message : "Generation failed", job.id]
-              );
-
+            } else if (job.status === "failed") {
               sendEvent("asset.failed", {
                 assetJobId: job.id,
                 fallback: "css_scene_card",
-                error: genError instanceof Error ? genError.message : "Unknown error",
+                error: job.error,
               });
             }
           }
         };
 
-        await pollAssets();
+        await pollStatus();
 
         let pollCount = 0;
         const interval = setInterval(async () => {
-          pollCount++;
-          if (pollCount > 30) {
+          if (closed) {
             clearInterval(interval);
-            controller.close();
+            return;
+          }
+
+          pollCount++;
+          if (pollCount > 60) {
+            clearInterval(interval);
+            try { controller.close(); } catch {}
             return;
           }
 
@@ -101,12 +121,18 @@ export async function GET(
 
           if (Number(remaining.rows[0]?.cnt) === 0) {
             clearInterval(interval);
-            controller.close();
+            try { controller.close(); } catch {}
             return;
           }
 
-          await pollAssets();
-        }, 3000);
+          await pollStatus();
+        }, 2000);
+
+        request.signal.addEventListener("abort", () => {
+          closed = true;
+          clearInterval(interval);
+          try { controller.close(); } catch {}
+        });
       },
     });
 
@@ -120,7 +146,7 @@ export async function GET(
   } catch (error) {
     console.error("GET /api/games/[sessionId]/events error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
+      { code: "INTERNAL", message: error instanceof Error ? error.message : "Internal server error", traceId: "events" },
       { status: 500 }
     );
   }

@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      target: runner
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/narrative_game
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
+      - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
+      - BFL_API_KEY=${BFL_API_KEY}
+      - IMAGE_PROVIDER=${IMAGE_PROVIDER:-mock}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - TOKEN_SALT=${TOKEN_SALT:-change-this-in-production}
+      - R2_ENDPOINT=${R2_ENDPOINT:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET=${R2_BUCKET:-narrative-assets}
+      - R2_REGION=${R2_REGION:-auto}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  worker:
+    build:
+      context: .
+      target: worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/narrative_game
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
+      - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
+      - BFL_API_KEY=${BFL_API_KEY}
+      - IMAGE_PROVIDER=${IMAGE_PROVIDER:-mock}
+      - ASSET_WORKER_CONCURRENCY=${ASSET_WORKER_CONCURRENCY:-3}
+      - TOKEN_SALT=${TOKEN_SALT:-change-this-in-production}
+      - R2_ENDPOINT=${R2_ENDPOINT:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET=${R2_BUCKET:-narrative-assets}
+      - R2_REGION=${R2_REGION:-auto}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: narrative_game
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
