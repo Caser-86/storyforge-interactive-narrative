@@ -25,7 +25,7 @@ export const ApiSceneSchema = z.object({
 export const AssetStatusSchema = z.enum(["none", "queued", "generating", "completed", "failed"]);
 
 const AssetsSchema = z.object({
-  imageJobId: z.string(),
+  imageJobId: z.string().nullable(),
   imageStatus: AssetStatusSchema,
 });
 

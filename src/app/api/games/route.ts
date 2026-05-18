@@ -9,6 +9,7 @@ import { initDb, withTransaction, query } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { getOrCreateUser } from "@/lib/user-service";
 import { hashToken } from "@/lib/crypto";
+import { shouldGenerateImages } from "@/lib/feature-flags";
 
 let dbInitialized = false;
 
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { prompt, language = "zh-CN", rating = "PG-13", options = {} } = body;
+    const requestOptions = typeof options === "object" && options !== null
+      ? options as Record<string, unknown>
+      : {};
+    const enableImages = shouldGenerateImages(requestOptions);
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
       return apiError(ErrorCodes.VALIDATION, "prompt is required", 400);
@@ -45,8 +50,10 @@ export async function POST(request: Request) {
       userId = user.id;
     } catch { /* user system optional */ }
     const storyState = createInitialState(sessionId, effectivePrompt);
-    storyState.styleBible.visualStyle = options.visualStyle || "";
+    const visualStyle = typeof requestOptions.visualStyle === "string" ? requestOptions.visualStyle : "";
+    storyState.styleBible.visualStyle = visualStyle;
     storyState.styleBible.musicStyle = "";
+    storyState.flags.imageGenerationEnabled = enableImages;
 
     const sceneId = `scene_${uuidv4().replace(/-/g, "").slice(0, 12)}`;
 
@@ -85,8 +92,8 @@ export async function POST(request: Request) {
     storyState.styleBible.visualStyle = narrative.scene.artPrompt.styleLock;
     storyState.styleBible.musicStyle = narrative.scene.bgmCue.mood;
 
-    const assetJobId = `asset_${uuidv4().replace(/-/g, "").slice(0, 12)}`;
-    const promptHash = computePromptHash(narrative.scene.artPrompt);
+    const assetJobId = enableImages ? `asset_${uuidv4().replace(/-/g, "").slice(0, 12)}` : null;
+    const promptHash = enableImages ? computePromptHash(narrative.scene.artPrompt) : null;
     const ownerToken = `ot_${uuidv4().replace(/-/g, "")}`;
     const ownerTokenHash = await hashToken(ownerToken);
 
@@ -97,7 +104,7 @@ export async function POST(request: Request) {
         [
           sessionId,
           effectivePrompt,
-          options.visualStyle || "general",
+          visualStyle || "general",
           language,
           rating,
           "active",
@@ -151,46 +158,50 @@ export async function POST(request: Request) {
         choice.id = safeId;
       }
 
-      await tx.query(
-        `INSERT INTO asset_jobs (id, session_id, scene_id, type, provider, status, prompt_hash, prompt_json)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
+      if (enableImages && assetJobId && promptHash) {
+        await tx.query(
+          `INSERT INTO asset_jobs (id, session_id, scene_id, type, provider, status, prompt_hash, prompt_json)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            assetJobId,
+            sessionId,
+            sceneId,
+            "image",
+            process.env.IMAGE_PROVIDER || "mock",
+            "queued",
+            promptHash,
+            JSON.stringify(narrative.scene.artPrompt),
+          ]
+        );
+      }
+    });
+
+    if (enableImages && assetJobId) {
+      try {
+        const enqueueResult = await enqueueAssetJob({
           assetJobId,
           sessionId,
           sceneId,
-          "image",
-          process.env.IMAGE_PROVIDER || "mock",
-          "queued",
-          promptHash,
-          JSON.stringify(narrative.scene.artPrompt),
-        ]
-      );
-    });
-
-    try {
-      const enqueueResult = await enqueueAssetJob({
-        assetJobId,
-        sessionId,
-        sceneId,
-        promptJson: narrative.scene.artPrompt,
-        provider: process.env.IMAGE_PROVIDER || "mock",
-      });
-      if (!enqueueResult.queued) {
+          promptJson: narrative.scene.artPrompt,
+          provider: process.env.IMAGE_PROVIDER || "mock",
+        });
+        if (!enqueueResult.queued) {
+          try {
+            await query(
+              `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
+              ["Worker unavailable: " + (enqueueResult.reason || "unknown"), assetJobId]
+            );
+          } catch { /* best effort */ }
+        }
+      } catch (queueErr) {
+        console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
         try {
           await query(
             `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-            ["Worker unavailable: " + (enqueueResult.reason || "unknown"), assetJobId]
+            ["Worker unavailable: " + (queueErr instanceof Error ? queueErr.message : String(queueErr)), assetJobId]
           );
         } catch { /* best effort */ }
       }
-    } catch (queueErr) {
-      console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
-      try {
-        await query(
-          `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-          ["Worker unavailable: " + (queueErr instanceof Error ? queueErr.message : String(queueErr)), assetJobId]
-        );
-      } catch { /* best effort */ }
     }
 
     return NextResponse.json({
@@ -214,7 +225,7 @@ export async function POST(request: Request) {
       safety: narrative.safety,
       assets: {
         imageJobId: assetJobId,
-        imageStatus: "queued",
+        imageStatus: enableImages ? "queued" : "none",
       },
       timing: {
         llmMs,
@@ -225,6 +236,7 @@ export async function POST(request: Request) {
         llmError,
         inputRewritten: !!safetyCheck.rewritten,
         safetyWarnings: safetyCheck.warnings,
+        imageGenerationEnabled: enableImages,
       },
     });
   } catch (error) {

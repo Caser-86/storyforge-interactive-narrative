@@ -27,7 +27,7 @@ export async function POST(
     }
 
     const result = await query(
-      `SELECT owner_token_hash FROM game_sessions WHERE id = $1`,
+      `SELECT owner_token FROM game_sessions WHERE id = $1`,
       [sessionId]
     );
 
@@ -35,7 +35,7 @@ export async function POST(
       return apiError(ErrorCodes.NOT_FOUND, "Session not found", 404);
     }
 
-    const valid = await verifyToken(ownerToken, result.rows[0].owner_token_hash);
+    const valid = await verifyToken(ownerToken, result.rows[0].owner_token);
     if (!valid) {
       return apiError(ErrorCodes.FORBIDDEN, "Invalid owner token", 403);
     }

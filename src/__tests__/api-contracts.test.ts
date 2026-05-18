@@ -68,6 +68,22 @@ describe("api-contracts", () => {
     expect(result.success).toBe(true);
   });
 
+  it("CreateGameResponseSchema accepts disabled image generation", () => {
+    const data = {
+      sessionId: "sess_1",
+      ownerToken: "ot_123",
+      scene: validScene,
+      statePatch: {},
+      safety: { rating: "PG-13", contentWarnings: [] },
+      assets: { imageJobId: null, imageStatus: "none" },
+      timing: { llmMs: 1000, totalMs: 1200 },
+      meta: { usedFallback: false, llmError: null, imageGenerationEnabled: false },
+    };
+
+    const result = CreateGameResponseSchema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
   it("CreateGameResponseSchema rejects missing sessionId", () => {
     const data = {
       scene: validScene,

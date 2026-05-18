@@ -1,6 +1,6 @@
 # StoryForge
 
-StoryForge 是一个基于 LLM 的全自动独立互动叙事游戏生成器。用户输入一句灵感，系统生成可玩的故事场景、NPC、三项选择、状态变化、场景图提示和音乐提示；玩家每次选择都会推进故事走向。
+StoryForge 是一个基于 LLM 的全自动独立互动叙事游戏生成器。用户输入一句灵感，系统生成可玩的故事场景、NPC、三项选择、状态变化和后续剧情分支；玩家每次选择都会推进故事走向。场景图是附属功能，默认关闭，可在开局时选择开启。
 
 当前项目定位：可运行的产品原型，正在收敛到内部 Alpha。详细完工计划见 [PROJECT_DELIVERY_ROADMAP.md](./PROJECT_DELIVERY_ROADMAP.md)。
 GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`
@@ -15,9 +15,10 @@ GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`
 - LLM 生成首幕叙事、NPC、选择、图像提示、BGM 提示。
 - 选择推进故事。
 - PostgreSQL 保存 session、scene、choice、asset job。
-- Redis/BullMQ 异步图片队列。
-- 图片生成 mock/BFL provider 架构。
-- 图片重绘和版本记录。
+- 对话剧情推进和后续选择分支生成。
+- 可选 Redis/BullMQ 异步图片队列。
+- 可选图片生成 mock/BFL provider 架构。
+- 可选图片重绘和版本记录。
 - owner token 权限校验。
 - 用户 fingerprint 和历史游戏列表。
 - 分享 replay。
@@ -28,7 +29,7 @@ GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`
 
 仍需交付前补齐：
 
-- SSE asset 事件鉴权。
+- 图片功能默认附属，后续仍需完善开启后的 SSE asset 事件鉴权。
 - 真实 PostgreSQL/Redis/Docker 冒烟。
 - 真实 R2/S3 对象存储实现。
 - Playwright E2E。
@@ -74,11 +75,12 @@ OPENAI_API_KEY=sk-your-key
 OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-chat
 IMAGE_PROVIDER=mock
+ENABLE_IMAGE_GENERATION=false
 TOKEN_SALT=replace-with-a-long-random-secret
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-开发时可以先用 `IMAGE_PROVIDER=mock`。如果 Redis 未启动，文字玩法仍可跑，但图片队列会降级或失败。
+默认主流程只跑文字剧情推进。开局勾选“场景图”或设置 `ENABLE_IMAGE_GENERATION=true` 后，系统才会创建图片任务；如果 Redis 未启动，文字玩法仍可跑，但图片队列会降级或失败。
 
 ### 3. 初始化数据库
 
@@ -164,6 +166,7 @@ npm run build
 | `OPENAI_BASE_URL` | 是 | OpenAI-compatible base URL | `https://api.deepseek.com` |
 | `OPENAI_MODEL` | 是 | LLM 模型 | `deepseek-chat` |
 | `IMAGE_PROVIDER` | 是 | 图片 provider：`mock` 或 `bfl` | `mock` |
+| `ENABLE_IMAGE_GENERATION` | 否 | 设为 `true` 时全局默认开启场景图；不设时由开局选项决定，默认关闭 | `false` |
 | `BFL_API_KEY` | BFL 必填 | Black Forest Labs API key | 空 |
 | `TOKEN_SALT` | 生产必填 | owner token hash 盐，生产不能用占位值 | 随机长字符串 |
 | `ADMIN_TOKEN` | 生产必填 | `/api/stats` 管理鉴权 | 随机长字符串 |
@@ -256,7 +259,7 @@ npm run build
   },
   "assets": {
     "imageJobId": "asset_xxx",
-    "imageStatus": "queued"
+      "imageStatus": "none"
   },
   "timing": {
     "llmMs": 1200,
@@ -269,7 +272,7 @@ npm run build
 }
 ```
 
-客户端必须保存 `ownerToken`。后续私有读写接口需要 `x-owner-token`。
+客户端必须保存 `ownerToken`。后续私有读写接口需要 `x-owner-token`。默认返回 `imageJobId: null`，表示本局未启用场景图。
 
 ### `GET /api/games/[sessionId]`
 
@@ -283,7 +286,7 @@ npm run build
 
 - `session`：会话元信息。
 - `scenes`：完整 scene 列表，包括正文、NPC、choices、artPrompt、bgmCue。
-- `assets`：当前 scene 的图片任务状态。
+- `assets`：当前 scene 的图片任务状态；未启用场景图时为 `imageJobId: null`、`imageStatus: "none"`。
 
 ### `POST /api/games/[sessionId]/choices`
 
@@ -314,8 +317,8 @@ npm run build
   },
   "safety": {},
   "assets": {
-    "imageJobId": "asset_xxx",
-    "imageStatus": "queued"
+    "imageJobId": null,
+    "imageStatus": "none"
   },
   "timing": {
     "llmMs": 1300
@@ -466,6 +469,7 @@ src/
 ## 交付文档
 
 - [PROJECT_DELIVERY_ROADMAP.md](./PROJECT_DELIVERY_ROADMAP.md)：可交付完工路线图。
+- [PROJECT_REMEDIATION_ACTION_PLAN.md](./PROJECT_REMEDIATION_ACTION_PLAN.md)：当前整改执行清单，主线聚焦对话剧情推进，图片默认关闭。
 - [PROJECT_ROADMAP.md](./PROJECT_ROADMAP.md)：较早阶段的项目路线图。
 - [PROJECT_COMPLETION_REVIEW.md](./PROJECT_COMPLETION_REVIEW.md)：历史审查记录。
 - [IMPROVEMENTS_CHECKLIST.md](./IMPROVEMENTS_CHECKLIST.md)：历史改进清单。

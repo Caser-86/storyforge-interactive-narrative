@@ -15,6 +15,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
       - BFL_API_KEY=${BFL_API_KEY}
       - IMAGE_PROVIDER=${IMAGE_PROVIDER:-mock}
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-false}
       - ADMIN_TOKEN=${ADMIN_TOKEN}
       - TOKEN_SALT=${TOKEN_SALT:-change-this-in-production}
       - R2_ENDPOINT=${R2_ENDPOINT:-}
@@ -47,6 +48,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
       - BFL_API_KEY=${BFL_API_KEY}
       - IMAGE_PROVIDER=${IMAGE_PROVIDER:-mock}
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-false}
       - ASSET_WORKER_CONCURRENCY=${ASSET_WORKER_CONCURRENCY:-3}
       - TOKEN_SALT=${TOKEN_SALT:-change-this-in-production}
       - R2_ENDPOINT=${R2_ENDPOINT:-}

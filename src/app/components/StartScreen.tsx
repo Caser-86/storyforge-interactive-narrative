@@ -39,6 +39,7 @@ export default function StartScreen() {
   const [language, setLanguage] = useState("zh-CN");
   const [rating, setRating] = useState("PG-13");
   const [visualStyle, setVisualStyle] = useState("");
+  const [enableImages, setEnableImages] = useState(false);
   const [templates, setTemplates] = useState<StyleTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -162,8 +163,24 @@ export default function StartScreen() {
             />
           </div>
 
+          <label className="flex items-center justify-between rounded-lg border border-[#333] bg-[#1a1a2e]/80 px-4 py-3">
+            <span>
+              <span className="block text-sm text-gray-200">场景图</span>
+              <span className="block text-xs text-gray-500">默认关闭，可作为附属功能开启</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={enableImages}
+              onChange={(e) => setEnableImages(e.target.checked)}
+              className="h-4 w-4 accent-[#e94560]"
+            />
+          </label>
+
           <button
-            onClick={() => createGame(prompt, language, rating, visualStyle ? { visualStyle } : {})}
+            onClick={() => createGame(prompt, language, rating, {
+              ...(visualStyle ? { visualStyle } : {}),
+              ...(enableImages ? { enableImages: true } : {}),
+            })}
             disabled={!prompt.trim()}
             className="w-full py-3 rounded-lg bg-gradient-to-r from-[#e94560] to-[#ff6b6b] text-white font-semibold text-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >

@@ -41,12 +41,12 @@ async function smokeTest() {
 
     console.log("4. Checking critical columns...");
     const columnChecks = [
-      { table: "game_sessions", column: "owner_token_hash" },
+      { table: "game_sessions", column: "owner_token" },
       { table: "game_sessions", column: "share_token" },
       { table: "choices", column: "model_choice_id" },
       { table: "choices", column: "preview" },
       { table: "asset_jobs", column: "prompt_hash" },
-      { table: "asset_versions", column: "storage_url" },
+      { table: "asset_versions", column: "url" },
     ];
 
     for (const check of columnChecks) {
@@ -77,27 +77,32 @@ async function smokeTest() {
     console.log();
 
     console.log("6. Testing cascade delete...");
-    const testUser = await query(
-      `INSERT INTO users (fingerprint) VALUES ('smoke_test_fp') RETURNING id`
+    const suffix = Date.now();
+    const userId = `smoke_user_${suffix}`;
+    const sessionId = `smoke_session_${suffix}`;
+    const sceneId = `smoke_scene_${suffix}`;
+    await query(
+      `INSERT INTO users (id, fingerprint) VALUES ($1, $2) RETURNING id`,
+      [userId, `smoke_test_fp_${suffix}`]
     );
-    const userId = testUser.rows[0].id;
 
     const _testSession = await query(
-      `INSERT INTO game_sessions (id, user_id, owner_token_hash, seed_prompt, genre, language, rating, status, current_scene_id, state_json)
-       VALUES ('smoke_test_session', $1, 'hash', 'test', 'fantasy', 'zh-CN', 'PG-13', 'active', '', '{}') RETURNING id`,
-      [userId]
+      `INSERT INTO game_sessions (id, user_id, owner_token, seed_prompt, genre, language, rating, status, current_scene_id, state_json)
+       VALUES ($1, $2, 'hash', 'test', 'fantasy', 'zh-CN', 'PG-13', 'active', $3, '{}') RETURNING id`,
+      [sessionId, userId, sceneId]
     );
 
     const _testScene = await query(
-      `INSERT INTO scenes (id, session_id, turn, title, location, time_of_day, mood, body, npcs_json, choices_json, art_prompt_json, bgm_cue_json, chapter_goal, memory_summary, state_json)
-       VALUES ('smoke_test_scene', 'smoke_test_session', 1, 'Test', 'Test', 'day', '[]', 'Test body', '[]', '[]', '{}', '{}', '', '', '{}') RETURNING id`,
-      []
+      `INSERT INTO scenes (id, session_id, turn, title, location, time_of_day, mood, body, npcs_json, choices_json, art_prompt_json, bgm_cue_json, chapter_goal, memory_summary)
+       VALUES ($1, $2, 1, 'Test', 'Test', 'day', '[]', 'Test body', '[]', '[]', '{}', '{}', '', '') RETURNING id`,
+      [sceneId, sessionId]
     );
 
     await query(`DELETE FROM users WHERE id = $1`, [userId]);
 
     const sessionCheck = await query(
-      `SELECT id FROM game_sessions WHERE id = 'smoke_test_session'`
+      `SELECT id FROM game_sessions WHERE id = $1`,
+      [sessionId]
     );
     if (sessionCheck.rows.length === 0) {
       console.log("   ✓ Cascade delete: session removed when user deleted");

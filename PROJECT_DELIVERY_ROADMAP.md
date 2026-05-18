@@ -4,6 +4,7 @@
 项目路径：`D:\Files\基于LLM的全自动独立游戏互动游戏叙事生成器\narrative-game`  
 项目名称：`StoryForge`  
 GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`  
+当前产品方向：先做稳定的对话剧情推进和分支选择生成；场景图为附属功能，默认关闭，后续可按局开启。
 目标口径：不是“本地能跑”，而是“可给真实用户灰度使用，可诊断、可恢复、可部署、可回滚”。
 
 ---

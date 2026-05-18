@@ -61,9 +61,9 @@ interface GameState {
   errorTraceId: string | null;
   timing: { llmMs?: number; totalMs?: number };
   selectedChoice: string | null;
-  lastAction: { type: "create"; prompt: string; language: string; rating: string; options: Record<string, string> } | { type: "choice"; sceneId: string; choiceId: string } | null;
+  lastAction: { type: "create"; prompt: string; language: string; rating: string; options: Record<string, string | boolean> } | { type: "choice"; sceneId: string; choiceId: string } | null;
 
-  createGame: (prompt: string, language?: string, rating?: string, options?: Record<string, string>) => Promise<void>;
+  createGame: (prompt: string, language?: string, rating?: string, options?: Record<string, string | boolean>) => Promise<void>;
   makeChoice: (sceneId: string, choiceId: string) => Promise<void>;
   pollAsset: () => Promise<void>;
   reset: () => void;
@@ -153,7 +153,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         ownerToken: string;
         scene: SceneData;
         safety: Safety;
-        assets: { imageJobId: string; imageStatus: string };
+        assets: { imageJobId: string | null; imageStatus: string };
         timing: { llmMs?: number; totalMs?: number };
       }>("/api/games", {
         method: "POST",
@@ -202,7 +202,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         scene: SceneData;
         stateDiff: Record<string, number>;
         safety: Safety;
-        assets: { imageJobId: string; imageStatus: string };
+        assets: { imageJobId: string | null; imageStatus: string };
         timing: { llmMs?: number; totalMs?: number };
       }>(`/api/games/${sessionId}/choices`, {
         method: "POST",

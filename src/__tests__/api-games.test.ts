@@ -66,6 +66,7 @@ vi.mock("@/lib/asset-queue", () => ({
 }));
 
 import { query } from "@/lib/db";
+import { enqueueAssetJob } from "@/lib/asset-queue";
 import { POST } from "@/app/api/games/route";
 
 function mockRequest(body: Record<string, unknown>): Request {
@@ -125,9 +126,26 @@ describe("POST /api/games", () => {
     expect(body.sessionId).toMatch(/^sess_/);
     expect(body.scene).toBeDefined();
     expect(body.assets).toBeDefined();
-    expect(body.assets.imageJobId).toMatch(/^asset_/);
+    expect(body.assets.imageJobId).toBeNull();
+    expect(body.assets.imageStatus).toBe("none");
     expect(body.timing).toBeDefined();
     expect(body.meta).toBeDefined();
+    expect(enqueueAssetJob).not.toHaveBeenCalled();
+  });
+
+  it("queues image job only when image generation is enabled", async () => {
+    (enqueueAssetJob as ReturnType<typeof vi.fn>).mockResolvedValue({ queued: true });
+    const req = mockRequest({
+      prompt: "一个勇敢的冒险者走进了神秘森林",
+      options: { enableImages: true },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.assets.imageJobId).toMatch(/^asset_/);
+    expect(body.assets.imageStatus).toBe("queued");
+    expect(body.meta.imageGenerationEnabled).toBe(true);
+    expect(enqueueAssetJob).toHaveBeenCalledOnce();
   });
 
   it("includes meta.usedFallback when LLM fails", async () => {

@@ -139,8 +139,9 @@ export async function POST(
 
     const newState = applyChoiceEffects(storyState, selectedChoice, narrative.statePatch);
 
-    const assetJobId = `asset_${uuidv4().replace(/-/g, "").slice(0, 12)}`;
-    const promptHash = computePromptHash(narrative.scene.artPrompt);
+    const enableImages = storyState.flags?.imageGenerationEnabled === true;
+    const assetJobId = enableImages ? `asset_${uuidv4().replace(/-/g, "").slice(0, 12)}` : null;
+    const promptHash = enableImages ? computePromptHash(narrative.scene.artPrompt) : null;
 
     await withTransaction(async (tx) => {
       const markResult = await tx.query(
@@ -197,46 +198,50 @@ export async function POST(
         );
       }
 
-      await tx.query(
-        `INSERT INTO asset_jobs (id, session_id, scene_id, type, provider, status, prompt_hash, prompt_json)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          assetJobId,
-          sessionId,
-          newSceneId,
-          "image",
-          process.env.IMAGE_PROVIDER || "mock",
-          "queued",
-          promptHash,
-          JSON.stringify(narrative.scene.artPrompt),
-        ]
-      );
+      if (enableImages && assetJobId && promptHash) {
+        await tx.query(
+          `INSERT INTO asset_jobs (id, session_id, scene_id, type, provider, status, prompt_hash, prompt_json)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            assetJobId,
+            sessionId,
+            newSceneId,
+            "image",
+            process.env.IMAGE_PROVIDER || "mock",
+            "queued",
+            promptHash,
+            JSON.stringify(narrative.scene.artPrompt),
+          ]
+        );
+      }
     });
 
-    try {
-      const enqueueResult = await enqueueAssetJob({
-        assetJobId,
-        sessionId,
-        sceneId: newSceneId,
-        promptJson: narrative.scene.artPrompt,
-        provider: process.env.IMAGE_PROVIDER || "mock",
-      });
-      if (!enqueueResult.queued) {
+    if (enableImages && assetJobId) {
+      try {
+        const enqueueResult = await enqueueAssetJob({
+          assetJobId,
+          sessionId,
+          sceneId: newSceneId,
+          promptJson: narrative.scene.artPrompt,
+          provider: process.env.IMAGE_PROVIDER || "mock",
+        });
+        if (!enqueueResult.queued) {
+          try {
+            await query(
+              `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
+              ["Worker unavailable: " + (enqueueResult.reason || "unknown"), assetJobId]
+            );
+          } catch { /* best effort */ }
+        }
+      } catch (queueErr) {
+        console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
         try {
           await query(
             `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-            ["Worker unavailable: " + (enqueueResult.reason || "unknown"), assetJobId]
+            ["Worker unavailable: " + (queueErr instanceof Error ? queueErr.message : String(queueErr)), assetJobId]
           );
         } catch { /* best effort */ }
       }
-    } catch (queueErr) {
-      console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
-      try {
-        await query(
-          `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-          ["Worker unavailable: " + (queueErr instanceof Error ? queueErr.message : String(queueErr)), assetJobId]
-        );
-      } catch { /* best effort */ }
     }
 
     const stateDiff: Record<string, number> = {};
@@ -265,7 +270,7 @@ export async function POST(
       safety: narrative.safety,
       assets: {
         imageJobId: assetJobId,
-        imageStatus: "queued",
+        imageStatus: enableImages ? "queued" : "none",
       },
       timing: {
         llmMs,
@@ -273,6 +278,7 @@ export async function POST(
       meta: {
         usedFallback,
         llmError,
+        imageGenerationEnabled: enableImages,
       },
     });
   } catch (error) {

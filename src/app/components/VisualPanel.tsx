@@ -42,7 +42,7 @@ export default function VisualPanel() {
     }
   }, [pollAsset, imageJobId, ownerToken]);
 
-  if (!currentScene) return null;
+  if (!currentScene || !imageJobId) return null;
 
   return (
     <div className="space-y-6">

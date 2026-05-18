@@ -12,9 +12,11 @@ import StatusPanel from "./components/StatusPanel";
 type MobileTab = "story" | "visual" | "status";
 
 export default function Home() {
-  const { status, currentScene, sessionId, pollAsset, restoreSession } = useGameStore();
+  const { status, currentScene, sessionId, imageJobId, pollAsset, restoreSession } = useGameStore();
   const [mobileTab, setMobileTab] = useState<MobileTab>("story");
   const prevSceneIdRef = useRef<string | null>(null);
+  const mobileTabs: MobileTab[] = imageJobId ? ["story", "visual", "status"] : ["story", "status"];
+  const activeMobileTab = !imageJobId && mobileTab === "visual" ? "story" : mobileTab;
 
   useEffect(() => {
     restoreSession();
@@ -31,6 +33,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!sessionId) return;
+    if (!imageJobId) return;
 
     const connectSSE = async () => {
       try {
@@ -103,7 +106,7 @@ export default function Home() {
     return () => {
       cleanup?.();
     };
-  }, [sessionId, pollAsset]);
+  }, [sessionId, imageJobId, pollAsset]);
 
   if (status === "idle") {
     return <StartScreen />;
@@ -121,22 +124,24 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#16213e]">
         <div className="hidden lg:flex min-h-screen">
-          <div className="flex-1 p-8 overflow-y-auto">
+          <div className={`${imageJobId ? "flex-1" : "flex-1 max-w-4xl mx-auto"} p-8 overflow-y-auto`}>
             <StoryPanel />
           </div>
-          <div className="w-[420px] p-8 border-l border-[#333] overflow-y-auto">
-            <VisualPanel />
-          </div>
+          {imageJobId ? (
+            <div className="w-[420px] p-8 border-l border-[#333] overflow-y-auto">
+              <VisualPanel />
+            </div>
+          ) : null}
         </div>
 
         <div className="lg:hidden flex flex-col min-h-screen" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
           <div className="flex border-b border-[#333] bg-[#0a0a1a]/80 sticky top-0 z-10">
-            {(["story", "visual", "status"] as MobileTab[]).map((tab) => (
+            {mobileTabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setMobileTab(tab)}
                 className={`flex-1 py-3 text-sm font-medium transition-colors ${
-                  mobileTab === tab
+                  activeMobileTab === tab
                     ? "text-[#e94560] border-b-2 border-[#e94560]"
                     : "text-gray-400"
                 }`}
@@ -147,9 +152,9 @@ export default function Home() {
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto">
-            {mobileTab === "story" && <StoryPanel />}
-            {mobileTab === "visual" && <VisualPanel />}
-            {mobileTab === "status" && <StatusPanel />}
+            {activeMobileTab === "story" && <StoryPanel />}
+            {activeMobileTab === "visual" && <VisualPanel />}
+            {activeMobileTab === "status" && <StatusPanel />}
           </div>
         </div>
       </div>
