@@ -63,4 +63,31 @@ describe("Database schema contract", () => {
     const versions = versionMatches.map((m) => parseInt(m[1]));
     expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
+
+  it("db-smoke-test INSERT columns match db.ts migration columns", () => {
+    const smokePath = join(process.cwd(), "src/scripts/db-smoke-test.ts");
+    const smokeSource = readFileSync(smokePath, "utf-8");
+
+    const sessionInsertMatch = smokeSource.match(/INSERT INTO game_sessions\s*\(([^)]+)\)/);
+    expect(sessionInsertMatch).toBeTruthy();
+    const sessionCols = sessionInsertMatch![1].split(",").map((c) => c.trim());
+    for (const col of sessionCols) {
+      expect(dbSource).toContain(col);
+    }
+
+    const sceneInsertMatch = smokeSource.match(/INSERT INTO scenes\s*\(([^)]+)\)/);
+    expect(sceneInsertMatch).toBeTruthy();
+    const sceneCols = sceneInsertMatch![1].split(",").map((c) => c.trim());
+    for (const col of sceneCols) {
+      expect(dbSource).toContain(col);
+    }
+  });
+
+  it("no stale field names in db-smoke-test (owner_token_hash, storage_url)", () => {
+    const smokePath = join(process.cwd(), "src/scripts/db-smoke-test.ts");
+    const smokeSource = readFileSync(smokePath, "utf-8");
+
+    expect(smokeSource).not.toContain("owner_token_hash");
+    expect(smokeSource).not.toContain("storage_url");
+  });
 });
