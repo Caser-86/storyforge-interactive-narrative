@@ -8,10 +8,10 @@ const riskColors: Record<string, string> = {
   high: "border-red-500/50 text-red-400 hover:bg-red-500/10",
 };
 
-const riskLabels: Record<string, string> = {
-  low: "低风险",
-  medium: "中风险",
-  high: "高风险",
+const riskPrefixes: Record<string, string> = {
+  low: "🔍 调查",
+  medium: "⚔️ 行动",
+  high: "💬 交涉",
 };
 
 export default function ChoiceList() {
@@ -48,7 +48,7 @@ export default function ChoiceList() {
                 {isSelected && status === "generating" ? "⏳ " : ""}{choice.label}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-black/30">
-                {riskLabels[choice.risk]}
+                {riskPrefixes[choice.risk] || choice.risk}
               </span>
             </div>
             <p className="text-sm opacity-70">{choice.preview}</p>

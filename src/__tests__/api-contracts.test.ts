@@ -311,4 +311,50 @@ describe("api-contracts", () => {
     const result = GetSessionResponseSchema.safeParse(data);
     expect(result.success).toBe(false);
   });
+
+  it("GetSessionResponseSchema accepts disabled image generation", () => {
+    const data = {
+      session: {
+        id: "sess_1",
+        seedPrompt: "测试提示词",
+        genre: "mystery",
+        language: "zh-CN",
+        rating: "PG-13",
+        status: "active",
+        currentSceneId: "scene_1",
+        state: {},
+        createdAt: "2026-05-18T00:00:00Z",
+        updatedAt: "2026-05-18T00:00:00Z",
+      },
+      scenes: [{
+        ...validScene,
+        turn: 1,
+        createdAt: "2026-05-18T00:00:00Z",
+        choices: validScene.choices.map((c) => ({ ...c, chosen: false })),
+      }],
+      assets: {
+        imageJobId: null,
+        imageStatus: "none",
+        imageUrl: null,
+      },
+    };
+
+    const result = GetSessionResponseSchema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it("ChoiceResponseSchema accepts disabled image generation", () => {
+    const data = {
+      sessionId: "sess_1",
+      scene: validScene,
+      previousChoiceId: "choice_scene1_choice_a",
+      stateDiff: { courage: 1 },
+      safety: { rating: "PG-13", contentWarnings: [] },
+      assets: { imageJobId: null, imageStatus: "none" },
+      timing: {},
+    };
+
+    const result = ChoiceResponseSchema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
 });

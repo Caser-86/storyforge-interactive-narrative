@@ -220,6 +220,40 @@ export function checkChoiceProgression(narrative: NarrativeOutput): QualityCheck
   };
 }
 
+export function checkStateEffectsDifference(choices: Choice[]): QualityCheckResult {
+  const issues: string[] = [];
+
+  if (choices.length < 2) {
+    return { passed: true, issues: [], shouldRetry: false };
+  }
+
+  for (let i = 0; i < choices.length; i++) {
+    const effects = choices[i].stateEffects;
+    const keys = Object.keys(effects);
+    if (keys.length === 0) {
+      issues.push(`选项 "${choices[i].label}" 的 stateEffects 为空，必须至少改变 1 个状态变量`);
+    }
+  }
+
+  for (let i = 0; i < choices.length; i++) {
+    for (let j = i + 1; j < choices.length; j++) {
+      const keysA = Object.keys(choices[i].stateEffects);
+      const keysB = Object.keys(choices[j].stateEffects);
+      const uniqueToA = keysA.filter((k) => !keysB.includes(k));
+      const uniqueToB = keysB.filter((k) => !keysA.includes(k));
+      if (uniqueToA.length === 0 && uniqueToB.length === 0 && keysA.length > 0) {
+        issues.push(`选项 "${choices[i].label}" 和 "${choices[j].label}" 的 stateEffects 完全相同`);
+      }
+    }
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues,
+    shouldRetry: issues.some((i) => i.includes("完全相同")),
+  };
+}
+
 export function runAllQualityChecks(
   narrative: NarrativeOutput,
   knownThreads: string[] = [],
@@ -231,6 +265,7 @@ export function runAllQualityChecks(
   const checks = [
     checkChoiceSimilarity(narrative.scene.choices),
     checkRiskCoverage(narrative.scene.choices),
+    checkStateEffectsDifference(narrative.scene.choices),
     checkThreadReference(narrative, knownThreads),
     checkNpcCount(narrative),
     checkChapterProgression(turn, narrative),
