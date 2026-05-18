@@ -157,3 +157,73 @@ describe("SSE stream token", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("Session restore: owner token required for private sessions", () => {
+  beforeEach(() => {
+    mockQuery.mockReset();
+  });
+
+  it("GET /api/games/[sessionId] returns 403 without owner token for private session", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ owner_token: "hashed_token" }],
+    });
+
+    const { GET } = await import("@/app/api/games/[sessionId]/route");
+    const req = new Request("http://localhost/api/games/s1", { headers: {} });
+    const res = await GET(req, { params: Promise.resolve({ sessionId: "s1" }) });
+    expect(res.status).toBe(403);
+  });
+
+  it("GET /api/games/[sessionId] returns 403 with wrong owner token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ owner_token: "hashed_token" }],
+    });
+
+    const { GET } = await import("@/app/api/games/[sessionId]/route");
+    const req = new Request("http://localhost/api/games/s1", {
+      headers: { "x-owner-token": "wrong_token" },
+    });
+    const res = await GET(req, { params: Promise.resolve({ sessionId: "s1" }) });
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /api/games/[sessionId]/share returns 403 for R-rated content", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "s1", status: "active", rating: "R", owner_token: null }],
+    });
+
+    const { POST } = await import("@/app/api/games/[sessionId]/share/route");
+    const req = new Request("http://localhost/api/games/s1/share", { method: "POST" });
+    const res = await POST(req, { params: Promise.resolve({ sessionId: "s1" }) });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.message).toContain("R-rated");
+  });
+
+  it("DELETE /api/games/[sessionId]/share revokes share token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "s1", owner_token: null, share_token: "existing_hash" }],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "s1" }],
+    });
+
+    const { DELETE } = await import("@/app/api/games/[sessionId]/share/route");
+    const req = new Request("http://localhost/api/games/s1/share", { method: "DELETE" });
+    const res = await DELETE(req, { params: Promise.resolve({ sessionId: "s1" }) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.revoked).toBe(true);
+  });
+
+  it("DELETE /api/games/[sessionId]/share returns 404 when no active share", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "s1", owner_token: null, share_token: null }],
+    });
+
+    const { DELETE } = await import("@/app/api/games/[sessionId]/share/route");
+    const req = new Request("http://localhost/api/games/s1/share", { method: "DELETE" });
+    const res = await DELETE(req, { params: Promise.resolve({ sessionId: "s1" }) });
+    expect(res.status).toBe(404);
+  });
+});
