@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
+import { hashToken } from "@/lib/crypto";
 
 let dbInitialized = false;
 
@@ -17,10 +18,11 @@ export async function GET(
   try {
     await ensureDb();
     const { token } = await params;
+    const tokenHash = await hashToken(token);
 
     const sessionRes = await query(
       `SELECT id, seed_prompt, genre, language, rating, status, state_json, created_at FROM game_sessions WHERE share_token = $1`,
-      [token]
+      [tokenHash]
     );
 
     if (sessionRes.rows.length === 0) {

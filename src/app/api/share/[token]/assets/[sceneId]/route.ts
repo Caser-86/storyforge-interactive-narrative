@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
+import { hashToken } from "@/lib/crypto";
 
 let dbInitialized = false;
 
@@ -18,10 +19,11 @@ export async function GET(
   try {
     await ensureDb();
     const { token, sceneId } = await params;
+    const tokenHash = await hashToken(token);
 
     const sessionRes = await query(
       `SELECT id, share_token, rating FROM game_sessions WHERE share_token = $1 AND status != 'deleted'`,
-      [token]
+      [tokenHash]
     );
 
     if (sessionRes.rows.length === 0) {
