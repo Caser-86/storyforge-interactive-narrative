@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { checkOutputSafety, getRatingPromptSuffix, getCopyrightAuditLog } from "@/lib/safety-service";
+import { hashToken, verifyToken, verifyAdminToken } from "@/lib/crypto";
 
 describe("Share/Export contract", () => {
   it("apiError returns traceId for share/export errors", () => {
@@ -84,5 +85,36 @@ describe("Safety service extended", () => {
     const log = getCopyrightAuditLog();
     expect(log.length).toBeGreaterThan(0);
     expect(log[log.length - 1].source).toBe("output_check");
+  });
+});
+
+describe("Crypto timing-safe verification", () => {
+  it("verifyToken accepts correct token", async () => {
+    const token = "ot_test_token_12345678";
+    const hash = await hashToken(token);
+    const valid = await verifyToken(token, hash);
+    expect(valid).toBe(true);
+  });
+
+  it("verifyToken rejects wrong token", async () => {
+    const token = "ot_test_token_12345678";
+    const hash = await hashToken(token);
+    const valid = await verifyToken("ot_wrong_token_87654321", hash);
+    expect(valid).toBe(false);
+  });
+
+  it("verifyToken rejects mismatched length", async () => {
+    const token = "ot_test_token_12345678";
+    const hash = await hashToken(token);
+    const valid = await verifyToken("short", hash);
+    expect(valid).toBe(false);
+  });
+
+  it("verifyAdminToken rejects null header", () => {
+    expect(verifyAdminToken(null)).toBe(false);
+  });
+
+  it("verifyAdminToken rejects wrong bearer token", () => {
+    expect(verifyAdminToken("Bearer wrong-token")).toBe(false);
   });
 });

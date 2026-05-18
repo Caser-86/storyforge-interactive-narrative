@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDailyCost, isWithinBudget } from "@/lib/observability-persist";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
+import { verifyAdminToken } from "@/lib/crypto";
 
 export async function GET(request: Request) {
   if (process.env.NODE_ENV === "production") {
-    const authHeader = request.headers.get("authorization");
-    const adminToken = process.env.ADMIN_TOKEN;
-
-    if (!adminToken || authHeader !== `Bearer ${adminToken}`) {
+    if (!verifyAdminToken(request.headers.get("authorization"))) {
       return apiError(ErrorCodes.UNAUTHORIZED, "Unauthorized", 401);
     }
   }

@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 
 function getTokenSalt(): string {
   const salt = process.env.TOKEN_SALT;
@@ -20,7 +20,16 @@ export async function hashToken(token: string): Promise<string> {
 
 export async function verifyToken(token: string, storedHash: string): Promise<boolean> {
   const hash = await hashToken(token);
-  return hash === storedHash;
+  if (hash.length !== storedHash.length) return false;
+  return timingSafeEqual(Buffer.from(hash), Buffer.from(storedHash));
+}
+
+export function verifyAdminToken(authHeader: string | null): boolean {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (!adminToken || !authHeader) return false;
+  const expected = `Bearer ${adminToken}`;
+  if (expected.length !== authHeader.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(authHeader));
 }
 
 export function signStreamToken(sessionId: string, _ownerToken: string): string {
@@ -49,7 +58,7 @@ export function verifyStreamToken(token: string, sessionId: string): { valid: bo
     const payload = `${tokenSessionId}:${exp}:${nonce}`;
     const expectedSig = createHmac("sha256", salt).update(payload).digest("hex").slice(0, 16);
 
-    if (sig !== expectedSig) return { valid: false, reason: "Invalid signature" };
+    if (sig.length !== expectedSig.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) return { valid: false, reason: "Invalid signature" };
 
     return { valid: true };
   } catch {

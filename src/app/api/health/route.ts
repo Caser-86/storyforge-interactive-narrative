@@ -68,23 +68,48 @@ export async function GET() {
     details: dailyCost,
   };
 
-  if (process.env.NODE_ENV === "production" && !process.env.ADMIN_TOKEN) {
-    checks.adminToken = {
-      status: "warning",
-      error: "ADMIN_TOKEN not set - /api/stats is unprotected in production",
-    };
-  }
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.ADMIN_TOKEN) {
+      checks.adminToken = {
+        status: "error",
+        error: "ADMIN_TOKEN not set - /api/stats is unprotected in production",
+      };
+    }
 
-  if (
-    process.env.NODE_ENV === "production" &&
-    (!process.env.TOKEN_SALT ||
+    if (
+      !process.env.TOKEN_SALT ||
       process.env.TOKEN_SALT === "change-this-in-production" ||
-      process.env.TOKEN_SALT === "change-this-to-a-random-string-in-production")
-  ) {
-    checks.tokenSalt = {
-      status: "error",
-      error: "TOKEN_SALT must be configured to a random production secret",
-    };
+      process.env.TOKEN_SALT === "change-this-to-a-random-string-in-production"
+    ) {
+      checks.tokenSalt = {
+        status: "error",
+        error: "TOKEN_SALT must be configured to a random production secret",
+      };
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      checks.openaiApiKey = {
+        status: "error",
+        error: "OPENAI_API_KEY not set - narrative generation will fail",
+      };
+    }
+
+    const imageEnabled = process.env.ENABLE_IMAGE_GENERATION === "true";
+    if (imageEnabled) {
+      if (!process.env.REDIS_URL) {
+        checks.redisRequired = {
+          status: "error",
+          error: "REDIS_URL required when ENABLE_IMAGE_GENERATION=true",
+        };
+      }
+      const imgProvider = process.env.IMAGE_PROVIDER;
+      if (!imgProvider || imgProvider === "mock") {
+        checks.imageProviderConfig = {
+          status: "error",
+          error: "IMAGE_PROVIDER must be set to a real provider (not mock) when ENABLE_IMAGE_GENERATION=true",
+        };
+      }
+    }
   }
 
   const overallStatus = computeOverallStatus(checks);

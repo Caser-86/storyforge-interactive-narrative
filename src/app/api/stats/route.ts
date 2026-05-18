@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getLlmStats, getAssetStats } from "@/lib/observability";
 import { query, initDb } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
+import { verifyAdminToken } from "@/lib/crypto";
 
 let dbInitialized = false;
 
@@ -14,10 +15,7 @@ async function ensureDb() {
 
 export async function GET(request: Request) {
   if (process.env.NODE_ENV === "production") {
-    const authHeader = request.headers.get("authorization");
-    const adminToken = process.env.ADMIN_TOKEN;
-
-    if (!adminToken || authHeader !== `Bearer ${adminToken}`) {
+    if (!verifyAdminToken(request.headers.get("authorization"))) {
       return apiError(ErrorCodes.UNAUTHORIZED, "Unauthorized", 401);
     }
   }
