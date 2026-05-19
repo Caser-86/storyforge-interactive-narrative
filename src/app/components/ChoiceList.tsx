@@ -43,15 +43,15 @@ export default function ChoiceList() {
                 : riskColors[choice.risk]
             } ${isDisabled && !isSelected ? "opacity-40 cursor-not-allowed" : isDisabled && isSelected ? "cursor-wait" : "cursor-pointer"}`}
           >
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold">
+            <div className="flex items-center justify-between mb-1 gap-2">
+              <span className="font-semibold break-words">
                 {isSelected && status === "generating" ? "⏳ " : ""}{choice.label}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-black/30">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-black/30 whitespace-nowrap shrink-0">
                 {riskPrefixes[choice.risk] || choice.risk}
               </span>
             </div>
-            <p className="text-sm opacity-70">{choice.preview}</p>
+            <p className="text-sm opacity-70 break-words">{choice.preview}</p>
           </button>
         );
       })}

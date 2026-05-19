@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
 import { hashToken } from "@/lib/crypto";
+import { apiError, ErrorCodes } from "@/lib/api-errors";
 
 let dbInitialized = false;
 
@@ -21,15 +22,19 @@ export async function GET(
     const tokenHash = await hashToken(token);
 
     const sessionRes = await query(
-      `SELECT id, seed_prompt, genre, language, rating, status, state_json, created_at FROM game_sessions WHERE share_token = $1`,
+      `SELECT id, seed_prompt, genre, language, rating, status, state_json, created_at, share_expires_at FROM game_sessions WHERE share_token = $1`,
       [tokenHash]
     );
 
     if (sessionRes.rows.length === 0) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return apiError(ErrorCodes.NOT_FOUND, "Share not found or expired", 404);
     }
 
     const session = sessionRes.rows[0];
+
+    if (session.share_expires_at && new Date(session.share_expires_at) < new Date()) {
+      return apiError(ErrorCodes.NOT_FOUND, "Share link has expired", 410);
+    }
 
     const scenesRes = await query(
       `SELECT id, turn, title, location, time_of_day, mood, body, npcs_json, chapter_goal FROM scenes WHERE session_id = $1 ORDER BY turn`,
@@ -37,6 +42,7 @@ export async function GET(
     );
 
     const scenes = scenesRes.rows.map((s) => ({
+      id: s.id,
       turn: s.turn,
       title: s.title,
       location: s.location,
@@ -55,7 +61,10 @@ export async function GET(
       },
       scenes,
     });
-  } catch {
-    return NextResponse.redirect(new URL("/", request.url));
+  } catch (error) {
+    return apiError(
+      ErrorCodes.INTERNAL,
+      error instanceof Error ? error.message : "Internal server error"
+    );
   }
 }

@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import Image from "next/image";
 import { useGameStore } from "@/lib/store";
+import { apiFetch } from "@/lib/client-api";
 import BgmPlayer from "./BgmPlayer";
 
 export default function VisualPanel() {
@@ -12,10 +13,11 @@ export default function VisualPanel() {
     if (!imageJobId) return;
     useGameStore.setState({ imageStatus: "queued", imageUrl: null });
     try {
-      const headers: Record<string, string> = {};
-      if (ownerToken) headers["x-owner-token"] = ownerToken;
-      const res = await fetch(`/api/assets/${imageJobId}`, { method: "POST", headers });
-      if (res.ok) {
+      const result = await apiFetch(`/api/assets/${imageJobId}`, {
+        method: "POST",
+        ownerToken,
+      });
+      if (result.ok) {
         pollAsset();
       }
     } catch {
@@ -27,14 +29,12 @@ export default function VisualPanel() {
     if (!imageJobId) return;
     useGameStore.setState({ imageStatus: "queued", imageUrl: null });
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (ownerToken) headers["x-owner-token"] = ownerToken;
-      const res = await fetch(`/api/assets/${imageJobId}`, {
+      const result = await apiFetch(`/api/assets/${imageJobId}`, {
         method: "POST",
-        headers,
-        body: JSON.stringify({ quality: "high" }),
+        ownerToken,
+        body: { quality: "high" },
       });
-      if (res.ok) {
+      if (result.ok) {
         pollAsset();
       }
     } catch {

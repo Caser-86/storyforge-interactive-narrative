@@ -250,6 +250,12 @@ const MIGRATIONS: { version: number; up: string }[] = [
       ALTER TABLE choices ADD COLUMN IF NOT EXISTS model_choice_id TEXT;
     `,
   },
+  {
+    version: 9,
+    up: `
+      ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
+    `,
+  },
 ];
 
 export async function initDb() {

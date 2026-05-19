@@ -58,10 +58,10 @@ describe("Database schema contract", () => {
     expect(dbSource).toContain("SLOW_QUERY_THRESHOLD");
   });
 
-  it("migrations are sequential from 1 to 8", () => {
+  it("migrations are sequential from 1 to 9", () => {
     const versionMatches = [...dbSource.matchAll(/version:\s*(\d+)/g)];
     const versions = versionMatches.map((m) => parseInt(m[1]));
-    expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it("db-smoke-test INSERT columns match db.ts migration columns", () => {

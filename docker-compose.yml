@@ -5,19 +5,66 @@ services:
     build:
       context: .
       target: runner
+    dns:
+      - 8.8.8.8
+      - 114.114.114.114
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/narrative_game
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/narrative_game
       - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
       - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
-      - BFL_API_KEY=${BFL_API_KEY}
+      - BFL_API_KEY=${BFL_API_KEY:-}
       - IMAGE_PROVIDER=${IMAGE_PROVIDER:-mock}
       - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-false}
-      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
       - TOKEN_SALT=${TOKEN_SALT:-change-this-in-production}
+      - DISABLE_REDIS=${DISABLE_REDIS:-true}
+      - R2_ENDPOINT=${R2_ENDPOINT:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET=${R2_BUCKET:-narrative-assets}
+      - R2_REGION=${R2_REGION:-auto}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  app-full:
+    build:
+      context: .
+      target: runner
+    dns:
+      - 8.8.8.8
+      - 114.114.114.114
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/narrative_game
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
+      - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
+      - BFL_API_KEY=${BFL_API_KEY:-}
+      - IMAGE_PROVIDER=${IMAGE_PROVIDER:-bfl}
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-true}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      - TOKEN_SALT=${TOKEN_SALT:-change-this-in-production}
+      - DISABLE_REDIS=false
       - R2_ENDPOINT=${R2_ENDPOINT:-}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
@@ -34,21 +81,26 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 30s
+    profiles:
+      - full
 
   worker:
     build:
       context: .
       target: worker
+    dns:
+      - 8.8.8.8
+      - 114.114.114.114
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/narrative_game
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/narrative_game
       - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
       - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
-      - BFL_API_KEY=${BFL_API_KEY}
-      - IMAGE_PROVIDER=${IMAGE_PROVIDER:-mock}
-      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-false}
+      - BFL_API_KEY=${BFL_API_KEY:-}
+      - IMAGE_PROVIDER=${IMAGE_PROVIDER:-bfl}
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-true}
       - ASSET_WORKER_CONCURRENCY=${ASSET_WORKER_CONCURRENCY:-3}
       - TOKEN_SALT=${TOKEN_SALT:-change-this-in-production}
       - R2_ENDPOINT=${R2_ENDPOINT:-}
@@ -62,15 +114,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    profiles:
+      - full
 
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: narrative_game
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -82,9 +136,11 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
+    profiles:
+      - full
 
 volumes:
   pgdata:

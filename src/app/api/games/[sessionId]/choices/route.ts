@@ -7,6 +7,7 @@ import { enqueueAssetJob } from "@/lib/asset-queue";
 import { query, initDb, withTransaction } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { verifyToken } from "@/lib/crypto";
+import { ChoiceResponseSchema, validateResponse } from "@/lib/api-contracts";
 import type { StoryState, Choice } from "@/lib/schemas";
 
 let dbInitialized = false;
@@ -249,7 +250,7 @@ export async function POST(
       stateDiff[key] = value as number;
     }
 
-    return NextResponse.json({
+    return NextResponse.json(validateResponse(ChoiceResponseSchema, {
       sessionId,
       previousChoiceId: choiceId,
       scene: {
@@ -280,7 +281,7 @@ export async function POST(
         llmError,
         imageGenerationEnabled: enableImages,
       },
-    });
+    }, `POST /api/games/${sessionId}/choices`));
   } catch (error) {
     if (error instanceof Error && error.message === "DUPLICATE_CHOICE") {
       return apiError(ErrorCodes.DUPLICATE, "This choice has already been selected", 409);

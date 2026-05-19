@@ -113,6 +113,9 @@ interface ParsedSelect {
 function parseSqlSelect(sql: string, params: unknown[]): ParsedSelect {
   const fromMatch = sql.match(/FROM\s+(\w+)(?:\s+(\w+))?/i);
   if (!fromMatch) {
+    if (/^\s*SELECT\s+\d+\s*$/i.test(sql)) {
+      return { columns: ["1"], table: "__dual__", where: {}, whereNotNull: [], computedColumns: {} };
+    }
     throw new Error("Cannot parse SELECT statement: no FROM");
   }
 
@@ -250,6 +253,9 @@ export async function memoryQuery(text: string, params: unknown[] = []): Promise
 
   if (text.startsWith("SELECT")) {
     const parsed = parseSqlSelect(text, params);
+    if (parsed.table === "__dual__") {
+      return { rows: [{ "1": 1 }], duration: Date.now() - start };
+    }
     const tableData = getTable(parsed.table);
     let rows: Record<string, unknown>[] = [];
 
@@ -418,4 +424,4 @@ export async function memoryInitDb(): Promise<void> {
   console.log("[MemoryDB] Initialized with mock migrations");
 }
 
-export const isMemoryMode = process.env.DISABLE_REDIS === "true" || !process.env.DATABASE_URL;
+export const isMemoryMode = !process.env.DATABASE_URL;

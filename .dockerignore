@@ -9,3 +9,5 @@ __tests__
 coverage
 .vscode
 .idea
+e2e
+playwright.config.ts

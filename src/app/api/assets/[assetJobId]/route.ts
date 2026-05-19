@@ -96,6 +96,9 @@ export async function POST(
     let quality: "draft" | "standard" | "high" | undefined;
     try {
       const body = await request.json();
+      if (body.quality && !["draft", "standard", "high"].includes(body.quality)) {
+        return apiError(ErrorCodes.VALIDATION, "quality must be one of: draft, standard, high", 400);
+      }
       quality = body.quality;
     } catch {
       // no body or invalid JSON, use default quality

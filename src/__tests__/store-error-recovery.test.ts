@@ -41,6 +41,15 @@ const MOCK_CHOICE_RESPONSE = {
   timing: { llmMs: 800, totalMs: 1500 },
 };
 
+function mockJsonResponse(data: unknown, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers({ "content-type": "application/json" }),
+    json: () => Promise.resolve(data),
+  };
+}
+
 describe("Store: error recovery", () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -66,10 +75,7 @@ describe("Store: error recovery", () => {
 
   it("retryLast retries createGame after failure", async () => {
     mockFetch.mockRejectedValueOnce(new Error("网络错误"));
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CREATE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
 
     await useGameStore.getState().createGame("测试故事");
     expect(useGameStore.getState().status).toBe("error");
@@ -83,10 +89,7 @@ describe("Store: error recovery", () => {
   });
 
   it("makeChoice failure sets error state with lastAction", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CREATE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
 
     await useGameStore.getState().createGame("测试故事");
     expect(useGameStore.getState().status).toBe("playing");
@@ -106,18 +109,12 @@ describe("Store: error recovery", () => {
   });
 
   it("retryLast retries makeChoice after failure", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CREATE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
 
     await useGameStore.getState().createGame("测试故事");
 
     mockFetch.mockRejectedValueOnce(new Error("临时错误"));
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CHOICE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CHOICE_RESPONSE));
 
     await useGameStore.getState().makeChoice("scene_1", "a");
     expect(useGameStore.getState().status).toBe("error");
@@ -136,11 +133,9 @@ describe("Store: error recovery", () => {
   });
 
   it("HTTP 500 error sets error state with traceId", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: () => Promise.resolve({ message: "Internal Server Error", traceId: "trace_abc123" }),
-    });
+    mockFetch.mockResolvedValueOnce(
+      mockJsonResponse({ message: "Internal Server Error", traceId: "trace_abc123" }, 500)
+    );
 
     await useGameStore.getState().createGame("测试故事");
 
@@ -152,10 +147,7 @@ describe("Store: error recovery", () => {
 
   it("retryLast clears errorMessage before retrying", async () => {
     mockFetch.mockRejectedValueOnce(new Error("首次失败"));
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CREATE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
 
     await useGameStore.getState().createGame("测试故事");
     expect(useGameStore.getState().errorMessage).toBeTruthy();
@@ -176,10 +168,7 @@ describe("Store: session persistence", () => {
   });
 
   it("reset clears sessionId and ownerToken", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CREATE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
 
     await useGameStore.getState().createGame("测试故事");
     expect(useGameStore.getState().sessionId).toBe("sess_test");
@@ -192,17 +181,11 @@ describe("Store: session persistence", () => {
   });
 
   it("history accumulates across choices", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CREATE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
 
     await useGameStore.getState().createGame("测试故事");
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CHOICE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CHOICE_RESPONSE));
 
     await useGameStore.getState().makeChoice("scene_1", "a");
 
@@ -213,18 +196,12 @@ describe("Store: session persistence", () => {
   });
 
   it("createGame then makeChoice preserves full state chain", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CREATE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
 
     await useGameStore.getState().createGame("测试故事");
     expect(useGameStore.getState().currentScene?.id).toBe("scene_1");
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(MOCK_CHOICE_RESPONSE),
-    });
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CHOICE_RESPONSE));
 
     await useGameStore.getState().makeChoice("scene_1", "a");
     expect(useGameStore.getState().currentScene?.id).toBe("scene_2");

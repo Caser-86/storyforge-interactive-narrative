@@ -22,7 +22,7 @@ export async function GET(
     const tokenHash = await hashToken(token);
 
     const sessionRes = await query(
-      `SELECT id, share_token, rating FROM game_sessions WHERE share_token = $1 AND status != 'deleted'`,
+      `SELECT id, share_token, rating, share_expires_at FROM game_sessions WHERE share_token = $1 AND status != 'deleted'`,
       [tokenHash]
     );
 
@@ -31,6 +31,10 @@ export async function GET(
     }
 
     const session = sessionRes.rows[0];
+
+    if (session.share_expires_at && new Date(session.share_expires_at) < new Date()) {
+      return apiError(ErrorCodes.NOT_FOUND, "Share link has expired", 410);
+    }
 
     if (session.rating === "R") {
       return apiError(ErrorCodes.FORBIDDEN, "R-rated content cannot be shared", 403);

@@ -47,9 +47,12 @@ export async function POST(
     const shareToken = crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36);
     const shareTokenHash = await hashToken(shareToken);
 
+    const shareTtlDays = parseInt(process.env.SHARE_TOKEN_TTL_DAYS || "30", 10);
+    const shareExpiresAt = new Date(Date.now() + shareTtlDays * 24 * 60 * 60 * 1000);
+
     await query(
-      `UPDATE game_sessions SET share_token = $1, updated_at = NOW() WHERE id = $2`,
-      [shareTokenHash, sessionId]
+      `UPDATE game_sessions SET share_token = $1, share_expires_at = $2, updated_at = NOW() WHERE id = $3`,
+      [shareTokenHash, shareExpiresAt.toISOString(), sessionId]
     );
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "";

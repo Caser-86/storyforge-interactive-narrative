@@ -61,16 +61,17 @@ export async function GET(
 
       const dbChoices = choicesRes.rows
         .filter((c) => c.scene_id === scene.id)
-        .map((c) => ({
-          id: c.id,
-          label: c.label,
-          intent: c.intent,
-          risk: c.risk,
-          preview: c.preview || sceneChoices.find((sc: { id: string; preview?: string }) => sc.id === c.id || sc.id === c.model_choice_id)?.preview || "",
-          stateEffects: typeof c.state_effects_json === "string" ? JSON.parse(c.state_effects_json) : c.state_effects_json,
-          modelChoiceId: c.model_choice_id || undefined,
-          chosen: c.chosen,
-        }));
+        .map((c) => {
+          const choice: Record<string, unknown> = {
+            id: c.id,
+            label: c.label,
+            intent: c.intent,
+            risk: c.risk,
+            preview: c.preview || sceneChoices.find((sc: { id: string; preview?: string }) => sc.id === c.id || sc.id === c.model_choice_id)?.preview || "",
+            chosen: c.chosen,
+          };
+          return choice;
+        });
 
       return {
         id: scene.id,
@@ -137,59 +138,68 @@ function renderMarkdown(
 
   lines.push(`# ${session.seedPrompt || "互动叙事"}`);
   lines.push(``);
-  lines.push(`> 题材：${session.genre || "未知"} | 语言：${session.language || "zh"} | 分级：${session.rating || "PG-13"}`);
+  lines.push(`> **题材**：${session.genre || "未知"} · **语言**：${session.language || "zh"} · **分级**：${session.rating || "PG-13"}`);
+  lines.push(`>`);
   lines.push(`> 导出时间：${new Date().toISOString()}`);
   lines.push(``);
   lines.push(`---`);
   lines.push(``);
 
-  for (const scene of scenes) {
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
     const turn = scene.turn as number;
     const title = scene.title as string;
     const location = scene.location as string;
     const timeOfDay = scene.timeOfDay as string;
     const mood = scene.mood as string[];
     const body = scene.body as string;
-    const npcs = scene.npcs as Array<{ name: string; role: string; dialogue: string }>;
-    const choices = scene.choices as Array<{ label: string; intent: string; risk: string; chosen: boolean }>;
+    const npcs = scene.npcs as Array<{ name: string; role: string; dialogue: string; attitude?: string }>;
+    const choices = scene.choices as Array<{ label: string; intent: string; risk: string; chosen: boolean; preview?: string }>;
     const chapterGoal = scene.chapterGoal as string | null;
 
     lines.push(`## 第 ${turn} 幕：${title}`);
     lines.push(``);
-    lines.push(`📍 ${location} · 🕐 ${timeOfDay}`);
-    if (mood?.length) {
-      lines.push(`🎭 ${mood.join("、")}`);
-    }
+    lines.push(`| 📍 ${location} | 🕐 ${timeOfDay} |${mood?.length ? ` 🎭 ${mood.join("、")} |` : ""}`);
     lines.push(``);
     lines.push(body);
     lines.push(``);
 
     if (npcs?.length) {
-      lines.push(`### NPC`);
-      for (const npc of npcs) {
-        lines.push(`- **${npc.name}**（${npc.role}）："${npc.dialogue}"`);
-      }
+      lines.push(`### 💬 对话`);
       lines.push(``);
+      for (const npc of npcs) {
+        const attitude = npc.attitude ? `（${npc.attitude}）` : "";
+        lines.push(`> **${npc.name}**${attitude}：*"${npc.dialogue}"*`);
+        lines.push(``);
+      }
     }
 
     if (choices?.length) {
-      lines.push(`### 选项`);
+      lines.push(`### 🔀 选项`);
+      lines.push(``);
       for (const choice of choices) {
         const marker = choice.chosen ? "✅" : "⬜";
-        lines.push(`- ${marker} **${choice.label}** [${choice.risk}] — ${choice.intent}`);
+        const riskEmoji = choice.risk === "high" ? "🔴" : choice.risk === "medium" ? "🟡" : "🟢";
+        const preview = choice.preview ? `\n> ${choice.preview}` : "";
+        lines.push(`${marker} **${choice.label}** ${riskEmoji}${choice.risk} — *${choice.intent}*${preview}`);
+        lines.push(``);
       }
-      lines.push(``);
     }
 
     if (chapterGoal) {
-      lines.push(`> 🎯 章节目标：${chapterGoal}`);
+      lines.push(`> 🎯 **章节目标**：${chapterGoal}`);
       lines.push(``);
     }
 
-    lines.push(`---`);
-    lines.push(``);
+    if (i < scenes.length - 1) {
+      lines.push(`---`);
+      lines.push(``);
+    }
   }
 
+  lines.push(``);
+  lines.push(`---`);
+  lines.push(``);
   lines.push(`*— 故事结束 —*`);
   return lines.join("\n");
 }

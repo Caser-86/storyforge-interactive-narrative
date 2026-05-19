@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useGameStore } from "@/lib/store";
+import { apiFetch } from "@/lib/client-api";
 
 interface StyleTemplate {
   id: string;
@@ -48,16 +49,14 @@ export default function StartScreen() {
   const { createGame, loadSession } = useGameStore();
 
   useEffect(() => {
-    fetch("/api/templates")
-      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
-      .then((data) => setTemplates(data.templates || []))
+    apiFetch<{ templates: StyleTemplate[] }>("/api/templates")
+      .then((r) => { if (r.ok) setTemplates(r.data.templates || []); })
       .catch(() => {});
 
     const fingerprint = typeof window !== "undefined" ? localStorage.getItem("user_fingerprint") : null;
     if (fingerprint) {
-      fetch("/api/user", { headers: { "x-user-fingerprint": fingerprint } })
-        .then((r) => r.ok ? r.json() : Promise.reject(r.status))
-        .then((data) => setUserGames(data.games || []))
+      apiFetch<{ games: UserGame[] }>("/api/user", { fingerprint })
+        .then((r) => { if (r.ok) setUserGames(r.data.games || []); })
         .catch(() => {});
     }
   }, []);

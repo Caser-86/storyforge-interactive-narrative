@@ -74,12 +74,22 @@ export async function GET(
 
         const pollStatus = async () => {
           const res = await query(
-            `SELECT id, status, url, type, provider, error FROM asset_jobs WHERE session_id = $1 AND status IN ('completed', 'failed')`,
+            `SELECT id, status, url, type, provider, error FROM asset_jobs WHERE session_id = $1 AND status IN ('completed', 'failed', 'generating')`,
             [sessionId]
           );
 
           for (const job of res.rows) {
             if (notifiedIds.has(job.id)) continue;
+
+            if (job.status === "generating") {
+              notifiedIds.add(job.id);
+              sendEvent("asset.updated", {
+                assetJobId: job.id,
+                status: "generating",
+              });
+              continue;
+            }
+
             notifiedIds.add(job.id);
 
             if (job.status === "completed") {

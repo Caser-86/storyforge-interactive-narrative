@@ -7,6 +7,8 @@ import { isObjectStorageConfigured, downloadAndStore, buildAssetKey } from "../l
 
 const ASSET_TIMEOUT_MS = parseInt(process.env.ASSET_TIMEOUT_MS || "300000", 10);
 const STALE_CHECK_INTERVAL_MS = parseInt(process.env.STALE_CHECK_INTERVAL_MS || "60000", 10);
+const ASSET_JOB_ATTEMPTS = parseInt(process.env.ASSET_JOB_ATTEMPTS || "3", 10);
+const ASSET_JOB_BACKOFF_MS = parseInt(process.env.ASSET_JOB_BACKOFF_MS || "5000", 10);
 
 let worker: Worker<AssetJobData> | null = null;
 
@@ -156,6 +158,7 @@ function startWorker() {
     {
       connection,
       concurrency: parseInt(process.env.ASSET_WORKER_CONCURRENCY || "3", 10),
+      lockDuration: ASSET_TIMEOUT_MS,
     }
   );
 
@@ -222,4 +225,4 @@ main().catch((err) => {
   process.exit(1);
 });
 
-export { AssetJobData };
+export { AssetJobData, ASSET_JOB_ATTEMPTS, ASSET_JOB_BACKOFF_MS };

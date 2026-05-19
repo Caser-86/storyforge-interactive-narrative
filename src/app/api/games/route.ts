@@ -10,6 +10,7 @@ import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { getOrCreateUser } from "@/lib/user-service";
 import { hashToken } from "@/lib/crypto";
 import { shouldGenerateImages } from "@/lib/feature-flags";
+import { CreateGameResponseSchema, validateResponse } from "@/lib/api-contracts";
 
 let dbInitialized = false;
 
@@ -204,7 +205,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({
+    return NextResponse.json(validateResponse(CreateGameResponseSchema, {
       sessionId,
       ownerToken,
       scene: {
@@ -238,7 +239,7 @@ export async function POST(request: Request) {
         safetyWarnings: safetyCheck.warnings,
         imageGenerationEnabled: enableImages,
       },
-    });
+    }, "POST /api/games"));
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,

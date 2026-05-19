@@ -8,9 +8,16 @@ import { isWithinBudget } from "./observability-persist";
 import { checkArtPromptSafety, checkInputSafety, getRatingPromptSuffix, checkOutputSafety } from "./safety-service";
 import { checkRiskCoverage, checkChoiceSimilarity, runAllQualityChecks } from "./narrative-quality";
 
-const openai = new OpenAI({
-  baseURL: process.env.OPENAI_BASE_URL || "https://api.deepseek.com",
-});
+let _openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      baseURL: process.env.OPENAI_BASE_URL || "https://api.deepseek.com",
+    });
+  }
+  return _openai;
+}
 
 interface GenerateSceneParams {
   seedPrompt: string;
@@ -54,7 +61,7 @@ export async function generateNarrative(params: GenerateSceneParams): Promise<{
   });
 
   const model = process.env.OPENAI_MODEL || "deepseek-chat";
-  const maxRetries = 1;
+  const maxRetries = 2;
   let retryCount = 0;
   let qualityIssues: string[] = [];
 
@@ -69,7 +76,7 @@ export async function generateNarrative(params: GenerateSceneParams): Promise<{
           : `\n\n${RETRY_PROMPT}`;
       }
 
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT + getRatingPromptSuffix(params.rating) },

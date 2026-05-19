@@ -1,3 +1,5 @@
+import { CreateGameResponseSchema, ChoiceResponseSchema, GetSessionResponseSchema } from "@/lib/api-contracts";
+
 export function authHeaders(ownerToken?: string | null, fingerprint?: string | null): Record<string, string> {
   const headers: Record<string, string> = {};
   if (ownerToken) headers["x-owner-token"] = ownerToken;
@@ -11,6 +13,14 @@ export interface ApiError {
   traceId: string;
 }
 
+export type ApiResult<T> =
+  | { data: T; ok: true }
+  | { data: ApiError; ok: false; status: number };
+
+interface ZodLikeSchema {
+  safeParse: (d: unknown) => { success: boolean; error?: { message: string } };
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: {
@@ -18,9 +28,11 @@ export async function apiFetch<T = unknown>(
     ownerToken?: string | null;
     fingerprint?: string | null;
     body?: unknown;
+    responseType?: "json" | "blob";
+    responseSchema?: ZodLikeSchema;
   } = {}
-): Promise<{ data: T; ok: true } | { data: ApiError; ok: false; status: number }> {
-  const { method = "GET", ownerToken, fingerprint, body } = options;
+): Promise<ApiResult<T>> {
+  const { method = "GET", ownerToken, fingerprint, body, responseType = "json", responseSchema } = options;
 
   const headers: Record<string, string> = {
     ...authHeaders(ownerToken, fingerprint),
@@ -51,10 +63,40 @@ export async function apiFetch<T = unknown>(
     };
   }
 
+  if (responseType === "blob") {
+    const blob = await res.blob();
+    return { data: blob as T, ok: true };
+  }
+
   if (isJson) {
     const data = await res.json();
+    if (responseSchema && process.env.NODE_ENV === "development") {
+      const result = responseSchema.safeParse(data);
+      if (!result.success) {
+        console.error(`[API Contract] ${path} response schema mismatch:`, result.error?.message);
+      }
+    }
     return { data: data as T, ok: true };
   }
 
   return { data: null as T, ok: true };
 }
+
+export function throwApiError<T>(result: ApiResult<T>): T {
+  if (result.ok) return result.data;
+  const { data, status } = result;
+  const error = new Error(data.message || `HTTP ${status}`);
+  (error as Error & { traceId?: string }).traceId = data.traceId;
+  throw error;
+}
+
+export function formatApiError(result: { data: ApiError; ok: false; status: number }): string {
+  const { data, status } = result;
+  return `${data.message || `HTTP ${status}`}${data.traceId ? ` (trace: ${data.traceId})` : ""}`;
+}
+
+export const Schemas = {
+  CreateGame: CreateGameResponseSchema,
+  Choice: ChoiceResponseSchema,
+  GetSession: GetSessionResponseSchema,
+} as const;

@@ -51,7 +51,7 @@ const PlayResponseBaseSchema = z.object({
 });
 
 export const CreateGameResponseSchema = PlayResponseBaseSchema.extend({
-  ownerToken: z.string(),
+  ownerToken: z.string().min(1),
   statePatch: z.record(z.unknown()),
 });
 
@@ -94,6 +94,7 @@ export const ShareReplayResponseSchema = z.object({
     rating: z.string(),
   }),
   scenes: z.array(z.object({
+    id: z.string(),
     turn: z.number(),
     title: z.string(),
     location: z.string(),
@@ -135,3 +136,17 @@ export const GetSessionResponseSchema = z.object({
 });
 
 export type GetSessionResponse = z.infer<typeof GetSessionResponseSchema>;
+
+export function validateResponse<T>(
+  schema: { safeParse: (d: unknown) => { success: boolean; error?: { message: string } } },
+  data: T,
+  label: string
+): T {
+  if (process.env.NODE_ENV === "development") {
+    const result = schema.safeParse(data);
+    if (!result.success) {
+      console.error(`[API Contract] ${label} response schema mismatch:`, result.error?.message);
+    }
+  }
+  return data;
+}

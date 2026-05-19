@@ -24,6 +24,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",
     "bullmq": "^5",
+    "geist": "^1.7.0",
     "ioredis": "^5",
     "next": "16.2.6",
     "openai": "^4",

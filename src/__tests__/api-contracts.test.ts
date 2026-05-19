@@ -139,6 +139,7 @@ describe("api-contracts", () => {
         rating: "PG-13",
       },
       scenes: [{
+        id: "scene_1",
         turn: 1,
         title: validScene.title,
         location: validScene.location,
@@ -233,6 +234,7 @@ describe("api-contracts", () => {
         rating: "PG-13",
       },
       scenes: [{
+        id: "scene_1",
         turn: 1,
         title: validScene.title,
         location: validScene.location,
@@ -356,5 +358,111 @@ describe("api-contracts", () => {
 
     const result = ChoiceResponseSchema.safeParse(data);
     expect(result.success).toBe(true);
+  });
+
+  it("ChoiceResponseSchema strips ownerToken from output", () => {
+    const data = {
+      sessionId: "sess_1",
+      previousChoiceId: "choice_1",
+      stateDiff: { courage: 1 },
+      scene: validScene,
+      safety: { rating: "PG-13", contentWarnings: [] },
+      assets: { imageJobId: "job_2", imageStatus: "queued" },
+      timing: {},
+      ownerToken: "ot_123",
+    };
+
+    const result = ChoiceResponseSchema.safeParse(data);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect("ownerToken" in result.data).toBe(false);
+    }
+  });
+
+  it("CreateGameResponseSchema rejects when ownerToken is empty string", () => {
+    const data = {
+      sessionId: "sess_1",
+      ownerToken: "",
+      scene: validScene,
+      statePatch: {},
+      safety: { rating: "PG-13", contentWarnings: [] },
+      assets: { imageJobId: "job_1", imageStatus: "queued" },
+      timing: {},
+    };
+
+    const result = CreateGameResponseSchema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it("ShareReplayResponseSchema requires scene id", () => {
+    const data = {
+      session: {
+        seedPrompt: "测试提示词",
+        genre: "mystery",
+        rating: "PG-13",
+      },
+      scenes: [{
+        turn: 1,
+        title: validScene.title,
+        location: validScene.location,
+        timeOfDay: validScene.timeOfDay,
+        mood: validScene.mood,
+        body: validScene.body,
+        npcs: validScene.npcs,
+        chapterGoal: validScene.chapterGoal,
+      }],
+    };
+
+    const result = ShareReplayResponseSchema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it("GetSessionResponseSchema requires chosen on choices", () => {
+    const baseData = {
+      session: {
+        id: "sess_1",
+        seedPrompt: "测试提示词",
+        genre: "mystery",
+        language: "zh-CN",
+        rating: "PG-13",
+        status: "active",
+        currentSceneId: "scene_1",
+        state: {},
+        createdAt: "2026-05-18T00:00:00Z",
+        updatedAt: "2026-05-18T00:00:00Z",
+      },
+      scenes: [{
+        ...validScene,
+        turn: 1,
+        choices: validScene.choices.map((c) => ({ ...c, chosen: true })),
+      }],
+      assets: {
+        imageJobId: "job_1",
+        imageStatus: "queued",
+        imageUrl: null,
+      },
+    };
+
+    const result = GetSessionResponseSchema.safeParse(baseData);
+    expect(result.success).toBe(true);
+  });
+
+  it("ExportResponseSchema requires session id", () => {
+    const data = {
+      session: {
+        seedPrompt: "测试提示词",
+        genre: "mystery",
+        language: "zh-CN",
+        rating: "PG-13",
+        status: "active",
+        state: {},
+        createdAt: "2026-05-18T00:00:00Z",
+      },
+      scenes: [{ ...validScene, turn: 1, createdAt: "2026-05-18T00:00:00Z" }],
+      exportedAt: "2026-05-18T00:00:00Z",
+    };
+
+    const result = ExportResponseSchema.safeParse(data);
+    expect(result.success).toBe(false);
   });
 });

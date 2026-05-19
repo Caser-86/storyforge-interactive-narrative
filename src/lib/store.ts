@@ -1,28 +1,6 @@
 import { create } from "zustand";
 import type { Npc, PersistedChoice, ArtPrompt, BgmCue, Safety } from "@/lib/schemas";
-import { CreateGameResponseSchema, ChoiceResponseSchema, GetSessionResponseSchema } from "@/lib/api-contracts";
-
-async function apiFetch<T>(
-  url: string,
-  options?: RequestInit,
-  responseSchema?: { safeParse: (d: unknown) => { success: boolean; error?: { message: string } } }
-): Promise<T> {
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
-    const error = new Error(err.message || err.error || `Request failed (${res.status})`);
-    (error as Error & { traceId?: string }).traceId = err.traceId;
-    throw error;
-  }
-  const data = await res.json();
-  if (responseSchema && process.env.NODE_ENV === "development") {
-    const result = responseSchema.safeParse(data);
-    if (!result.success) {
-      console.error(`[API Contract] ${url} response schema mismatch:`, result.error?.message);
-    }
-  }
-  return data as T;
-}
+import { apiFetch, throwApiError, Schemas } from "@/lib/client-api";
 
 export interface SceneData {
   id: string;
@@ -42,8 +20,15 @@ export interface SceneData {
 export interface HistoryEntry {
   sceneId: string;
   title: string;
+  location: string;
+  timeOfDay: string;
+  mood: string[];
+  body: string;
+  npcs: Npc[];
   choiceLabel?: string;
   choiceId?: string;
+  choicePreview?: string;
+  choiceRisk?: string;
 }
 
 interface GameState {
@@ -148,7 +133,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           })()
         : "anonymous";
 
-      const res = await apiFetch<{
+      const data = throwApiError(await apiFetch<{
         sessionId: string;
         ownerToken: string;
         scene: SceneData;
@@ -157,11 +142,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         timing: { llmMs?: number; totalMs?: number };
       }>("/api/games", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-fingerprint": fingerprint },
-        body: JSON.stringify({ prompt, language, rating, options }),
-      }, CreateGameResponseSchema);
-
-      const data = res;
+        fingerprint,
+        body: { prompt, language, rating, options },
+        responseSchema: Schemas.CreateGame,
+      }));
 
       set({
         sessionId: data.sessionId,
@@ -172,7 +156,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         safety: data.safety,
         imageJobId: data.assets.imageJobId,
         imageStatus: data.assets.imageStatus as GameState["imageStatus"],
-        history: [{ sceneId: data.scene.id, title: data.scene.title }],
+        history: [{
+          sceneId: data.scene.id,
+          title: data.scene.title,
+          location: data.scene.location,
+          timeOfDay: data.scene.timeOfDay,
+          mood: data.scene.mood,
+          body: data.scene.body,
+          npcs: data.scene.npcs,
+        }],
         timing: data.timing,
       });
 
@@ -195,10 +187,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ lastAction: { type: "choice", sceneId, choiceId } });
 
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (ownerToken) headers["x-owner-token"] = ownerToken;
-
-      const data = await apiFetch<{
+      const data = throwApiError(await apiFetch<{
         scene: SceneData;
         stateDiff: Record<string, number>;
         safety: Safety;
@@ -206,9 +195,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         timing: { llmMs?: number; totalMs?: number };
       }>(`/api/games/${sessionId}/choices`, {
         method: "POST",
-        headers,
-        body: JSON.stringify({ sceneId, choiceId }),
-      }, ChoiceResponseSchema);
+        ownerToken,
+        body: { sceneId, choiceId },
+        responseSchema: Schemas.Choice,
+      }));
 
       const selectedChoice = currentScene?.choices.find((c) => c.id === choiceId);
 
@@ -222,10 +212,24 @@ export const useGameStore = create<GameState>((set, get) => ({
         history: [
           ...history.map((h, i) =>
             i === history.length - 1
-              ? { ...h, choiceLabel: selectedChoice?.label, choiceId }
+              ? {
+                  ...h,
+                  choiceLabel: selectedChoice?.label,
+                  choiceId,
+                  choicePreview: selectedChoice?.preview,
+                  choiceRisk: selectedChoice?.risk,
+                }
               : h
           ),
-          { sceneId: data.scene.id, title: data.scene.title },
+          {
+            sceneId: data.scene.id,
+            title: data.scene.title,
+            location: data.scene.location,
+            timeOfDay: data.scene.timeOfDay,
+            mood: data.scene.mood,
+            body: data.scene.body,
+            npcs: data.scene.npcs,
+          },
         ],
         timing: data.timing,
       });
@@ -251,15 +255,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (currentJobId !== imageJobId) return;
 
       try {
-        const headers: Record<string, string> = {};
-        if (ownerToken) headers["x-owner-token"] = ownerToken;
+        const result = await apiFetch<{ status: string; url?: string }>(`/api/assets/${imageJobId}`, { ownerToken });
+        if (!result.ok || get().imageJobId !== imageJobId) return;
 
-        const res = await fetch(`/api/assets/${imageJobId}`, { headers });
-        if (!res.ok) return;
-
-        const data = await res.json();
-
-        if (get().imageJobId !== imageJobId) return;
+        const data = result.data;
 
         if (data.status === "completed") {
           set({ imageStatus: "completed", imageUrl: data.url });
@@ -318,11 +317,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   restoreSession: () => {
     const persisted = loadPersisted();
-    if (persisted.sessionId) {
+    if (persisted.sessionId && persisted.ownerToken) {
       set({
         sessionId: persisted.sessionId,
         ownerToken: persisted.ownerToken,
       });
+      get().loadSession(persisted.sessionId, persisted.ownerToken);
     }
   },
 
@@ -331,10 +331,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ status: "generating", errorMessage: null, lastAction: null });
 
     try {
-      const headers: Record<string, string> = {};
-      if (ownerToken) headers["x-owner-token"] = ownerToken;
-
-      const data = await apiFetch<{
+      const data = throwApiError(await apiFetch<{
         session: { currentSceneId?: string; [k: string]: unknown };
         scenes: Array<{
           id?: string; turn?: number; title?: string;
@@ -346,7 +343,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           choiceLabel?: string; choice_label?: string;
         }>;
         assets?: { imageJobId?: string; imageStatus?: string; imageUrl?: string };
-      }>(`/api/games/${targetSessionId}`, { headers }, GetSessionResponseSchema);
+      }>(`/api/games/${targetSessionId}`, { ownerToken, responseSchema: Schemas.GetSession }));
       const session = data.session;
       const scenes = data.scenes || [];
 
@@ -369,11 +366,27 @@ export const useGameStore = create<GameState>((set, get) => ({
           }
         : null;
 
-      const history: HistoryEntry[] = scenes.map((s: { id?: string; turn?: number; title?: string; choiceLabel?: string; choice_label?: string }) => ({
-        sceneId: s.id || s.turn?.toString() || "",
-        title: s.title || "",
-        choiceLabel: s.choiceLabel || s.choice_label,
-      }));
+      const history: HistoryEntry[] = scenes.map((s: {
+        id?: string; turn?: number; title?: string;
+        location?: string; timeOfDay?: string; time_of_day?: string;
+        mood?: string[]; body?: string; npcs?: Npc[];
+        choiceLabel?: string; choice_label?: string;
+        choices?: Array<{ label?: string; chosen?: boolean; preview?: string; risk?: string }>;
+      }) => {
+        const chosenChoice = Array.isArray(s.choices) ? s.choices.find((c: { chosen?: boolean }) => c.chosen) : undefined;
+        return {
+          sceneId: s.id || s.turn?.toString() || "",
+          title: s.title || "",
+          location: s.location || "",
+          timeOfDay: s.timeOfDay || s.time_of_day || "",
+          mood: Array.isArray(s.mood) ? s.mood : [],
+          body: s.body || "",
+          npcs: Array.isArray(s.npcs) ? s.npcs : [],
+          choiceLabel: s.choiceLabel || s.choice_label || chosenChoice?.label,
+          choicePreview: chosenChoice?.preview,
+          choiceRisk: chosenChoice?.risk,
+        };
+      });
 
       const imageJobId = data.assets?.imageJobId || null;
       const imageStatus = (data.assets?.imageStatus || "none") as GameState["imageStatus"];

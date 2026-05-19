@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useGameStore } from "@/lib/store";
 
 export default function StatusPanel() {
   const { currentScene, stateDiff, history } = useGameStore();
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   if (!currentScene) return null;
 
@@ -55,10 +57,51 @@ export default function StatusPanel() {
           <p className="text-gray-400 text-sm mb-2">历史选择</p>
           <div className="space-y-1">
             {history.slice(0, -1).map((h, i) => (
-              <div key={i} className="text-xs text-gray-500 p-2 bg-[#1a1a2e]/50 rounded">
-                <span className="text-gray-400">{h.title}</span>
-                {h.choiceLabel && (
-                  <span className="text-[#e94560]"> → {h.choiceLabel}</span>
+              <div key={i}>
+                <button
+                  onClick={() => setExpandedIdx(expandedIdx === i ? null : i)}
+                  className="w-full text-left text-xs p-2 bg-[#1a1a2e]/50 rounded hover:bg-[#1a1a2e]/80 transition-colors"
+                >
+                  <span className="text-gray-500 mr-1">{expandedIdx === i ? "▼" : "▶"}</span>
+                  <span className="text-gray-400">{h.title}</span>
+                  {h.choiceLabel && (
+                    <span className="text-[#e94560]"> → {h.choiceLabel}</span>
+                  )}
+                </button>
+                {expandedIdx === i && (
+                  <div className="mt-1 ml-3 p-2 bg-[#1a1a2e]/40 border border-[#2a2a4a] rounded text-xs space-y-1.5">
+                    {h.location && (
+                      <p className="text-gray-500">📍 {h.location} · 🕐 {h.timeOfDay}</p>
+                    )}
+                    {h.mood.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {h.mood.map((m, mi) => (
+                          <span key={mi} className="px-1 py-0.5 rounded bg-[#e94560]/10 text-[#e94560] text-[10px]">
+                            {m}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-gray-400 leading-relaxed whitespace-pre-wrap break-words line-clamp-4">
+                      {h.body}
+                    </p>
+                    {h.npcs.length > 0 && (
+                      <div className="space-y-1">
+                        {h.npcs.map((npc, ni) => (
+                          <div key={ni} className="bg-[#1e1e38]/40 rounded p-1.5">
+                            <span className="text-[#e94560]">{npc.name}</span>
+                            <span className="text-gray-500 ml-1">{npc.role}</span>
+                            <p className="text-gray-400 italic">&ldquo;{npc.dialogue}&rdquo;</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {h.choicePreview && (
+                      <p className="text-gray-500 italic border-t border-[#333] pt-1">
+                        预览：{h.choicePreview}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

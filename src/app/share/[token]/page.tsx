@@ -3,8 +3,11 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import { apiFetch, formatApiError } from "@/lib/client-api";
 
 interface ReplayScene {
+  id?: string;
   turn: number;
   title: string;
   location: string;
@@ -13,6 +16,7 @@ interface ReplayScene {
   body: string;
   npcs: Array<{ name: string; role: string; dialogue: string }>;
   chapterGoal: string;
+  imageUrl?: string | null;
 }
 
 export default function SharePage() {
@@ -26,18 +30,35 @@ export default function SharePage() {
   useEffect(() => {
     if (!token) return;
 
-    fetch(`/api/share/${token}`)
-      .then((r) => {
-        if (!r.ok) throw new Error("分享链接无效");
-        return r.json();
-      })
-      .then((data) => {
+    apiFetch<{ session: { seedPrompt: string }; scenes: ReplayScene[] }>(`/api/share/${token}`)
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.status === 404 ? "分享链接不存在或已过期" : formatApiError(result));
+          setLoading(false);
+          return;
+        }
+        const data = result.data;
         setSeedPrompt(data.session?.seedPrompt || "");
-        setScenes(data.scenes || []);
+        const loadedScenes: ReplayScene[] = data.scenes || [];
+        setScenes(loadedScenes);
         setLoading(false);
+
+        loadedScenes.forEach((scene, idx) => {
+          if (scene.id) {
+            apiFetch<{ assets: Array<{ url: string }> }>(`/api/share/${token}/assets/${scene.id}`)
+              .then((assetResult) => {
+                if (assetResult.ok && assetResult.data.assets?.[0]?.url) {
+                  setScenes((prev) =>
+                    prev.map((s, i) => (i === idx ? { ...s, imageUrl: assetResult.data.assets[0].url } : s))
+                  );
+                }
+              })
+              .catch(() => {});
+          }
+        });
       })
       .catch((err) => {
-        setError(err.message);
+        setError(err instanceof Error ? err.message : "加载失败");
         setLoading(false);
       });
   }, [token]);
@@ -90,6 +111,17 @@ export default function SharePage() {
                   📍 {scene.location} · 🕐 {scene.timeOfDay}
                 </span>
               </div>
+              {scene.imageUrl && (
+                <div className="mb-3 rounded-lg overflow-hidden border border-[#333] relative w-full h-64">
+                  <Image
+                    src={scene.imageUrl}
+                    alt={scene.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 100vw, 672px"
+                  />
+                </div>
+              )}
               <h2 className="text-lg font-bold text-white mb-2">{scene.title}</h2>
               <p className="text-gray-200 leading-relaxed whitespace-pre-wrap text-sm">
                 {scene.body}

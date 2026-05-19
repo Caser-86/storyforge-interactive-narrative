@@ -126,9 +126,11 @@ export async function enqueueAssetJob(data: AssetJobData): Promise<{ queued: boo
       if (!ready) return { queued: false, reason: "Redis not available" };
     }
     const queue = getAssetQueue();
+    const attempts = parseInt(process.env.ASSET_JOB_ATTEMPTS || "3", 10);
+    const backoffDelay = parseInt(process.env.ASSET_JOB_BACKOFF_MS || "5000", 10);
     await queue.add("generate-image", data, {
-      attempts: 2,
-      backoff: { type: "exponential", delay: 5000 },
+      attempts,
+      backoff: { type: "exponential", delay: backoffDelay },
       removeOnComplete: 100,
       removeOnFail: 50,
       jobId: data.assetJobId,
