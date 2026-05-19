@@ -3,6 +3,7 @@ import { NarrativeOutputSchema, type NarrativeOutput } from "./schemas";
 import { SYSTEM_PROMPT, buildUserPrompt, RETRY_PROMPT, detectGenre, GENRE_PRESETS } from "./prompts";
 import type { StoryState } from "./schemas";
 import { compressContext } from "./story-state-service";
+import { getPhaseInstruction, shouldForceResolution } from "./story-arc-service";
 import { logLlmCall } from "./observability";
 import { isWithinBudget } from "./observability-persist";
 import { checkArtPromptSafety, checkInputSafety, getRatingPromptSuffix, checkOutputSafety } from "./safety-service";
@@ -14,6 +15,8 @@ function getOpenAI(): OpenAI {
   if (!_openai) {
     _openai = new OpenAI({
       baseURL: process.env.OPENAI_BASE_URL || "https://api.deepseek.com",
+      timeout: parseInt(process.env.OPENAI_TIMEOUT_MS || "60000", 10),
+      maxRetries: 1,
     });
   }
   return _openai;
@@ -37,6 +40,11 @@ export async function generateNarrative(params: GenerateSceneParams): Promise<{
 }> {
   const { storyState, seedPrompt, sessionId, sceneId } = params;
 
+  if (process.env.MOCK_LLM === "true") {
+    const fallback = generateFallbackNarrative(params);
+    return { data: fallback, latencyMs: 50, retryCount: 0 };
+  }
+
   if (!isWithinBudget()) {
     throw new Error("BUDGET_EXCEEDED: daily token/asset limit reached");
   }
@@ -58,6 +66,12 @@ export async function generateNarrative(params: GenerateSceneParams): Promise<{
     selectedChoice: params.selectedChoice,
     styleBible: styleBible || undefined,
     characterCard: characterCard || undefined,
+    storyPhase: storyState?.currentPhase,
+    targetTurns: storyState?.targetTurns,
+    remainingTurns: storyState ? storyState.targetTurns - storyState.turn : undefined,
+    phaseInstruction: storyState ? getPhaseInstruction(storyState) : undefined,
+    allowNewThreads: storyState?.allowNewThreads,
+    mustResolveThreads: storyState ? shouldForceResolution(storyState) : false,
   });
 
   const model = process.env.OPENAI_MODEL || "deepseek-chat";
@@ -261,6 +275,7 @@ export function generateFallbackNarrative(params: GenerateSceneParams): Narrativ
           label: "走向光芒的方向",
           intent: "追寻希望的微光，相信光明意味着安全",
           risk: "low" as const,
+          route: "investigate" as const,
           preview: "微弱的光芒可能意味着安全，但也可能是陷阱",
           stateEffects: { hope: 5 },
         },
@@ -269,6 +284,7 @@ export function generateFallbackNarrative(params: GenerateSceneParams): Narrativ
           label: "踏入黑暗深处",
           intent: "探索未知的黑暗，寻找隐藏的真相",
           risk: "medium" as const,
+          route: "act" as const,
           preview: "黑暗中或许藏着真相，但也充满危险",
           stateEffects: { courage: 5 },
         },
@@ -277,8 +293,9 @@ export function generateFallbackNarrative(params: GenerateSceneParams): Narrativ
           label: "原地等待观察",
           intent: "耐心观察局势变化，等待迷雾散去",
           risk: "high" as const,
+          route: "sacrifice" as const,
           preview: "迷雾或许会自行散去，但也可能永远不会消散",
-          stateEffects: { patience: 3, anxiety: 5 },
+          stateEffects: { patience: 3, anxiety: -5 },
         },
       ],
       artPrompt: {

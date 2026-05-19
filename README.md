@@ -1,8 +1,10 @@
 # StoryForge
 
-基于 LLM 的互动叙事生成器，面向“输入一句灵感，生成可玩的剧情场景，并通过选择推进后续分支故事”的文字互动体验。支持首幕生成、分支选择、剧情状态延续、会话恢复、只读分享、JSON/Markdown 导出、权限校验，以及可选的场景图异步生成链路。
+基于 LLM 的互动叙事生成器，面向“输入一句灵感，生成可玩的剧情场景，并通过选择推进后续分支故事”的文字互动体验。支持首幕生成、分支选择、剧情状态延续、故事长度规划、阶段推进、结局收束、会话恢复、只读分享、JSON/Markdown 导出、权限校验，以及可选的场景图异步生成链路。
 
 当前主产品路径是“对话剧情推进”。场景图功能作为附属模块默认关闭，只有在开局勾选或显式配置 `ENABLE_IMAGE_GENERATION=true` 时才会创建图片任务。
+
+当前故事执行不是无限续写模式。每局会按短篇 / 中篇 / 长篇目标步数推进，并通过 `setup`、`development`、`crisis`、`resolution`、`ending` 阶段逐步收束；旧版固定 `turn >= 12` 的硬截断已被动态 `targetTurns` 和 `endingReadiness` 机制替代。
 
 GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`
 
@@ -23,6 +25,7 @@ GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`
 | 项目方向 | 当前状态 |
 |------|------|
 | **文字剧情推进** | 当前唯一主路径，优先保证可玩性、连续性、恢复能力和分支差异 |
+| **故事生命周期** | 已接入短篇 / 中篇 / 长篇目标步数、阶段推进、结局准备度和结局状态 |
 | **场景图生成** | 附属增强模块，默认关闭，按局开启 |
 | **分享与导出** | 已接通，只读 replay、JSON/Markdown 导出可用 |
 | **交付收口** | 正在从原型收敛到内部 Alpha |
@@ -50,6 +53,7 @@ src/
 │   ├── narrative-service.ts            # LLM 叙事生成与 fallback
 │   ├── prompts.ts                      # 叙事与分支选择 prompt 约束
 │   ├── story-state-service.ts          # 状态推进、上下文压缩、选择效果应用
+│   ├── story-arc-service.ts            # 故事长度、阶段推进、结局判断
 │   ├── schemas.ts                      # 叙事输出、场景、choice、BGM、状态 schema
 │   ├── api-contracts.ts                # 前后端 API 契约
 │   ├── store.ts                        # Zustand 客户端状态与恢复逻辑
@@ -79,6 +83,7 @@ src/
 |------|------|
 | **剧情首幕生成** | 用户输入一句灵感后，生成标题、地点、时间、气氛、正文、NPC、三项选择、章节目标与记忆摘要 |
 | **分支剧情推进** | 玩家选择会驱动后续剧情生成，并通过 `stateDiff`、`StoryState`、`memorySummary` 延续上下文 |
+| **故事长度与结局** | 支持短篇 7-12 步、中篇 20-40 步、长篇 50-100 步；按阶段推进并在结局阶段收束 |
 | **会话恢复** | 刷新页面或从历史列表进入时，可恢复最后一幕完整 scene 与可继续选择的分支 |
 | **安全边界** | owner token 保护私有会话；分享 replay 为只读；输入/输出带安全与版权检查 |
 | **可选图片模块** | 场景图为附属功能，默认关闭；开启后才会创建 `asset_jobs` 并走 Redis/BullMQ/worker |
@@ -93,11 +98,13 @@ src/
 ### 开局页
 
 - 风格模板、语言分级、视觉风格输入和“场景图”可选开关集中在同一屏内。
+- 故事长度可选择短篇、中篇、长篇；默认短篇，适合快速体验。
 - 默认路径直接服务文字剧情主流程，不要求先接通图片基础设施。
 
 ### 剧情推进页
 
 - 正文、NPC 对话、状态变化、内容提示、三项分支选择和历史选择时间线同时展示。
+- 故事进度会展示当前阶段、当前步数、目标步数和收束提示。
 - 设计目标是让用户把注意力放在“如何推进故事”上，而不是工具面板本身。
 
 ---
@@ -107,7 +114,7 @@ src/
 ```text
 Client (StartScreen / StoryPanel / StatusPanel / optional VisualPanel)
   -> Next.js Route Handlers
-  -> Narrative generation + StoryState update
+  -> Narrative generation + StoryState update + StoryArc phase control
   -> PostgreSQL persistence
   -> Optional asset queue (Redis / BullMQ / worker / object storage)
   -> Replay / export / health / stats
@@ -121,13 +128,17 @@ Client (StartScreen / StoryPanel / StatusPanel / optional VisualPanel)
 flowchart TB
     A[用户输入开局灵感] --> B[输入安全检查]
     B --> C[LLM 生成首幕 scene]
-    C --> D[保存 session / scene / choices]
-    D --> E[返回首幕剧情与三个分支选择]
-    E --> F[玩家选择]
-    F --> G[读取 StoryState + 上一幕摘要]
-    G --> H[LLM 生成下一幕]
-    H --> I[更新状态与历史]
-    I --> J[继续推进剧情]
+    C --> D[初始化 StoryState 与目标步数]
+    D --> E[保存 session / scene / choices]
+    E --> F[返回首幕剧情与三个分支选择]
+    F --> G[玩家选择]
+    G --> H[读取 StoryState + 上一幕摘要]
+    H --> I[计算故事阶段和剩余步数]
+    I --> J[LLM 生成下一幕]
+    J --> K[更新状态、历史和结局准备度]
+    K --> L{是否达到结局条件}
+    L -->|否| F
+    L -->|是| M[标记 ended 并显示结局操作]
 ```
 
 ---
@@ -141,7 +152,8 @@ flowchart LR
     N --> O[scene output]
     O --> Q[choices persisted]
     Q --> T[StoryState applyChoiceEffects]
-    T --> M[memorySummary / knownFacts / unresolvedThreads]
+    T --> A[story-arc-service]
+    A --> M[memorySummary / knownFacts / unresolvedThreads / resolvedThreads]
     M --> N
 ```
 
@@ -168,7 +180,9 @@ flowchart LR
 ### 1. 开局生成
 
 - 用户在 `StartScreen` 输入灵感、语言、年龄分级、可选视觉风格。
+- 用户选择故事长度：短篇、中篇或长篇。
 - 系统先做输入安全检查。
+- `createInitialState()` 初始化 `targetTurns`、`currentPhase`、`endingReadiness` 等故事生命周期字段。
 - `narrative-service` 生成首幕 scene。
 - 服务端写入 `game_sessions`、`scenes`、`choices`。
 - 默认不创建图片任务；如果启用场景图，才会写入 `asset_jobs`。
@@ -178,16 +192,26 @@ flowchart LR
 - 用户选择一个 choice。
 - 服务端读取当前 `StoryState`、上一幕 `memorySummary` 和所选项。
 - `applyChoiceEffects()` 更新变量、flags、inventory、relations、endingPotential。
+- `story-arc-service` 根据 `turn / targetTurns` 计算当前阶段，并决定是否进入收束或结局。
 - 再次调用 LLM 生成下一幕。
 - 新幕会写入 DB，并作为新的当前 scene。
 
-### 3. 恢复与重试
+### 3. 故事结束
+
+- 故事不会无限续写。
+- 短篇目标 7-12 步，中篇目标 20-40 步，长篇目标 50-100 步。
+- 阶段按 `setup`、`development`、`crisis`、`resolution`、`ending` 推进。
+- 接近结局时 prompt 会要求回收旧伏笔、减少新 NPC 和新主线。
+- 达到 `targetTurns`、`endingReadiness` 或结局条件后，session 会进入 `ended`。
+- 前端在已完结状态下隐藏普通选择，并提供导出、分享、新故事入口。
+
+### 4. 恢复与重试
 
 - 客户端持久化 `sessionId` 和 `ownerToken`。
 - 恢复会话时读取完整 scene，而不是只读摘要。
 - 失败后可依据 `lastAction` 做重试。
 
-### 4. 场景图附属链路
+### 5. 场景图附属链路
 
 - 默认关闭。
 - 只有开局勾选或环境变量开启时才创建图片任务。
@@ -313,6 +337,7 @@ curl http://localhost:3000/api/health
 | `OPENAI_MODEL` | LLM 模型 |
 | `IMAGE_PROVIDER` | `mock` / `bfl` |
 | `ENABLE_IMAGE_GENERATION` | 是否默认启用场景图 |
+| `OPENAI_TIMEOUT_MS` | LLM 请求超时控制 |
 | `BFL_API_KEY` | BFL key |
 | `TOKEN_SALT` | owner token / stream token 签名盐 |
 | `ADMIN_TOKEN` | 生产环境 `/api/stats` 鉴权 |
@@ -324,6 +349,8 @@ curl http://localhost:3000/api/health
 ### 当前默认策略
 
 - 文字剧情推进优先。
+- 故事长度默认短篇，避免首次体验过长。
+- 阶段推进和结局收束由 `story-arc-service` 控制。
 - 场景图默认关闭。
 - 图片失败不阻塞叙事。
 - 生产环境 `TOKEN_SALT` 不能使用占位值。
@@ -390,21 +417,24 @@ curl http://localhost:3000/api/health
 ## 项目文档
 
 - [PROJECT_DELIVERY_ROADMAP.md](./PROJECT_DELIVERY_ROADMAP.md)：交付路线图
+- [PROJECT_NEXT_TASK_ROADMAP.md](./PROJECT_NEXT_TASK_ROADMAP.md)：后续任务总路线图，包含故事生命周期、结局机制、Alpha/Beta/正式交付任务
 - [PROJECT_REMEDIATION_ACTION_PLAN.md](./PROJECT_REMEDIATION_ACTION_PLAN.md)：当前整改执行清单
 - [PROJECT_COMPLETION_REVIEW.md](./PROJECT_COMPLETION_REVIEW.md)：阶段性审查记录
 - [PROJECT_ROADMAP.md](./PROJECT_ROADMAP.md)：较早阶段路线图
 - [IMPROVEMENTS_CHECKLIST.md](./IMPROVEMENTS_CHECKLIST.md)：历史改进清单
 
-当前执行优先级：先按 `PROJECT_REMEDIATION_ACTION_PLAN.md` 收口文字剧情主流程，再继续完善图片附属模块。
+当前执行优先级：先按 `PROJECT_NEXT_TASK_ROADMAP.md` 验证故事生命周期和结局收束，再继续完善图片附属模块、Docker/DB/Redis 冒烟和正式交付能力。
 
 ---
 
 ## 当前状态
 
 - 文字剧情推进主流程可用。
+- 故事长度选择、阶段推进、目标步数和结局状态已接入。
+- 旧版固定 12 步硬结束已替换为动态 `targetTurns` / `endingReadiness` 机制。
 - 会话恢复、分享、导出、权限校验已接通。
 - 场景图默认关闭，已降级为可选增强模块。
-- 全量本地质量门最近一次验证通过：
+- 全量本地质量门曾验证通过；当前故事生命周期改动仍需在提交前重新复跑：
   - `npm run typecheck`
   - `npm run lint`
   - `npm test`
@@ -412,9 +442,9 @@ curl http://localhost:3000/api/health
 
 仍需继续完成：
 
-- 真实 PostgreSQL `db:smoke`
-- 文字主流程 Playwright E2E
-- 分支质量与记忆连续性增强
+- 故事生命周期全量单测和 E2E 继续补强
+- 中篇 20-40 步、长篇 50-100 步真实回归验证
+- 结局自然度、伏笔回收和导出结局摘要继续打磨
 - 图片开启模式下的 Redis / worker / R2/S3 全链路验证
 
 ---

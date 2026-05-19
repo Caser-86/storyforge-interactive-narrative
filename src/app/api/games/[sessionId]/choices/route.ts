@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { generateNarrative, generateFallbackNarrative } from "@/lib/narrative-service";
 import { applyChoiceEffects } from "@/lib/story-state-service";
+import { advanceStoryArc, shouldEndStory, determineEndingType } from "@/lib/story-arc-service";
 import { computePromptHash } from "@/lib/asset-service";
 import { enqueueAssetJob } from "@/lib/asset-queue";
 import { query, initDb, withTransaction } from "@/lib/db";
@@ -139,8 +140,14 @@ export async function POST(
     }
 
     const newState = applyChoiceEffects(storyState, selectedChoice, narrative.statePatch);
+    const arcState = advanceStoryArc(newState);
+    const isEnding = shouldEndStory(arcState);
 
-    const enableImages = storyState.flags?.imageGenerationEnabled === true;
+    if (isEnding && !arcState.endingType) {
+      arcState.endingType = determineEndingType(arcState);
+    }
+
+    const enableImages = arcState.flags?.imageGenerationEnabled === true;
     const assetJobId = enableImages ? `asset_${uuidv4().replace(/-/g, "").slice(0, 12)}` : null;
     const promptHash = enableImages ? computePromptHash(narrative.scene.artPrompt) : null;
 
@@ -189,10 +196,10 @@ export async function POST(
 
       await tx.query(
         `UPDATE game_sessions SET current_scene_id = $1, state_json = $2, updated_at = NOW() WHERE id = $3`,
-        [newSceneId, JSON.stringify(newState), sessionId]
+        [newSceneId, JSON.stringify(arcState), sessionId]
       );
 
-      if (newState.endingPotential >= 80 || newState.turn >= 12) {
+      if (isEnding) {
         await tx.query(
           `UPDATE game_sessions SET status = 'ended', updated_at = NOW() WHERE id = $1`,
           [sessionId]
@@ -281,6 +288,14 @@ export async function POST(
         llmError,
         imageGenerationEnabled: enableImages,
       },
+      sessionStatus: isEnding ? "ended" : "active",
+      storyProgress: {
+        turn: arcState.turn,
+        targetTurns: arcState.targetTurns,
+        currentPhase: arcState.currentPhase,
+        endingReadiness: arcState.endingReadiness,
+      },
+      isEnding,
     }, `POST /api/games/${sessionId}/choices`));
   } catch (error) {
     if (error instanceof Error && error.message === "DUPLICATE_CHOICE") {

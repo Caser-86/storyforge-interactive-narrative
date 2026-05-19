@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+export type StoryLengthPreset = "short" | "medium" | "long" | "custom";
+export type StoryPhase = "setup" | "development" | "crisis" | "resolution" | "ending";
+export type EndingType = "success" | "bittersweet" | "failure" | "open";
+export type ChoiceRoute = "investigate" | "act" | "social" | "stealth" | "sacrifice";
+
+export const STORY_LENGTH_CONFIG: Record<StoryLengthPreset, { minTurns: number; maxTurns: number; defaultTarget: number }> = {
+  short: { minTurns: 7, maxTurns: 12, defaultTarget: 10 },
+  medium: { minTurns: 20, maxTurns: 40, defaultTarget: 30 },
+  long: { minTurns: 50, maxTurns: 100, defaultTarget: 70 },
+  custom: { minTurns: 5, maxTurns: 120, defaultTarget: 10 },
+};
+
 export const NpcSchema = z.object({
   id: z.string().regex(/^npc_[a-z0-9_]+$/),
   name: z.string().min(1).max(24),
@@ -14,6 +26,7 @@ export const ModelChoiceSchema = z.object({
   label: z.string().min(4).max(42),
   intent: z.string().min(10).max(120),
   risk: z.enum(["low", "medium", "high"]),
+  route: z.enum(["investigate", "act", "social", "stealth", "sacrifice"]).optional(),
   preview: z.string().min(10).max(100),
   stateEffects: z.record(z.string(), z.number().min(-20).max(20)),
 });
@@ -23,6 +36,7 @@ export const PersistedChoiceSchema = z.object({
   label: z.string().min(4).max(42),
   intent: z.string().min(10).max(120),
   risk: z.enum(["low", "medium", "high"]),
+  route: z.enum(["investigate", "act", "social", "stealth", "sacrifice"]).optional(),
   preview: z.string().min(10).max(100),
   stateEffects: z.record(z.string(), z.number().min(-20).max(20)),
   modelChoiceId: z.string().regex(/^choice_[a-c]$/).optional(),
@@ -95,6 +109,7 @@ export interface StoryState {
   inventory: string[];
   knownFacts: string[];
   unresolvedThreads: string[];
+  resolvedThreads: string[];
   flags: Record<string, boolean>;
   npcRelations: Record<string, number>;
   endingPotential: number;
@@ -102,6 +117,19 @@ export interface StoryState {
     visualStyle: string;
     musicStyle: string;
   };
+  storyLengthPreset: StoryLengthPreset;
+  targetTurns: number;
+  minTurns: number;
+  maxTurns: number;
+  currentPhase: StoryPhase;
+  storyGoal: string;
+  endCondition: string;
+  phaseStartedAtTurn: number;
+  endingReadiness: number;
+  allowNewThreads: boolean;
+  endingType: EndingType | null;
+  endingSummary: string;
+  lastChoiceImpact: string;
 }
 
 export interface GameSession {

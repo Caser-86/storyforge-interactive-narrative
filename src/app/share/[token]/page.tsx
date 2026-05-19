@@ -19,18 +19,27 @@ interface ReplayScene {
   imageUrl?: string | null;
 }
 
+const ENDING_LABELS: Record<string, string> = {
+  success: "圆满结局",
+  bittersweet: "苦甜结局",
+  failure: "失败结局",
+  open: "开放式结局",
+};
+
 export default function SharePage() {
   const params = useParams();
   const token = params?.token as string;
   const [scenes, setScenes] = useState<ReplayScene[]>([]);
   const [seedPrompt, setSeedPrompt] = useState("");
+  const [sessionStatus, setSessionStatus] = useState<string>("");
+  const [endingType, setEndingType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
 
-    apiFetch<{ session: { seedPrompt: string }; scenes: ReplayScene[] }>(`/api/share/${token}`)
+    apiFetch<{ session: { seedPrompt: string; status: string; endingType: string | null }; scenes: ReplayScene[] }>(`/api/share/${token}`)
       .then((result) => {
         if (!result.ok) {
           setError(result.status === 404 ? "分享链接不存在或已过期" : formatApiError(result));
@@ -39,6 +48,8 @@ export default function SharePage() {
         }
         const data = result.data;
         setSeedPrompt(data.session?.seedPrompt || "");
+        setSessionStatus(data.session?.status || "");
+        setEndingType(data.session?.endingType ?? null);
         const loadedScenes: ReplayScene[] = data.scenes || [];
         setScenes(loadedScenes);
         setLoading(false);
@@ -146,7 +157,18 @@ export default function SharePage() {
           ))}
         </div>
 
-        <div className="text-center mt-8 text-gray-500 text-sm">— 故事结束 —</div>
+        <div className="text-center mt-8">
+          {sessionStatus === "ended" ? (
+            <div className="space-y-2">
+              <div className="text-lg font-bold text-[#e94560]">
+                {endingType ? (ENDING_LABELS[endingType] || "故事完结") : "故事完结"}
+              </div>
+              <div className="text-gray-500 text-sm">— 全剧终 —</div>
+            </div>
+          ) : (
+            <div className="text-gray-500 text-sm">— 故事进行中 —</div>
+          )}
+        </div>
       </div>
     </div>
   );

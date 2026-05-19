@@ -256,6 +256,21 @@ const MIGRATIONS: { version: number; up: string }[] = [
       ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
     `,
   },
+  {
+    version: 10,
+    up: `
+      UPDATE game_sessions SET user_id = NULL WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users);
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name = 'game_sessions' AND constraint_name = 'game_sessions_user_id_fkey'
+        ) THEN
+          ALTER TABLE game_sessions ADD CONSTRAINT game_sessions_user_id_fkey
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 export async function initDb() {

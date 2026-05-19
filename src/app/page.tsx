@@ -80,6 +80,16 @@ export default function Home() {
 
         es.onerror = () => {
           es.close();
+          const retryTimer = setTimeout(() => {
+            connectSSE().then((fn) => {
+              if (fn) cleanup = fn;
+            });
+          }, 5000);
+          const prevCleanup = cleanup;
+          cleanup = () => {
+            clearTimeout(retryTimer);
+            prevCleanup?.();
+          };
         };
 
         return () => {

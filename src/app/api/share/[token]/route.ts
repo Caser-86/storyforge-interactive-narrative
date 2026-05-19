@@ -36,6 +36,12 @@ export async function GET(
       return apiError(ErrorCodes.NOT_FOUND, "Share link has expired", 410);
     }
 
+    let endingType: string | null = null;
+    try {
+      const stateJson = typeof session.state_json === "string" ? JSON.parse(session.state_json) : session.state_json;
+      endingType = stateJson?.endingType ?? null;
+    } catch {}
+
     const scenesRes = await query(
       `SELECT id, turn, title, location, time_of_day, mood, body, npcs_json, chapter_goal FROM scenes WHERE session_id = $1 ORDER BY turn`,
       [session.id]
@@ -58,6 +64,8 @@ export async function GET(
         seedPrompt: session.seed_prompt,
         genre: session.genre,
         rating: session.rating,
+        status: session.status,
+        endingType,
       },
       scenes,
     });

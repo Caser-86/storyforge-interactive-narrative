@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getQueueHealth, isQueueAvailable } from "@/lib/asset-queue";
-import { getDailyCost, isCircuitOpen } from "@/lib/observability-persist";
+import { getDailyCost, isCircuitOpen, isWithinBudget } from "@/lib/observability-persist";
 
 type HealthStatus = "ok" | "degraded" | "error";
 
@@ -65,7 +65,9 @@ export async function GET() {
   const dailyCost = getDailyCost();
   checks.budget = {
     status: "ok",
-    details: dailyCost,
+    details: process.env.NODE_ENV === "production"
+      ? { withinBudget: isWithinBudget() }
+      : dailyCost,
   };
 
   if (process.env.NODE_ENV === "production") {

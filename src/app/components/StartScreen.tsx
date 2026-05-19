@@ -41,12 +41,15 @@ export default function StartScreen() {
   const [rating, setRating] = useState("PG-13");
   const [visualStyle, setVisualStyle] = useState("");
   const [enableImages, setEnableImages] = useState(false);
+  const [storyLengthPreset, setStoryLengthPreset] = useState<"short" | "medium" | "long">("short");
   const [templates, setTemplates] = useState<StyleTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [userGames, setUserGames] = useState<UserGame[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<StyleTemplate | null>(null);
 
-  const { createGame, loadSession } = useGameStore();
+  const { createGame, loadSession, status } = useGameStore();
 
   useEffect(() => {
     apiFetch<{ templates: StyleTemplate[] }>("/api/templates")
@@ -61,11 +64,27 @@ export default function StartScreen() {
     }
   }, []);
 
-  const handleTemplateSelect = (t: StyleTemplate) => {
+  const applyTemplate = (t: StyleTemplate) => {
     setSelectedTemplate(t.id);
     setPrompt(t.samplePrompt);
     setVisualStyle(t.visualStyle);
+    setStoryLengthPreset(t.lengthPreset);
     setShowTemplates(false);
+  };
+
+  const handleTemplateSelect = (t: StyleTemplate) => {
+    if (prompt.trim()) {
+      setPendingTemplate(t);
+    } else {
+      applyTemplate(t);
+    }
+  };
+
+  const confirmTemplateOverride = () => {
+    if (pendingTemplate) {
+      applyTemplate(pendingTemplate);
+      setPendingTemplate(null);
+    }
   };
 
   return (
@@ -94,6 +113,8 @@ export default function StartScreen() {
 
           <div>
             <button
+              type="button"
+              data-testid="template-toggle"
               onClick={() => setShowTemplates(!showTemplates)}
               className="text-sm text-[#e94560] hover:underline"
             >
@@ -104,6 +125,8 @@ export default function StartScreen() {
                 {templates.map((t) => (
                   <button
                     key={t.id}
+                    type="button"
+                    data-testid={`template-${t.id}`}
                     onClick={() => handleTemplateSelect(t)}
                     className={`text-left p-3 rounded-lg border transition-colors ${
                       selectedTemplate === t.id
@@ -153,6 +176,38 @@ export default function StartScreen() {
           </div>
 
           <div>
+            <label className="block text-sm text-gray-300 mb-1">故事长度</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: "short" as const, label: "短篇", desc: "7-12步", time: "约10分钟", steps: "预计7-12步完成" },
+                { value: "medium" as const, label: "中篇", desc: "20-40步", time: "约30分钟", steps: "预计20-40步完成" },
+                { value: "long" as const, label: "长篇", desc: "50-100步", time: "约1小时", steps: "预计50-100步完成" },
+              ]).map((opt) => (
+                <button
+                  type="button"
+                  key={opt.value}
+                  data-testid={`length-${opt.value}`}
+                  onClick={() => setStoryLengthPreset(opt.value)}
+                  className={`p-2 rounded-lg border text-center transition-colors ${
+                    storyLengthPreset === opt.value
+                      ? "border-[#e94560] bg-[#e94560]/10"
+                      : "border-[#333] bg-[#1a1a2e] hover:border-[#555]"
+                  }`}
+                >
+                  <span className="block text-sm font-medium text-white">{opt.label}</span>
+                  <span className="block text-xs text-gray-400">{opt.desc}</span>
+                  <span className="block text-xs text-gray-500">{opt.time}</span>
+                </button>
+              ))}
+            </div>
+            {storyLengthPreset === "long" && (
+              <p className="mt-2 text-xs text-yellow-400/80">
+                ⚠️ 长篇模式需要更长的生成时间和更多 token，建议在网络稳定时使用
+              </p>
+            )}
+          </div>
+
+          <div>
             <label className="block text-sm text-gray-300 mb-1">视觉风格（可选）</label>
             <input
               value={visualStyle}
@@ -176,14 +231,23 @@ export default function StartScreen() {
           </label>
 
           <button
-            onClick={() => createGame(prompt, language, rating, {
-              ...(visualStyle ? { visualStyle } : {}),
-              ...(enableImages ? { enableImages: true } : {}),
-            })}
-            disabled={!prompt.trim()}
+            onClick={async () => {
+              if (isCreating) return;
+              setIsCreating(true);
+              try {
+                await createGame(prompt, language, rating, {
+                  storyLengthPreset,
+                  ...(visualStyle ? { visualStyle } : {}),
+                  ...(enableImages ? { enableImages: true } : {}),
+                });
+              } finally {
+                setIsCreating(false);
+              }
+            }}
+            disabled={!prompt.trim() || isCreating || status === "generating"}
             className="w-full py-3 rounded-lg bg-gradient-to-r from-[#e94560] to-[#ff6b6b] text-white font-semibold text-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            开始冒险
+            {isCreating || status === "generating" ? "正在创建..." : "开始冒险"}
           </button>
 
           {userGames.length > 0 && (
@@ -210,6 +274,33 @@ export default function StartScreen() {
             </div>
           )}
         </div>
+
+        {pendingTemplate && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setPendingTemplate(null)}>
+            <div className="bg-[#1a1a2e] border border-[#333] rounded-xl p-6 max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-white font-semibold mb-2">替换灵感？</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                你已输入了灵感内容，选择模板会替换当前内容。是否继续？
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPendingTemplate(null)}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmTemplateOverride}
+                  className="px-4 py-2 text-sm bg-[#e94560] text-white rounded-lg hover:bg-[#e94560]/80 transition-colors"
+                >
+                  替换
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

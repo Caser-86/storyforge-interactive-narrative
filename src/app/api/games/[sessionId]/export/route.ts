@@ -90,6 +90,7 @@ export async function GET(
             prompt: ap?.prompt || "",
             negativePrompt: ap?.negativePrompt || "",
             aspectRatio: ap?.aspectRatio || "16:9",
+            styleLock: ap?.styleLock || "",
           };
         })(),
         npcs: typeof scene.npcs_json === "string" ? JSON.parse(scene.npcs_json) : scene.npcs_json,
@@ -108,6 +109,24 @@ export async function GET(
       });
     }
 
+    const safeState = (() => {
+      const raw = typeof session.state_json === "string" ? JSON.parse(session.state_json) : session.state_json;
+      if (!raw) return {};
+      return {
+        chapter: raw.chapter,
+        turn: raw.turn,
+        tone: raw.tone,
+        protagonist: raw.protagonist,
+        storyGoal: raw.storyGoal,
+        currentPhase: raw.currentPhase,
+        endingType: raw.endingType,
+        endingSummary: raw.endingSummary,
+        inventory: raw.inventory,
+        knownFacts: raw.knownFacts,
+        npcRelations: raw.npcRelations,
+      };
+    })();
+
     return NextResponse.json({
       session: {
         id: session.id,
@@ -116,7 +135,7 @@ export async function GET(
         language: session.language,
         rating: session.rating,
         status: session.status,
-        state: typeof session.state_json === "string" ? JSON.parse(session.state_json) : session.state_json,
+        state: safeState,
         createdAt: session.created_at,
       },
       scenes,
@@ -186,6 +205,16 @@ function renderMarkdown(
       }
     }
 
+    if (scene.stateEffects && Object.keys(scene.stateEffects as Record<string, unknown>).length > 0) {
+      lines.push(`### 📊 状态变化`);
+      lines.push(``);
+      for (const [key, val] of Object.entries(scene.stateEffects as Record<string, number>)) {
+        const arrow = val > 0 ? "↑" : val < 0 ? "↓" : "→";
+        lines.push(`- ${key}: ${arrow} ${val > 0 ? "+" : ""}${val}`);
+      }
+      lines.push(``);
+    }
+
     if (chapterGoal) {
       lines.push(`> 🎯 **章节目标**：${chapterGoal}`);
       lines.push(``);
@@ -200,6 +229,43 @@ function renderMarkdown(
   lines.push(``);
   lines.push(`---`);
   lines.push(``);
+
+  const state = session.state_json as Record<string, unknown> | null;
+  if (state) {
+    const endingType = state.endingType as string | null;
+    const endingSummary = state.endingSummary as string | null;
+    const storyGoal = state.storyGoal as string | null;
+    const inventory = state.inventory as string[] | null;
+    const knownFacts = state.knownFacts as string[] | null;
+
+    if (endingType || endingSummary) {
+      lines.push(`## 🏁 结局`);
+      lines.push(``);
+      if (endingType) lines.push(`**结局类型**：${endingType}`);
+      if (endingSummary) lines.push(``);
+      if (endingSummary) lines.push(endingSummary);
+      lines.push(``);
+    }
+
+    if (storyGoal) {
+      lines.push(`> 🎯 **故事目标**：${storyGoal}`);
+      lines.push(``);
+    }
+
+    if (inventory && inventory.length > 0) {
+      lines.push(`**持有道具**：${inventory.join("、")}`);
+      lines.push(``);
+    }
+
+    if (knownFacts && knownFacts.length > 0) {
+      lines.push(`**已知事实**：`);
+      for (const fact of knownFacts) {
+        lines.push(`- ${fact}`);
+      }
+      lines.push(``);
+    }
+  }
+
   lines.push(`*— 故事结束 —*`);
   return lines.join("\n");
 }

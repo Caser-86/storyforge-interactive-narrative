@@ -419,9 +419,9 @@ export async function memoryInitDb(): Promise<void> {
   if (globalObj[initializedKey]) {
     return;
   }
-  memoryDb.migrations = [1, 2, 3, 4, 5, 6, 7, 8];
+  memoryDb.migrations = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   globalObj[initializedKey] = true;
   console.log("[MemoryDB] Initialized with mock migrations");
 }
 
-export const isMemoryMode = !process.env.DATABASE_URL;
+export const isMemoryMode = process.env.USE_MEMORY_DB === "true" || !process.env.DATABASE_URL;

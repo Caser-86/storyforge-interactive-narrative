@@ -1,4 +1,12 @@
-import type { NarrativeOutput, Choice } from "./schemas";
+import type { NarrativeOutput, Choice, ChoiceRoute } from "./schemas";
+
+const ROUTE_LABELS: Record<ChoiceRoute, string> = {
+  investigate: "调查",
+  act: "行动",
+  social: "交涉",
+  stealth: "潜行",
+  sacrifice: "牺牲",
+};
 
 export interface QualityCheckResult {
   passed: boolean;
@@ -254,6 +262,86 @@ export function checkStateEffectsDifference(choices: Choice[]): QualityCheckResu
   };
 }
 
+export function checkRouteCoverage(choices: Choice[]): QualityCheckResult {
+  const issues: string[] = [];
+  const routes = choices.map((c) => c.route).filter((r): r is ChoiceRoute => r != null);
+  const uniqueRoutes = new Set(routes);
+
+  if (choices.length >= 3 && routes.length < 2) {
+    issues.push("至少2个选项应有路线类型(investigate/act/social/stealth/sacrifice)");
+  }
+
+  if (routes.length === choices.length && uniqueRoutes.size < 2) {
+    issues.push(`所有选项路线类型相同(${routes.map((r) => ROUTE_LABELS[r]).join("/")})，缺乏路线差异`);
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues,
+    shouldRetry: routes.length === choices.length && uniqueRoutes.size < 2,
+  };
+}
+
+export function checkMainlineAdvancement(choices: Choice[]): QualityCheckResult {
+  const issues: string[] = [];
+
+  const hasMainline = choices.some((c) => {
+    const intent = c.intent.toLowerCase();
+    return /推进|前进|追|寻找|解决|完成|攻|追击|揭示|发现真相|达成|面对/i.test(intent);
+  });
+
+  if (!hasMainline && choices.length > 0) {
+    issues.push("至少1个选项应推进主线目标");
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues,
+    shouldRetry: false,
+  };
+}
+
+export function checkCostExposure(choices: Choice[]): QualityCheckResult {
+  const issues: string[] = [];
+
+  const hasCost = choices.some((c) => {
+    const effects = Object.values(c.stateEffects);
+    return effects.some((v) => v < 0);
+  });
+
+  if (!hasCost && choices.length > 0) {
+    issues.push("至少1个选项应暴露代价(有负面的 stateEffects)");
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues,
+    shouldRetry: false,
+  };
+}
+
+export function checkPreviewDistinctness(choices: Choice[]): QualityCheckResult {
+  const issues: string[] = [];
+
+  for (let i = 0; i < choices.length; i++) {
+    for (let j = i + 1; j < choices.length; j++) {
+      const sim = choiceSimilarity(
+        { ...choices[i], label: choices[i].preview, intent: "" },
+        { ...choices[j], label: choices[j].preview, intent: "" }
+      );
+      if (sim > 0.75) {
+        issues.push(`选项预览 "${choices[i].preview.slice(0, 20)}" 和 "${choices[j].preview.slice(0, 20)}" 过于相似`);
+      }
+    }
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues,
+    shouldRetry: issues.length > 0,
+  };
+}
+
 export function runAllQualityChecks(
   narrative: NarrativeOutput,
   knownThreads: string[] = [],
@@ -266,6 +354,10 @@ export function runAllQualityChecks(
     checkChoiceSimilarity(narrative.scene.choices),
     checkRiskCoverage(narrative.scene.choices),
     checkStateEffectsDifference(narrative.scene.choices),
+    checkRouteCoverage(narrative.scene.choices),
+    checkMainlineAdvancement(narrative.scene.choices),
+    checkCostExposure(narrative.scene.choices),
+    checkPreviewDistinctness(narrative.scene.choices),
     checkThreadReference(narrative, knownThreads),
     checkNpcCount(narrative),
     checkChapterProgression(turn, narrative),

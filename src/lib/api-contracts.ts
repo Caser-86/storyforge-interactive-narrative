@@ -7,6 +7,17 @@ import {
   SafetySchema,
 } from "./schemas";
 
+export const StoryLengthPresetSchema = z.enum(["short", "medium", "long", "custom"]);
+
+export const CreateGameOptionsSchema = z.object({
+  storyLengthPreset: StoryLengthPresetSchema.default("short"),
+  targetTurns: z.number().int().min(5).max(120).optional(),
+  enableImages: z.boolean().optional(),
+  visualStyle: z.string().max(220).optional(),
+});
+
+export type CreateGameOptions = z.infer<typeof CreateGameOptionsSchema>;
+
 export const ApiSceneSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -41,6 +52,13 @@ const MetaSchema = z.object({
   safetyWarnings: z.array(z.string()).optional(),
 }).passthrough();
 
+const StoryProgressSchema = z.object({
+  turn: z.number(),
+  targetTurns: z.number(),
+  currentPhase: z.string(),
+  endingReadiness: z.number(),
+});
+
 const PlayResponseBaseSchema = z.object({
   sessionId: z.string(),
   scene: ApiSceneSchema,
@@ -53,6 +71,7 @@ const PlayResponseBaseSchema = z.object({
 export const CreateGameResponseSchema = PlayResponseBaseSchema.extend({
   ownerToken: z.string().min(1),
   statePatch: z.record(z.unknown()),
+  storyProgress: StoryProgressSchema.optional(),
 });
 
 export type CreateGameResponse = z.infer<typeof CreateGameResponseSchema>;
@@ -60,6 +79,9 @@ export type CreateGameResponse = z.infer<typeof CreateGameResponseSchema>;
 export const ChoiceResponseSchema = PlayResponseBaseSchema.extend({
   previousChoiceId: z.string(),
   stateDiff: z.record(z.number()),
+  sessionStatus: z.enum(["active", "ended"]).optional(),
+  storyProgress: StoryProgressSchema.optional(),
+  isEnding: z.boolean().optional(),
 });
 
 export type ChoiceResponse = z.infer<typeof ChoiceResponseSchema>;

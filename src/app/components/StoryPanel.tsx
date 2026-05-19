@@ -6,7 +6,7 @@ import { apiFetch, formatApiError } from "@/lib/client-api";
 import ChoiceList from "./ChoiceList";
 
 export default function StoryPanel() {
-  const { currentScene, stateDiff, safety, timing, history, reset, sessionId, ownerToken } = useGameStore();
+  const { currentScene, stateDiff, safety, timing, history, reset, sessionId, ownerToken, storyProgress, isEnding, status } = useGameStore();
   const [shareCopied, setShareCopied] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [showStateDiff, setShowStateDiff] = useState(false);
@@ -155,6 +155,34 @@ export default function StoryPanel() {
         </div>
       )}
 
+      {storyProgress && (
+        <div data-testid="story-progress" className="mb-4 p-2.5 rounded-lg bg-[#1a1a2e]/60 border border-[#333]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-gray-400">
+              {storyProgress.currentPhase === "setup" && "📖 开端"}
+              {storyProgress.currentPhase === "development" && "🔍 展开"}
+              {storyProgress.currentPhase === "crisis" && "⚡ 危机"}
+              {storyProgress.currentPhase === "resolution" && "🔄 收束"}
+              {storyProgress.currentPhase === "ending" && "🎬 结局"}
+            </span>
+            <span className="text-xs text-gray-500">
+              第 {storyProgress.turn} / 目标 {storyProgress.targetTurns} 步
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-[#333] rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                storyProgress.endingReadiness >= 60 ? "bg-[#e94560]" : "bg-blue-500"
+              }`}
+              style={{ width: `${Math.min(100, (storyProgress.turn / storyProgress.targetTurns) * 100)}%` }}
+            />
+          </div>
+          {storyProgress.endingReadiness >= 60 && !isEnding && (
+            <p className="text-xs text-[#e94560] mt-1">故事正在收束...</p>
+          )}
+        </div>
+      )}
+
       <div className="mb-4">
         <div className="flex flex-wrap items-center gap-2 mb-1">
           {currentScene.mood.map((m, i) => (
@@ -187,45 +215,85 @@ export default function StoryPanel() {
             >
               <div className="absolute left-0 top-3 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px] border-r-[#1e1e38]" />
               <div className="bg-[#1e1e38] border border-[#3a3a5a] rounded-lg p-4 ml-2">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="text-[#e94560] font-semibold text-sm">{npc.name}</span>
-                  <span className="text-gray-500 text-xs px-1.5 py-0.5 rounded bg-[#2a2a4a]">{npc.role}</span>
-                  <span className="text-gray-500 text-xs">{npc.attitude}</span>
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#e94560]/40 to-[#0f3460]/40 border border-[#3a3a5a] flex items-center justify-center shrink-0 text-sm">
+                    {npc.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="text-[#e94560] font-semibold text-sm">{npc.name}</span>
+                      <span className="text-gray-500 text-xs px-1.5 py-0.5 rounded bg-[#2a2a4a]">{npc.role}</span>
+                      <span className="text-gray-500 text-xs">{npc.attitude}</span>
+                    </div>
+                    <p className="text-gray-200 italic text-sm leading-relaxed break-words border-l-2 border-[#e94560]/40 pl-3">&ldquo;{npc.dialogue}&rdquo;</p>
+                  </div>
                 </div>
-                <p className="text-gray-200 italic text-sm leading-relaxed break-words">&ldquo;{npc.dialogue}&rdquo;</p>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {Object.keys(stateDiff).length > 0 && (
-        <div className={`mb-4 p-3 rounded-lg bg-[#1a1a2e]/50 border border-[#333] transition-all duration-500 ${showStateDiff ? "opacity-100 border-[#e94560]/30" : "opacity-40"}`}>
-          <p className="text-xs text-gray-400 mb-1">状态变化</p>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(stateDiff).map(([key, value]) => (
-              <span
-                key={key}
-                className={`text-xs px-2 py-0.5 rounded ${
-                  value > 0
-                    ? "bg-green-500/20 text-green-400"
-                    : value < 0
-                    ? "bg-red-500/20 text-red-400"
-                    : "bg-gray-500/20 text-gray-400"
-                }`}
-              >
-                {key}: {value > 0 ? "+" : ""}{value}
-              </span>
-            ))}
+      {Object.keys(stateDiff).length > 0 && (() => {
+        const significant = Object.entries(stateDiff).filter(([, v]) => Math.abs(v as number) >= 3);
+        if (significant.length === 0) return null;
+        return (
+          <div className={`mb-4 p-3 rounded-lg bg-[#1a1a2e]/50 border border-[#333] transition-all duration-500 ${showStateDiff ? "opacity-100 border-[#e94560]/30" : "opacity-40"}`}>
+            <p className="text-xs text-gray-400 mb-1">状态变化</p>
+            <div className="flex flex-wrap gap-2">
+              {significant.map(([key, value]) => (
+                <span
+                  key={key}
+                  className={`text-xs px-2 py-0.5 rounded ${
+                    (value as number) > 0
+                      ? "bg-green-500/20 text-green-400"
+                      : (value as number) < 0
+                      ? "bg-red-500/20 text-red-400"
+                      : "bg-gray-500/20 text-gray-400"
+                  }`}
+                >
+                  {key}: {(value as number) > 0 ? "+" : ""}{value as number}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {safety && safety.contentWarnings.length > 0 && (
         <div className="mb-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
           <p className="text-xs text-yellow-400">
             ⚠️ 内容提示：{safety.contentWarnings.join("、")}
           </p>
+        </div>
+      )}
+
+      {(isEnding || status === "ended") && (
+        <div data-testid="story-ending" className="mb-6 p-5 rounded-xl bg-gradient-to-br from-[#e94560]/20 to-[#0f3460]/20 border border-[#e94560]/40">
+          <h3 className="text-xl font-bold text-white mb-2">🎬 故事已完结</h3>
+          <p className="text-gray-300 text-sm mb-4">
+            你的选择塑造了这个故事的走向。感谢你的冒险！
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => handleExport("markdown")}
+              className="px-4 py-2 text-sm bg-[#1a1a2e] border border-[#333] text-white rounded-lg hover:border-[#e94560] transition-colors"
+            >
+              📄 导出故事
+            </button>
+            <button
+              onClick={handleShare}
+              className="px-4 py-2 text-sm bg-[#1a1a2e] border border-[#333] text-white rounded-lg hover:border-[#e94560] transition-colors"
+            >
+              {shareCopied ? "✅ 已复制!" : "🔗 分享故事"}
+            </button>
+            <button
+              onClick={() => reset()}
+              className="px-4 py-2 text-sm bg-gradient-to-r from-[#e94560] to-[#ff6b6b] text-white rounded-lg hover:opacity-90 transition-opacity"
+            >
+              ✨ 新故事
+            </button>
+          </div>
         </div>
       )}
 

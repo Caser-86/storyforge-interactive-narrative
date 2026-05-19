@@ -175,3 +175,136 @@ describe("Choice differentiation", () => {
     expect(checkStateEffectsDifference(choices).passed).toBe(true);
   });
 });
+
+describe("P1-2 Memory continuity enhancements", () => {
+  const baseState: StoryState = createInitialState("sess_p12", "P1-2测试");
+
+  it("lastChoiceImpact is set from statePatch", () => {
+    const choice: Choice = {
+      id: "c1", label: "调查线索", intent: "仔细检查房间", risk: "low",
+      preview: "你仔细检查了房间", stateEffects: { caution: 2 },
+    };
+    const result = applyChoiceEffects(baseState, choice, {
+      lastChoiceImpact: "发现了隐藏的密室入口",
+    });
+    expect(result.lastChoiceImpact).toBe("发现了隐藏的密室入口");
+  });
+
+  it("lastChoiceImpact auto-generates from choice when not provided", () => {
+    const choice: Choice = {
+      id: "c1", label: "调查线索", intent: "仔细检查房间", risk: "low",
+      preview: "你仔细检查了房间", stateEffects: { caution: 2 },
+    };
+    const result = applyChoiceEffects(baseState, choice, {});
+    expect(result.lastChoiceImpact).toContain("调查线索");
+    expect(result.lastChoiceImpact).toContain("仔细检查房间");
+  });
+
+  it("unresolvedThreads > 5 triggers forced recycling", () => {
+    const state: StoryState = {
+      ...baseState,
+      unresolvedThreads: ["伏笔1", "伏笔2", "伏笔3", "伏笔4", "伏笔5", "伏笔6"],
+    };
+    const choice: Choice = {
+      id: "c1", label: "继续", intent: "继续前进", risk: "low",
+      preview: "你继续前进", stateEffects: { tension: 1 },
+    };
+    const result = applyChoiceEffects(state, choice, {});
+    expect(result.unresolvedThreads.length).toBeLessThanOrEqual(5);
+    expect(result.resolvedThreads.some((t) => t.includes("[自动回收]"))).toBe(true);
+    expect(result.allowNewThreads).toBe(false);
+  });
+
+  it("allowNewThreads is true when unresolvedThreads <= 5", () => {
+    const state: StoryState = {
+      ...baseState,
+      unresolvedThreads: ["伏笔1", "伏笔2", "伏笔3"],
+    };
+    const choice: Choice = {
+      id: "c1", label: "继续", intent: "继续前进", risk: "low",
+      preview: "你继续前进", stateEffects: { tension: 1 },
+    };
+    const result = applyChoiceEffects(state, choice, {});
+    expect(result.allowNewThreads).toBe(true);
+  });
+
+  it("new unresolvedThreads are blocked when allowNewThreads is false", () => {
+    const state: StoryState = {
+      ...baseState,
+      unresolvedThreads: ["伏笔1", "伏笔2", "伏笔3", "伏笔4", "伏笔5", "伏笔6"],
+      allowNewThreads: false,
+    };
+    const choice: Choice = {
+      id: "c1", label: "继续", intent: "继续前进", risk: "low",
+      preview: "你继续前进", stateEffects: { tension: 1 },
+    };
+    const beforeCount = state.unresolvedThreads.length;
+    const result = applyChoiceEffects(state, choice, {
+      unresolvedThreads: ["新伏笔"],
+    });
+    expect(result.unresolvedThreads.length).toBeLessThanOrEqual(beforeCount);
+  });
+
+  it("knownFacts capped at 30", () => {
+    const state: StoryState = {
+      ...baseState,
+      knownFacts: Array.from({ length: 28 }, (_, i) => `事实${i + 1}`),
+    };
+    const choice: Choice = {
+      id: "c1", label: "继续", intent: "继续前进", risk: "low",
+      preview: "你继续前进", stateEffects: { tension: 1 },
+    };
+    const result = applyChoiceEffects(state, choice, {
+      knownFacts: ["新事实1", "新事实2", "新事实3", "新事实4"],
+    });
+    expect(result.knownFacts.length).toBeLessThanOrEqual(30);
+  });
+
+  it("compressContext includes lastChoiceImpact", () => {
+    const state: StoryState = {
+      ...baseState,
+      lastChoiceImpact: "选择了调查路线，发现了密室",
+    };
+    const ctx = compressContext(state);
+    expect(ctx).toContain("上次选择影响");
+    expect(ctx).toContain("选择了调查路线");
+  });
+
+  it("compressContext includes remaining steps", () => {
+    const state: StoryState = { ...baseState, turn: 5, targetTurns: 10 };
+    const ctx = compressContext(state);
+    expect(ctx).toContain("剩余5步");
+  });
+
+  it("compressContext warns when new threads blocked", () => {
+    const state: StoryState = {
+      ...baseState,
+      allowNewThreads: false,
+    };
+    const ctx = compressContext(state);
+    expect(ctx).toContain("禁止新增伏笔");
+  });
+
+  it("20-turn progression maintains story goal", () => {
+    let state: StoryState = {
+      ...baseState,
+      storyGoal: "找到失踪的村民",
+      targetTurns: 20,
+    };
+
+    for (let i = 1; i <= 20; i++) {
+      const choice: Choice = {
+        id: `c${i}`, label: `第${i}步`, intent: `第${i}步行动`, risk: "low" as const,
+        preview: `第${i}步预览`, stateEffects: { tension: i },
+      };
+      state = applyChoiceEffects(state, choice, {
+        knownFacts: [`第${i}步发现`],
+        unresolvedThreads: i <= 6 ? [`第${i}步伏笔`] : [],
+      });
+    }
+
+    expect(state.storyGoal).toBe("找到失踪的村民");
+    expect(state.knownFacts.length).toBeLessThanOrEqual(30);
+    expect(state.unresolvedThreads.length).toBeLessThanOrEqual(10);
+  });
+});

@@ -10,7 +10,8 @@ import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { getOrCreateUser } from "@/lib/user-service";
 import { hashToken } from "@/lib/crypto";
 import { shouldGenerateImages } from "@/lib/feature-flags";
-import { CreateGameResponseSchema, validateResponse } from "@/lib/api-contracts";
+import { CreateGameResponseSchema, CreateGameOptionsSchema, validateResponse } from "@/lib/api-contracts";
+import type { StoryLengthPreset } from "@/lib/schemas";
 
 let dbInitialized = false;
 
@@ -27,9 +28,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { prompt, language = "zh-CN", rating = "PG-13", options = {} } = body;
-    const requestOptions = typeof options === "object" && options !== null
-      ? options as Record<string, unknown>
-      : {};
+    const parsedOptions = CreateGameOptionsSchema.safeParse(options);
+    const requestOptions = parsedOptions.success ? parsedOptions.data : { storyLengthPreset: "short" as const };
+    const storyLengthPreset = requestOptions.storyLengthPreset as StoryLengthPreset;
+    const customTargetTurns = requestOptions.targetTurns;
     const enableImages = shouldGenerateImages(requestOptions);
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -50,8 +52,8 @@ export async function POST(request: Request) {
       const user = await getOrCreateUser(fingerprint);
       userId = user.id;
     } catch { /* user system optional */ }
-    const storyState = createInitialState(sessionId, effectivePrompt);
-    const visualStyle = typeof requestOptions.visualStyle === "string" ? requestOptions.visualStyle : "";
+    const storyState = createInitialState(sessionId, effectivePrompt, storyLengthPreset, customTargetTurns);
+    const visualStyle = requestOptions.visualStyle || "";
     storyState.styleBible.visualStyle = visualStyle;
     storyState.styleBible.musicStyle = "";
     storyState.flags.imageGenerationEnabled = enableImages;
@@ -223,6 +225,12 @@ export async function POST(request: Request) {
         memorySummary: narrative.scene.memorySummary,
       },
       statePatch: narrative.statePatch,
+      storyProgress: {
+        turn: storyState.turn,
+        targetTurns: storyState.targetTurns,
+        currentPhase: storyState.currentPhase,
+        endingReadiness: storyState.endingReadiness,
+      },
       safety: narrative.safety,
       assets: {
         imageJobId: assetJobId,

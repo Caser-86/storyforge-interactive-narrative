@@ -31,10 +31,12 @@ export interface HistoryEntry {
   choiceRisk?: string;
 }
 
+type CreateGameOptions = Record<string, string | boolean | number>;
+
 interface GameState {
   sessionId: string | null;
   ownerToken: string | null;
-  status: "idle" | "generating" | "playing" | "error";
+  status: "idle" | "generating" | "playing" | "ended" | "error";
   currentScene: SceneData | null;
   stateDiff: Record<string, number>;
   safety: Safety | null;
@@ -46,9 +48,16 @@ interface GameState {
   errorTraceId: string | null;
   timing: { llmMs?: number; totalMs?: number };
   selectedChoice: string | null;
-  lastAction: { type: "create"; prompt: string; language: string; rating: string; options: Record<string, string | boolean> } | { type: "choice"; sceneId: string; choiceId: string } | null;
+  lastAction: { type: "create"; prompt: string; language: string; rating: string; options: CreateGameOptions } | { type: "choice"; sceneId: string; choiceId: string } | null;
+  storyProgress: {
+    turn: number;
+    targetTurns: number;
+    currentPhase: string;
+    endingReadiness: number;
+  } | null;
+  isEnding: boolean;
 
-  createGame: (prompt: string, language?: string, rating?: string, options?: Record<string, string | boolean>) => Promise<void>;
+  createGame: (prompt: string, language?: string, rating?: string, options?: CreateGameOptions) => Promise<void>;
   makeChoice: (sceneId: string, choiceId: string) => Promise<void>;
   pollAsset: () => Promise<void>;
   reset: () => void;
@@ -119,6 +128,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   timing: {},
   selectedChoice: null,
   lastAction: null,
+  storyProgress: null,
+  isEnding: false,
 
   createGame: async (prompt, language = "zh-CN", rating = "PG-13", options = {}) => {
     set({ status: "generating", errorMessage: null, imageUrl: null, imageStatus: "none" });
@@ -140,6 +151,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         safety: Safety;
         assets: { imageJobId: string | null; imageStatus: string };
         timing: { llmMs?: number; totalMs?: number };
+        storyProgress?: { turn: number; targetTurns: number; currentPhase: string; endingReadiness: number };
       }>("/api/games", {
         method: "POST",
         fingerprint,
@@ -166,6 +178,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           npcs: data.scene.npcs,
         }],
         timing: data.timing,
+        storyProgress: data.storyProgress || null,
+        isEnding: false,
       });
 
       persistState({ sessionId: data.sessionId, ownerToken: data.ownerToken });
@@ -187,23 +201,40 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ lastAction: { type: "choice", sceneId, choiceId } });
 
     try {
-      const data = throwApiError(await apiFetch<{
+      const result = await apiFetch<{
         scene: SceneData;
         stateDiff: Record<string, number>;
         safety: Safety;
         assets: { imageJobId: string | null; imageStatus: string };
         timing: { llmMs?: number; totalMs?: number };
+        sessionStatus?: "active" | "ended";
+        storyProgress?: { turn: number; targetTurns: number; currentPhase: string; endingReadiness: number };
+        isEnding?: boolean;
       }>(`/api/games/${sessionId}/choices`, {
         method: "POST",
         ownerToken,
         body: { sceneId, choiceId },
         responseSchema: Schemas.Choice,
-      }));
+      });
+
+      if (!result.ok) {
+        const errData = result.data as { code?: string; message?: string; traceId?: string };
+        if (errData.code === "DUPLICATE") {
+          await get().loadSession(sessionId, ownerToken);
+          return;
+        }
+        const error = new Error(errData.message || `HTTP ${result.status}`);
+        (error as Error & { traceId?: string }).traceId = errData.traceId;
+        throw error;
+      }
+
+      const data = result.data;
 
       const selectedChoice = currentScene?.choices.find((c) => c.id === choiceId);
+      const isEnding = data.isEnding || data.sessionStatus === "ended";
 
       set({
-        status: "playing",
+        status: isEnding ? "ended" : "playing",
         currentScene: data.scene,
         stateDiff: data.stateDiff,
         safety: data.safety,
@@ -232,6 +263,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           },
         ],
         timing: data.timing,
+        storyProgress: data.storyProgress || null,
+        isEnding,
       });
 
       get().pollAsset();
@@ -294,6 +327,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       timing: {},
       selectedChoice: null,
       lastAction: null,
+      storyProgress: null,
+      isEnding: false,
     });
     persistState({ sessionId: null, ownerToken: null });
   },
@@ -332,7 +367,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     try {
       const data = throwApiError(await apiFetch<{
-        session: { currentSceneId?: string; [k: string]: unknown };
+        session: { currentSceneId?: string; state?: unknown; status?: string; [k: string]: unknown };
         scenes: Array<{
           id?: string; turn?: number; title?: string;
           location?: string; timeOfDay?: string; time_of_day?: string;
@@ -390,11 +425,31 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       const imageJobId = data.assets?.imageJobId || null;
       const imageStatus = (data.assets?.imageStatus || "none") as GameState["imageStatus"];
+      const storyState = session.state && typeof session.state === "object"
+        ? session.state as {
+            turn?: number;
+            targetTurns?: number;
+            currentPhase?: string;
+            endingReadiness?: number;
+          }
+        : null;
+      const restoredProgress = storyState
+        && typeof storyState.turn === "number"
+        && typeof storyState.targetTurns === "number"
+        && typeof storyState.currentPhase === "string"
+        ? {
+            turn: storyState.turn,
+            targetTurns: storyState.targetTurns,
+            currentPhase: storyState.currentPhase,
+            endingReadiness: typeof storyState.endingReadiness === "number" ? storyState.endingReadiness : 0,
+          }
+        : null;
+      const restoredIsEnding = session.status === "ended" || restoredProgress?.currentPhase === "ending";
 
       set({
         sessionId: targetSessionId,
         ownerToken,
-        status: currentScene ? "playing" : "idle",
+        status: currentScene ? (restoredIsEnding ? "ended" : "playing") : "idle",
         currentScene,
         stateDiff: {},
         safety: null,
@@ -405,6 +460,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         errorMessage: null,
         errorTraceId: null,
         timing: {},
+        storyProgress: restoredProgress,
+        isEnding: restoredIsEnding,
       });
 
       persistState({ sessionId: targetSessionId, ownerToken });
@@ -412,9 +469,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         get().pollAsset();
       }
     } catch (error) {
+      persistState({ sessionId: null, ownerToken: null });
       set({
-        status: "error",
-        errorMessage: error instanceof Error ? error.message : "Failed to load session",
+        sessionId: null,
+        ownerToken: null,
+        status: "idle",
+        currentScene: null,
+        history: [],
+        errorMessage: null,
         errorTraceId: null,
       });
     }

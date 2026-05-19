@@ -207,4 +207,29 @@ describe("Store: session persistence", () => {
     expect(useGameStore.getState().currentScene?.id).toBe("scene_2");
     expect(useGameStore.getState().stateDiff).toEqual({ tension: 5 });
   });
+
+  it("DUPLICATE choice triggers session recovery", async () => {
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(MOCK_CREATE_RESPONSE));
+
+    await useGameStore.getState().createGame("测试故事");
+    expect(useGameStore.getState().status).toBe("playing");
+
+    mockFetch.mockResolvedValueOnce(
+      mockJsonResponse({ code: "DUPLICATE", message: "This choice has already been selected", traceId: "" }, 409)
+    );
+
+    const getSessionResponse = {
+      session: { currentSceneId: "scene_2" },
+      scenes: [
+        { id: "scene_1", title: "测试场景", body: "场景1", choices: [{ id: "a", label: "小心前进", chosen: true }] },
+        { id: "scene_2", title: "第二幕", body: "场景2", choices: [] },
+      ],
+    };
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(getSessionResponse));
+
+    await useGameStore.getState().makeChoice("scene_1", "a");
+
+    expect(useGameStore.getState().status).not.toBe("error");
+    expect(useGameStore.getState().currentScene?.id).toBe("scene_2");
+  });
 });
