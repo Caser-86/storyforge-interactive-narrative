@@ -31,10 +31,10 @@ export async function getOrCreateUser(fingerprint: string): Promise<UserProfile>
       [row.id]
     );
     return {
-      id: row.id,
-      nickname: row.nickname,
-      createdAt: row.created_at,
-      gameCount: countRes.rows[0]?.cnt || 0,
+      id: row.id as string,
+      nickname: row.nickname as string,
+      createdAt: row.created_at as string,
+      gameCount: Number(countRes.rows[0]?.cnt) || 0,
     };
   }
 
@@ -64,11 +64,11 @@ export async function getUserGames(userId: string): Promise<Array<{
   );
 
   return res.rows.map((r) => ({
-    id: r.id,
-    seedPrompt: r.seed_prompt,
-    genre: r.genre,
-    status: r.status,
-    createdAt: r.created_at,
+    id: String(r.id),
+    seedPrompt: String(r.seed_prompt),
+    genre: String(r.genre),
+    status: String(r.status),
+    createdAt: String(r.created_at),
   }));
 }
 

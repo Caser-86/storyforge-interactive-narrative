@@ -17,6 +17,7 @@ export default defineConfig({
       DISABLE_REDIS: "true",
       IMAGE_PROVIDER: "mock",
       OPENAI_API_KEY: "sk-test-mock",
+      USE_MEMORY_DB: "true",
     },
   },
 });

@@ -32,7 +32,7 @@ export async function GET(
 
     const session = sessionRes.rows[0];
 
-    if (session.share_expires_at && new Date(session.share_expires_at) < new Date()) {
+    if (session.share_expires_at && new Date(session.share_expires_at as string) < new Date()) {
       return apiError(ErrorCodes.NOT_FOUND, "Share link has expired", 410);
     }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { query, getStorageDriverInfo } from "@/lib/db";
 import { getQueueHealth, isQueueAvailable } from "@/lib/asset-queue";
 import { getDailyCost, isCircuitOpen, isWithinBudget } from "@/lib/observability-persist";
 
@@ -117,11 +117,18 @@ export async function GET() {
   const overallStatus = computeOverallStatus(checks);
   const httpStatus = overallStatus === "error" ? 503 : 200;
 
+  const storageInfo = getStorageDriverInfo();
+
   return NextResponse.json(
     {
       status: overallStatus,
       version: "0.1.0",
       timestamp: new Date().toISOString(),
+      storage: {
+        driver: storageInfo.driver,
+        persistent: storageInfo.persistent,
+        path: storageInfo.path,
+      },
       checks,
     },
     { status: httpStatus }

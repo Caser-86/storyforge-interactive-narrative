@@ -424,4 +424,4 @@ export async function memoryInitDb(): Promise<void> {
   console.log("[MemoryDB] Initialized with mock migrations");
 }
 
-export const isMemoryMode = process.env.USE_MEMORY_DB === "true" || !process.env.DATABASE_URL;
+export const isMemoryMode = process.env.USE_MEMORY_DB === "true" || (!process.env.DATABASE_URL && process.env.STORAGE_DRIVER !== "sqlite");

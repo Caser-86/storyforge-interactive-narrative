@@ -32,7 +32,7 @@ export async function GET(
 
     const session = sessionRes.rows[0];
 
-    if (session.share_expires_at && new Date(session.share_expires_at) < new Date()) {
+    if (session.share_expires_at && new Date(session.share_expires_at as string) < new Date()) {
       return apiError(ErrorCodes.NOT_FOUND, "Share link has expired", 410);
     }
 
@@ -47,12 +47,12 @@ export async function GET(
       [session.id, sceneId]
     );
 
-    const assets = assetRes.rows.map((a: { id: string; status: string; url: string; type: string; provider: string }) => ({
-      id: a.id,
-      status: a.status,
-      url: a.url,
-      type: a.type,
-      provider: a.provider,
+    const assets = assetRes.rows.map((a) => ({
+      id: String(a.id),
+      status: String(a.status),
+      url: String(a.url),
+      type: String(a.type),
+      provider: String(a.provider),
     }));
 
     return NextResponse.json({ assets });

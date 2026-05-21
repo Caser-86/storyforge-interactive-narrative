@@ -28,7 +28,7 @@ async function smokeTest() {
     const tableResult = await query(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
     );
-    const existingTables = new Set(tableResult.rows.map((r: { tablename: string }) => r.tablename));
+    const existingTables = new Set(tableResult.rows.map((r) => String(r.tablename)));
 
     for (const table of requiredTables) {
       if (existingTables.has(table)) {

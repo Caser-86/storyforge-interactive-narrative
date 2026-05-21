@@ -6,7 +6,7 @@ import { apiFetch, formatApiError } from "@/lib/client-api";
 import ChoiceList from "./ChoiceList";
 
 export default function StoryPanel() {
-  const { currentScene, stateDiff, safety, timing, history, reset, sessionId, ownerToken, storyProgress, isEnding, status } = useGameStore();
+  const { currentScene, stateDiff, safety, timing, history, reset, sessionId, ownerToken, storyProgress, isEnding, status, meta } = useGameStore();
   const [shareCopied, setShareCopied] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [showStateDiff, setShowStateDiff] = useState(false);
@@ -259,6 +259,15 @@ export default function StoryPanel() {
           </div>
         );
       })()}
+
+      {meta?.usedFallback && (
+        <div className="mb-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+          <p className="text-xs text-orange-400">
+            ⚠️ LLM 调用失败，使用本地模板生成内容
+            {meta.llmError && <span className="block mt-1 text-[10px] opacity-70">错误: {meta.llmError}</span>}
+          </p>
+        </div>
+      )}
 
       {safety && safety.contentWarnings.length > 0 && (
         <div className="mb-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">

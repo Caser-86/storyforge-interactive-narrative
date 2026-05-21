@@ -58,12 +58,12 @@ export async function GET(
 
     const versions = isOwner
       ? versionsRes.rows
-      : versionsRes.rows.map((v: { id: string; url: string; provider: string; version: number; created_at: string }) => ({
-          id: v.id,
-          url: v.url,
-          provider: v.provider,
-          version: v.version,
-          created_at: v.created_at,
+      : versionsRes.rows.map((v) => ({
+          id: String(v.id),
+          url: String(v.url),
+          provider: String(v.provider),
+          version: Number(v.version),
+          created_at: String(v.created_at),
         }));
 
     return NextResponse.json({

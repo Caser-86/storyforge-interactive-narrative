@@ -15,6 +15,8 @@
     "typecheck": "tsc --noEmit",
     "db:init": "tsx src/scripts/init-db.ts",
     "db:smoke": "tsx src/scripts/db-smoke-test.ts",
+    "db:sqlite:smoke": "tsx src/scripts/sqlite-smoke-test.ts",
+    "db:sqlite:backup": "tsx src/scripts/sqlite-backup.ts",
     "llm:smoke": "tsx src/scripts/llm-smoke-test.ts",
     "worker": "tsx src/scripts/asset-worker.ts",
     "test": "vitest run",
@@ -23,6 +25,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",
+    "better-sqlite3": "^12.10.0",
     "bullmq": "^5",
     "geist": "^1.7.0",
     "ioredis": "^5",
@@ -38,6 +41,7 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",

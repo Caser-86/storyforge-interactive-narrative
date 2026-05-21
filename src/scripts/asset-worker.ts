@@ -74,10 +74,10 @@ function startWorker() {
           if (cachedRes.rows.length > 0) {
             await query(
           `UPDATE asset_jobs SET status = 'completed', url = $1, completed_at = NOW() WHERE id = $2`,
-          [cachedRes.rows[0].url, assetJobId]
+          [cachedRes.rows[0].url as string | null, assetJobId]
         );
 
-        await writeAssetVersion(assetJobId, cachedRes.rows[0].url, promptJson, "cache", currentHash);
+        await writeAssetVersion(assetJobId, cachedRes.rows[0].url as string | null, promptJson, "cache", currentHash);
 
             logAssetCall({
               assetJobId,

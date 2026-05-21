@@ -3,12 +3,19 @@ import {
   memoryQuery,
   memoryWithTransaction,
   memoryInitDb,
-  isMemoryMode,
 } from "./memory-db";
+import { sqliteQuery, sqliteWithTransaction, sqliteInitDb, closeSqlite } from "./db/sqlite";
+import { getStorageDriver } from "./db/types";
+import type { QueryResult, QueryFn, DbRow } from "./db/types";
+
+export type { QueryResult, QueryFn, DbRow } from "./db/types";
+export { getStorageDriver, getStorageDriverInfo } from "./db/types";
 
 let pool: Pool | null = null;
 
-if (!isMemoryMode && process.env.DATABASE_URL) {
+const currentDriver = getStorageDriver();
+
+if (currentDriver === "postgres" && process.env.DATABASE_URL) {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     max: 20,
@@ -23,51 +30,65 @@ if (!isMemoryMode && process.env.DATABASE_URL) {
 
 const SLOW_QUERY_THRESHOLD_MS = 500;
 
-export async function query(text: string, params?: unknown[]) {
-  if (isMemoryMode) {
-    return memoryQuery(text, params);
-  }
+export async function query(text: string, params?: unknown[]): Promise<QueryResult> {
+  switch (currentDriver) {
+    case "memory":
+      return memoryQuery(text, params);
 
-  if (!pool) {
-    throw new Error("Database not configured");
-  }
+    case "sqlite":
+      return sqliteQuery(text, params);
 
-  const start = Date.now();
-  const res = await pool.query(text, params);
-  const duration = Date.now() - start;
-  if (duration > SLOW_QUERY_THRESHOLD_MS) {
-    const preview = text.replace(/\s+/g, " ").slice(0, 120);
-    console.warn(`[SlowQuery] ${duration}ms: ${preview}`);
+    case "postgres": {
+      if (!pool) {
+        throw new Error("Database not configured: PostgreSQL pool not initialized");
+      }
+      const start = Date.now();
+      const res = await pool.query(text, params);
+      const duration = Date.now() - start;
+      if (duration > SLOW_QUERY_THRESHOLD_MS) {
+        const preview = text.replace(/\s+/g, " ").slice(0, 120);
+        console.warn(`[SlowQuery] ${duration}ms: ${preview}`);
+      }
+      return { rows: res.rows as DbRow[], duration };
+    }
+
+    default:
+      throw new Error(`Unknown storage driver: ${currentDriver}`);
   }
-  return { rows: res.rows, duration };
 }
-
-type QueryFn = (text: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[]; duration: number }>;
 
 export async function withTransaction<T>(callback: (client: { query: QueryFn }) => Promise<T>): Promise<T> {
-  if (isMemoryMode) {
-    return memoryWithTransaction(callback as unknown as (client: { query: typeof memoryQuery }) => Promise<T>);
-  }
+  switch (currentDriver) {
+    case "memory":
+      return memoryWithTransaction(callback as (client: { query: typeof memoryQuery }) => Promise<T>) as Promise<T>;
 
-  if (!pool) {
-    throw new Error("Database not configured");
-  }
+    case "sqlite":
+      return sqliteWithTransaction(callback);
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await callback({ query: client.query.bind(client) });
-    await client.query("COMMIT");
-    return result;
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
+    case "postgres": {
+      if (!pool) {
+        throw new Error("Database not configured: PostgreSQL pool not initialized");
+      }
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await callback({ query: client.query.bind(client) });
+        await client.query("COMMIT");
+        return result;
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    default:
+      throw new Error(`Unknown storage driver: ${currentDriver}`);
   }
 }
 
-const MIGRATIONS: { version: number; up: string }[] = [
+const POSTGRES_MIGRATIONS: { version: number; up: string }[] = [
   {
     version: 1,
     up: `
@@ -273,35 +294,55 @@ const MIGRATIONS: { version: number; up: string }[] = [
   },
 ];
 
-export async function initDb() {
-  if (isMemoryMode) {
-    await memoryInitDb();
-    return;
-  }
+export async function initDb(): Promise<void> {
+  switch (currentDriver) {
+    case "memory":
+      await memoryInitDb();
+      break;
 
-  if (!pool) {
-    throw new Error("Database not configured");
-  }
+    case "sqlite":
+      await sqliteInitDb();
+      break;
 
-  await query(`
-    CREATE TABLE IF NOT EXISTS _migrations (
-      version INT PRIMARY KEY,
-      applied_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
+    case "postgres": {
+      if (!pool) {
+        throw new Error("Database not configured: PostgreSQL pool not initialized");
+      }
 
-  const applied = await query(`SELECT version FROM _migrations ORDER BY version`);
-  const appliedVersions = new Set(applied.rows.map((r: { version: number }) => r.version));
+      await query(`
+        CREATE TABLE IF NOT EXISTS _migrations (
+          version INT PRIMARY KEY,
+          applied_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
 
-  for (const migration of MIGRATIONS) {
-    if (appliedVersions.has(migration.version)) {
-      continue;
+      const applied = await query(`SELECT version FROM _migrations ORDER BY version`);
+      const appliedVersions = new Set(applied.rows.map((r) => Number(r.version)));
+
+      for (const migration of POSTGRES_MIGRATIONS) {
+        if (appliedVersions.has(migration.version)) {
+          continue;
+        }
+
+        console.log(`[Migration] Applying version ${migration.version}...`);
+        await query(migration.up);
+        await query(`INSERT INTO _migrations (version) VALUES ($1)`, [migration.version]);
+        console.log(`[Migration] Version ${migration.version} applied.`);
+      }
+      break;
     }
 
-    console.log(`[Migration] Applying version ${migration.version}...`);
-    await query(migration.up);
-    await query(`INSERT INTO _migrations (version) VALUES ($1)`, [migration.version]);
-    console.log(`[Migration] Version ${migration.version} applied.`);
+    default:
+      throw new Error(`Unknown storage driver: ${currentDriver}`);
+  }
+}
+
+export function closeDb(): void {
+  if (currentDriver === "sqlite") {
+    closeSqlite();
+  }
+  if (pool) {
+    pool.end();
   }
 }
 

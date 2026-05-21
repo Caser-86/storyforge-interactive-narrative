@@ -56,6 +56,7 @@ interface GameState {
     endingReadiness: number;
   } | null;
   isEnding: boolean;
+  meta: { usedFallback: boolean; llmError: string | null } | null;
 
   createGame: (prompt: string, language?: string, rating?: string, options?: CreateGameOptions) => Promise<void>;
   makeChoice: (sceneId: string, choiceId: string) => Promise<void>;
@@ -130,6 +131,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastAction: null,
   storyProgress: null,
   isEnding: false,
+  meta: null,
 
   createGame: async (prompt, language = "zh-CN", rating = "PG-13", options = {}) => {
     set({ status: "generating", errorMessage: null, imageUrl: null, imageStatus: "none" });
@@ -152,6 +154,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         assets: { imageJobId: string | null; imageStatus: string };
         timing: { llmMs?: number; totalMs?: number };
         storyProgress?: { turn: number; targetTurns: number; currentPhase: string; endingReadiness: number };
+        meta?: { usedFallback: boolean; llmError: string | null };
       }>("/api/games", {
         method: "POST",
         fingerprint,
@@ -180,6 +183,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         timing: data.timing,
         storyProgress: data.storyProgress || null,
         isEnding: false,
+        meta: data.meta || null,
       });
 
       persistState({ sessionId: data.sessionId, ownerToken: data.ownerToken });
@@ -210,6 +214,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         sessionStatus?: "active" | "ended";
         storyProgress?: { turn: number; targetTurns: number; currentPhase: string; endingReadiness: number };
         isEnding?: boolean;
+        meta?: { usedFallback: boolean; llmError: string | null };
       }>(`/api/games/${sessionId}/choices`, {
         method: "POST",
         ownerToken,
@@ -265,6 +270,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         timing: data.timing,
         storyProgress: data.storyProgress || null,
         isEnding,
+        meta: data.meta || null,
       });
 
       get().pollAsset();
@@ -329,6 +335,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastAction: null,
       storyProgress: null,
       isEnding: false,
+      meta: null,
     });
     persistState({ sessionId: null, ownerToken: null });
   },
@@ -462,13 +469,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         timing: {},
         storyProgress: restoredProgress,
         isEnding: restoredIsEnding,
+        meta: null,
       });
 
       persistState({ sessionId: targetSessionId, ownerToken });
       if (imageJobId && (imageStatus === "queued" || imageStatus === "generating")) {
         get().pollAsset();
       }
-    } catch (error) {
+    } catch {
       persistState({ sessionId: null, ownerToken: null });
       set({
         sessionId: null,
