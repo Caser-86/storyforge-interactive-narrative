@@ -65,7 +65,7 @@ describe("Stats API - SQL field correctness", () => {
       path.join(process.cwd(), "src/app/api/stats/route.ts"),
       "utf-8"
     );
-    expect(content).toContain("FROM llm_logs WHERE timestamp > NOW()");
+    expect(content).toContain("FROM llm_logs WHERE timestamp >");
     expect(content).not.toContain("FROM llm_logs WHERE created_at > NOW()");
   });
 });

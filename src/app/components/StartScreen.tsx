@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useGameStore } from "@/lib/store";
 import { apiFetch } from "@/lib/client-api";
+import LlmStatusBanner from "./LlmStatusBanner";
 
 interface StyleTemplate {
   id: string;
@@ -48,10 +49,13 @@ export default function StartScreen() {
   const [userGames, setUserGames] = useState<UserGame[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<StyleTemplate | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const { createGame, loadSession, status } = useGameStore();
 
   useEffect(() => {
+    const hydrationTimer = window.setTimeout(() => setIsHydrated(true), 0);
+
     apiFetch<{ templates: StyleTemplate[] }>("/api/templates")
       .then((r) => { if (r.ok) setTemplates(r.data.templates || []); })
       .catch(() => {});
@@ -62,6 +66,8 @@ export default function StartScreen() {
         .then((r) => { if (r.ok) setUserGames(r.data.games || []); })
         .catch(() => {});
     }
+
+    return () => window.clearTimeout(hydrationTimer);
   }, []);
 
   const applyTemplate = (t: StyleTemplate) => {
@@ -102,14 +108,17 @@ export default function StartScreen() {
             <label className="block text-sm text-gray-300 mb-1">你的灵感</label>
             <textarea
               value={prompt}
+              disabled={!isHydrated}
               onChange={(e) => {
                 setPrompt(e.target.value);
                 setSelectedTemplate(null);
               }}
               placeholder="例如：一个赛博朋克风格的侦探悬疑故事"
-              className="w-full h-24 px-4 py-3 rounded-lg bg-[#1a1a2e] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#e94560] resize-none"
+              className="w-full h-24 px-4 py-3 rounded-lg bg-[#1a1a2e] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#e94560] resize-none disabled:opacity-60"
             />
           </div>
+
+          <LlmStatusBanner />
 
           <div>
             <button
@@ -244,7 +253,7 @@ export default function StartScreen() {
                 setIsCreating(false);
               }
             }}
-            disabled={!prompt.trim() || isCreating || status === "generating"}
+            disabled={!isHydrated || !prompt.trim() || isCreating || status === "generating"}
             className="w-full py-3 rounded-lg bg-gradient-to-r from-[#e94560] to-[#ff6b6b] text-white font-semibold text-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isCreating || status === "generating" ? "正在创建..." : "开始冒险"}

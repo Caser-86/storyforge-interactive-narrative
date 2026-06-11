@@ -16,12 +16,15 @@ test.describe("Text Flow - 无图文字主线", () => {
 
     const checkbox = page.locator('input[type="checkbox"]');
     await expect(checkbox).not.toBeChecked();
+    await expect(page.locator("textarea")).toHaveValue("一个勇敢的冒险者走进了神秘森林");
 
+    const startButton = page.locator('button:has-text("开始冒险")');
+    await expect(startButton).toBeEnabled();
     const responsePromise = page.waitForResponse((resp) =>
       resp.url().includes("/api/games") && resp.request().method() === "POST"
     );
 
-    await page.locator('button:has-text("开始冒险")').click();
+    await startButton.click();
 
     const response = await responsePromise;
     const body = await response.json();

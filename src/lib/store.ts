@@ -56,7 +56,12 @@ interface GameState {
     endingReadiness: number;
   } | null;
   isEnding: boolean;
-  meta: { usedFallback: boolean; llmError: string | null } | null;
+  meta: {
+    usedFallback: boolean;
+    llmError: string | null;
+    llmMode?: "real" | "mock" | "fallback";
+    llmHint?: string;
+  } | null;
 
   createGame: (prompt: string, language?: string, rating?: string, options?: CreateGameOptions) => Promise<void>;
   makeChoice: (sceneId: string, choiceId: string) => Promise<void>;
@@ -154,7 +159,12 @@ export const useGameStore = create<GameState>((set, get) => ({
         assets: { imageJobId: string | null; imageStatus: string };
         timing: { llmMs?: number; totalMs?: number };
         storyProgress?: { turn: number; targetTurns: number; currentPhase: string; endingReadiness: number };
-        meta?: { usedFallback: boolean; llmError: string | null };
+        meta?: {
+          usedFallback: boolean;
+          llmError: string | null;
+          llmMode?: "real" | "mock" | "fallback";
+          llmHint?: string;
+        };
       }>("/api/games", {
         method: "POST",
         fingerprint,
@@ -214,7 +224,12 @@ export const useGameStore = create<GameState>((set, get) => ({
         sessionStatus?: "active" | "ended";
         storyProgress?: { turn: number; targetTurns: number; currentPhase: string; endingReadiness: number };
         isEnding?: boolean;
-        meta?: { usedFallback: boolean; llmError: string | null };
+        meta?: {
+          usedFallback: boolean;
+          llmError: string | null;
+          llmMode?: "real" | "mock" | "fallback";
+          llmHint?: string;
+        };
       }>(`/api/games/${sessionId}/choices`, {
         method: "POST",
         ownerToken,

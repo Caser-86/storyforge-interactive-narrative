@@ -110,6 +110,8 @@ export async function POST(
     let llmMs = 0;
     let usedFallback = false;
     let llmError: string | null = null;
+    let llmMode: "real" | "mock" | "fallback" = process.env.MOCK_LLM === "true" ? "mock" : "real";
+    let llmHint: string | undefined = process.env.MOCK_LLM === "true" ? "MOCK_LLM=true" : undefined;
 
     try {
       const result = await generateNarrative({
@@ -127,6 +129,8 @@ export async function POST(
     } catch (llmErr) {
       usedFallback = true;
       llmError = llmErr instanceof Error ? llmErr.message : String(llmErr);
+      llmMode = "fallback";
+      if (!process.env.OPENAI_API_KEY) llmHint = "OPENAI_API_KEY not configured";
       narrative = generateFallbackNarrative({
         seedPrompt: "",
         language,
@@ -286,6 +290,8 @@ export async function POST(
       meta: {
         usedFallback,
         llmError,
+        llmMode,
+        llmHint,
         imageGenerationEnabled: enableImages,
       },
       sessionStatus: isEnding ? "ended" : "active",

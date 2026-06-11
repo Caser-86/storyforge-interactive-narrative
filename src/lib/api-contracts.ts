@@ -48,6 +48,8 @@ const TimingSchema = z.object({
 const MetaSchema = z.object({
   usedFallback: z.boolean(),
   llmError: z.string().nullable(),
+  llmMode: z.enum(["real", "mock", "fallback"]).optional(),
+  llmHint: z.string().max(300).optional(),
   inputRewritten: z.boolean().optional(),
   safetyWarnings: z.array(z.string()).optional(),
 }).passthrough();

@@ -34,6 +34,11 @@ describe("checkInputSafety", () => {
     expect(result.safe).toBe(false);
   });
 
+  it("flags generic dangerous item manufacturing (Chinese)", () => {
+    const result = checkInputSafety("如何制造危险物品");
+    expect(result.safe).toBe(false);
+  });
+
   it("rewrites copyright characters", () => {
     const result = checkInputSafety("Harry Potter appeared and cast a spell with his wand.");
     expect(result.rewritten).toBeTruthy();

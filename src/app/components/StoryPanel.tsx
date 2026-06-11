@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useGameStore } from "@/lib/store";
 import { apiFetch, formatApiError } from "@/lib/client-api";
 import ChoiceList from "./ChoiceList";
+import LlmStatusBanner from "./LlmStatusBanner";
 
 export default function StoryPanel() {
   const { currentScene, stateDiff, safety, timing, history, reset, sessionId, ownerToken, storyProgress, isEnding, status, meta } = useGameStore();
@@ -123,6 +124,8 @@ export default function StoryPanel() {
           )}
         </div>
       </div>
+
+      <LlmStatusBanner compact />
 
       {showEndConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowEndConfirm(false)}>
@@ -260,11 +263,32 @@ export default function StoryPanel() {
         );
       })()}
 
+      {meta?.llmMode === "mock" && (
+        <div className="mb-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+          <p className="text-xs text-orange-400">
+            ⚠️ 当前为 MOCK_LLM 模式，未调用大模型。
+            <span className="block mt-1 text-[10px] opacity-70">
+              处理方式：关闭 `MOCK_LLM=true`，并配置 `OPENAI_API_KEY`（以及可选 `OPENAI_BASE_URL` / `OPENAI_MODEL`）。
+            </span>
+          </p>
+        </div>
+      )}
+
       {meta?.usedFallback && (
         <div className="mb-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
           <p className="text-xs text-orange-400">
+            ⚠️ 大模型调用失败，已使用本地模板生成内容。
+            {meta?.llmHint && <span className="block mt-1 text-[10px] opacity-70">提示: {meta?.llmHint}</span>}
+            {meta?.llmError && <span className="block mt-1 text-[10px] opacity-70">错误: {meta?.llmError}</span>}
+          </p>
+        </div>
+      )}
+
+      {meta && false && (
+        <div className="mb-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+          <p className="text-xs text-orange-400">
             ⚠️ LLM 调用失败，使用本地模板生成内容
-            {meta.llmError && <span className="block mt-1 text-[10px] opacity-70">错误: {meta.llmError}</span>}
+            {meta?.llmError && <span className="block mt-1 text-[10px] opacity-70">错误: {meta?.llmError}</span>}
           </p>
         </div>
       )}

@@ -3,7 +3,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Main Flow", () => {
   test("homepage shows start screen", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("h1")).toContainText("互动叙事生成器");
+    await expect(page.locator("h1")).toContainText("StoryForge");
+    await expect(page.locator('[data-testid="llm-status-panel"]')).toContainText("当前模型");
     await expect(page.locator("textarea")).toBeVisible();
     await expect(page.locator('button:has-text("开始冒险")')).toBeVisible();
   });
@@ -55,11 +56,12 @@ test.describe("API Health", () => {
     expect(Array.isArray(body.templates)).toBeTruthy();
   });
 
-  test("user endpoint returns json even without fingerprint", async ({ request }) => {
+  test("user endpoint returns json error without fingerprint", async ({ request }) => {
     const res = await request.get("/api/user");
-    expect(res.ok()).toBeTruthy();
+    expect(res.status()).toBe(400);
     const body = await res.json();
-    expect(body).toBeDefined();
+    expect(body.code).toBe("VALIDATION");
+    expect(body.message).toContain("x-user-fingerprint");
   });
 });
 
@@ -70,7 +72,8 @@ test.describe("Game API", () => {
     });
     expect(res.status()).toBe(400);
     const body = await res.json();
-    expect(body.error).toBeDefined();
+    expect(body.code).toBe("VALIDATION");
+    expect(body.message).toBeDefined();
   });
 
   test("POST /api/games with unsafe prompt returns 400", async ({ request }) => {

@@ -1,6 +1,10 @@
 import { query } from "./db";
 import type { LlmLogEntry, AssetLogEntry } from "./observability";
 
+function toDbBoolean(value: boolean): 1 | 0 {
+  return value ? 1 : 0;
+}
+
 export async function persistLlmLog(entry: LlmLogEntry): Promise<void> {
   try {
     await query(
@@ -14,7 +18,7 @@ export async function persistLlmLog(entry: LlmLogEntry): Promise<void> {
         entry.inputTokens || null,
         entry.outputTokens || null,
         entry.retryCount,
-        entry.success,
+        toDbBoolean(entry.success),
         entry.error || null,
         entry.timestamp,
       ]
@@ -36,7 +40,7 @@ export async function persistAssetLog(entry: AssetLogEntry): Promise<void> {
         entry.provider,
         entry.type,
         entry.latencyMs || null,
-        entry.success,
+        toDbBoolean(entry.success),
         entry.error || null,
         entry.timestamp,
       ]

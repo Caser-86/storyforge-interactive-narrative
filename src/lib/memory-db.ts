@@ -45,6 +45,27 @@ function parseSqlInsert(sql: string, params: unknown[]): { table: string; row: R
   return { table: tableName, row };
 }
 
+function applyInsertDefaults(tableName: string, row: Record<string, unknown>): Record<string, unknown> {
+  const now = new Date().toISOString();
+
+  if (tableName === "game_sessions") {
+    return {
+      created_at: now,
+      updated_at: now,
+      ...row,
+    };
+  }
+
+  if (["scenes", "asset_jobs", "asset_versions", "users"].includes(tableName)) {
+    return {
+      created_at: now,
+      ...row,
+    };
+  }
+
+  return row;
+}
+
 function parseSqlUpdate(sql: string, params: unknown[]): { table: string; set: Record<string, unknown>; where: Record<string, unknown>; whereNull: string[] } {
   const tableMatch = sql.match(/UPDATE (\w+)/i);
   const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/i);
@@ -216,7 +237,7 @@ export async function memoryQuery(text: string, params: unknown[] = []): Promise
   if (text.startsWith("INSERT")) {
     const { table, row } = parseSqlInsert(text, params);
     const tableData = getTable(table);
-    tableData.rows.push(row);
+    tableData.rows.push(applyInsertDefaults(table, row));
     return { rows: [], duration: Date.now() - start };
   }
 

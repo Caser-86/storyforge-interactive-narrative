@@ -2,22 +2,7 @@ import { NextResponse } from "next/server";
 import { query, getStorageDriverInfo } from "@/lib/db";
 import { getQueueHealth, isQueueAvailable } from "@/lib/asset-queue";
 import { getDailyCost, isCircuitOpen, isWithinBudget } from "@/lib/observability-persist";
-
-type HealthStatus = "ok" | "degraded" | "error";
-
-function computeOverallStatus(checks: Record<string, { status: string }>): HealthStatus {
-  const dbOk = checks.database?.status === "ok";
-  const redisOk = checks.redis?.status === "ok";
-  const imageProvider = process.env.IMAGE_PROVIDER || "mock";
-
-  if (Object.values(checks).some((check) => check.status === "error")) return "error";
-  if (!dbOk) return "error";
-
-  if (!redisOk && imageProvider !== "mock") return "error";
-  if (!redisOk && imageProvider === "mock") return "degraded";
-
-  return "ok";
-}
+import { computeOverallStatus } from "@/lib/health-status";
 
 export async function GET() {
   const checks: Record<string, { status: string; latencyMs?: number; error?: string; details?: unknown }> = {};
@@ -46,8 +31,21 @@ export async function GET() {
     checks.redis = { status: "disabled", error: "Redis not configured (build phase or DISABLE_REDIS=true)" };
   }
 
+  const mockLlm = process.env.MOCK_LLM === "true";
+  const llmConfigured = !!process.env.OPENAI_API_KEY;
   checks.llm = {
-    status: process.env.OPENAI_API_KEY ? "configured" : "not_configured",
+    status: mockLlm ? "mock" : llmConfigured ? "configured" : "not_configured",
+    details: {
+      active: !mockLlm && llmConfigured,
+      mode: mockLlm ? "mock" : llmConfigured ? "real" : "not_configured",
+      model: process.env.OPENAI_MODEL || "default",
+      baseUrl: process.env.OPENAI_BASE_URL || "default",
+      hint: mockLlm
+        ? "MOCK_LLM=true, narrative uses local mock content"
+        : llmConfigured
+          ? "LLM is active by default"
+          : "OPENAI_API_KEY not configured, fallback narrative will be used",
+    },
   };
 
   checks.imageProvider = {

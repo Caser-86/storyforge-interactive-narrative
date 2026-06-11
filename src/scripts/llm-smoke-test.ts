@@ -1,5 +1,8 @@
+import { loadEnvConfig } from "@next/env";
 import { generateNarrative, generateFallbackNarrative } from "../lib/narrative-service";
 import { NarrativeOutputSchema } from "../lib/schemas";
+
+loadEnvConfig(process.cwd());
 
 async function smokeTest() {
   console.log("=== LLM Provider Smoke Test ===\n");

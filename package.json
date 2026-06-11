@@ -1,6 +1,6 @@
 {
   "name": "storyforge-interactive-narrative",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "StoryForge - 基于 LLM 的互动叙事生成器",
   "repository": {
@@ -29,7 +29,7 @@
     "bullmq": "^5",
     "geist": "^1.7.0",
     "ioredis": "^5",
-    "next": "16.2.6",
+    "next": "^16.2.9",
     "openai": "^4",
     "pg": "^8",
     "react": "19.2.4",
@@ -37,6 +37,11 @@
     "uuid": "^11",
     "zod": "^3",
     "zustand": "^5"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.15"
+    }
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
@@ -48,10 +53,10 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.2.9",
     "tailwindcss": "^4",
     "tsx": "^4",
-    "typescript": "^5",
+    "typescript": "5.9.3",
     "vitest": "^4.1.6"
   }
 }

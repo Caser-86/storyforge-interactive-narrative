@@ -5,6 +5,8 @@ const UNSAFE_PATTERNS = [
   /自杀/i,
   /教.*制.*毒/i,
   /教.*造.*枪/i,
+  /(?:如何|教|指导|教程).*(?:制造|制作|合成|获取).*(?:危险物品|爆炸物|炸弹|武器|枪支|毒品)/i,
+  /(?:how\s+to|teach|guide|tutorial).*(?:make|build|manufacture|create|obtain).*(?:dangerous\s+item|explosive|bomb|weapon|gun|drug)/i,
 ];
 
 const DEFAULT_COPYRIGHT_PATTERNS: [RegExp, string][] = [
