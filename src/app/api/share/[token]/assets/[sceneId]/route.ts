@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { hashToken } from "@/lib/crypto";
+import { getErrorMessage } from "@/lib/errors";
 
 let dbInitialized = false;
 
@@ -57,6 +58,6 @@ export async function GET(
 
     return NextResponse.json({ assets });
   } catch (error) {
-    return apiError(ErrorCodes.INTERNAL, error instanceof Error ? error.message : "Internal server error", 500);
+    return apiError(ErrorCodes.INTERNAL, getErrorMessage(error, "Internal server error"), 500);
   }
 }

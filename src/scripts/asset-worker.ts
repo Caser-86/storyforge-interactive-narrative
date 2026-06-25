@@ -4,11 +4,13 @@ import { query, initDb } from "../lib/db";
 import { logAssetCall } from "../lib/observability";
 import { getConnection, type AssetJobData } from "../lib/asset-queue";
 import { isObjectStorageConfigured, downloadAndStore, buildAssetKey } from "../lib/object-storage";
+import { readIntEnv } from "../lib/env";
+import { getErrorMessage } from "../lib/errors";
 
-const ASSET_TIMEOUT_MS = parseInt(process.env.ASSET_TIMEOUT_MS || "300000", 10);
-const STALE_CHECK_INTERVAL_MS = parseInt(process.env.STALE_CHECK_INTERVAL_MS || "60000", 10);
-const ASSET_JOB_ATTEMPTS = parseInt(process.env.ASSET_JOB_ATTEMPTS || "3", 10);
-const ASSET_JOB_BACKOFF_MS = parseInt(process.env.ASSET_JOB_BACKOFF_MS || "5000", 10);
+const ASSET_TIMEOUT_MS = readIntEnv("ASSET_TIMEOUT_MS", 300000, { min: 1 });
+const STALE_CHECK_INTERVAL_MS = readIntEnv("STALE_CHECK_INTERVAL_MS", 60000, { min: 1 });
+const ASSET_JOB_ATTEMPTS = readIntEnv("ASSET_JOB_ATTEMPTS", 3, { min: 1 });
+const ASSET_JOB_BACKOFF_MS = readIntEnv("ASSET_JOB_BACKOFF_MS", 5000, { min: 0 });
 
 let worker: Worker<AssetJobData> | null = null;
 
@@ -23,7 +25,9 @@ async function markStaleJobs() {
     if (res.rows.length > 0) {
       console.log(`[Worker] Marked ${res.rows.length} stale jobs as failed`);
     }
-  } catch {}
+  } catch (err) {
+    console.warn("[Worker] Failed to mark stale jobs:", getErrorMessage(err));
+  }
 }
 
 async function writeAssetVersion(assetJobId: string, url: string | null, promptJson: Record<string, unknown>, provider: string, promptHash: string) {
@@ -41,7 +45,7 @@ async function writeAssetVersion(assetJobId: string, url: string | null, promptJ
       [versionId, assetJobId, url, promptHash, JSON.stringify(promptJson), provider, nextVer]
     );
   } catch (err) {
-    console.warn(`[Worker] Failed to write asset_version for ${assetJobId}:`, err instanceof Error ? err.message : err);
+    console.warn(`[Worker] Failed to write asset_version for ${assetJobId}:`, getErrorMessage(err));
   }
 }
 
@@ -111,7 +115,7 @@ function startWorker() {
             const storageKey = buildAssetKey(sessionId, sceneId);
             finalUrl = await downloadAndStore(finalUrl, storageKey);
           } catch (storageErr) {
-            console.warn(`[Worker] Object storage upload failed, keeping remote URL:`, storageErr instanceof Error ? storageErr.message : storageErr);
+            console.warn(`[Worker] Object storage upload failed, keeping remote URL:`, getErrorMessage(storageErr));
           }
         }
 
@@ -137,7 +141,7 @@ function startWorker() {
       } catch (error) {
         await query(
           `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-          [error instanceof Error ? error.message : "Unknown error", assetJobId]
+          [getErrorMessage(error), assetJobId]
         );
 
         logAssetCall({
@@ -148,7 +152,7 @@ function startWorker() {
           type: "image",
           latencyMs: Date.now() - start,
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: getErrorMessage(error),
           timestamp: new Date().toISOString(),
         });
 
@@ -157,7 +161,7 @@ function startWorker() {
     },
     {
       connection,
-      concurrency: parseInt(process.env.ASSET_WORKER_CONCURRENCY || "3", 10),
+      concurrency: readIntEnv("ASSET_WORKER_CONCURRENCY", 3, { min: 1 }),
       lockDuration: ASSET_TIMEOUT_MS,
     }
   );
@@ -201,7 +205,7 @@ async function main() {
       console.log("[Worker] Redis connection OK");
     }
   } catch (err) {
-    console.warn("[Worker] Redis connection check failed:", err instanceof Error ? err.message : err);
+    console.warn("[Worker] Redis connection check failed:", getErrorMessage(err));
   }
 
   startWorker();

@@ -1,6 +1,7 @@
 import { loadEnvConfig } from "@next/env";
 import { generateNarrative, generateFallbackNarrative } from "../lib/narrative-service";
 import { NarrativeOutputSchema } from "../lib/schemas";
+import { getErrorMessage } from "../lib/errors";
 
 loadEnvConfig(process.cwd());
 
@@ -46,7 +47,7 @@ async function smokeTest() {
       console.log(`   ✓ ${result.data.scene.choices.length} choices, ${result.data.scene.npcs.length} NPCs`);
       console.log();
     } catch (err) {
-      console.error("   ✗ Real LLM call failed:", err instanceof Error ? err.message : err);
+      console.error("   ✗ Real LLM call failed:", getErrorMessage(err));
       console.log("   This is expected if the API key is invalid or rate-limited\n");
     }
   }

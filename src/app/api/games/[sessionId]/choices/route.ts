@@ -4,11 +4,12 @@ import { generateNarrative, generateFallbackNarrative } from "@/lib/narrative-se
 import { applyChoiceEffects } from "@/lib/story-state-service";
 import { advanceStoryArc, shouldEndStory, determineEndingType } from "@/lib/story-arc-service";
 import { computePromptHash } from "@/lib/asset-service";
-import { enqueueAssetJob } from "@/lib/asset-queue";
+import { enqueueAssetJobWithFailureMark } from "@/lib/asset-job-service";
 import { query, initDb, withTransaction } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { verifyToken } from "@/lib/crypto";
 import { ChoiceResponseSchema, validateResponse } from "@/lib/api-contracts";
+import { getErrorMessage } from "@/lib/errors";
 import type { StoryState, Choice } from "@/lib/schemas";
 
 let dbInitialized = false;
@@ -128,7 +129,7 @@ export async function POST(
       llmMs = result.latencyMs;
     } catch (llmErr) {
       usedFallback = true;
-      llmError = llmErr instanceof Error ? llmErr.message : String(llmErr);
+      llmError = getErrorMessage(llmErr);
       llmMode = "fallback";
       if (!process.env.OPENAI_API_KEY) llmHint = "OPENAI_API_KEY not configured";
       narrative = generateFallbackNarrative({
@@ -229,31 +230,13 @@ export async function POST(
     });
 
     if (enableImages && assetJobId) {
-      try {
-        const enqueueResult = await enqueueAssetJob({
-          assetJobId,
-          sessionId,
-          sceneId: newSceneId,
-          promptJson: narrative.scene.artPrompt,
-          provider: process.env.IMAGE_PROVIDER || "mock",
-        });
-        if (!enqueueResult.queued) {
-          try {
-            await query(
-              `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-              ["Worker unavailable: " + (enqueueResult.reason || "unknown"), assetJobId]
-            );
-          } catch { /* best effort */ }
-        }
-      } catch (queueErr) {
-        console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
-        try {
-          await query(
-            `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-            ["Worker unavailable: " + (queueErr instanceof Error ? queueErr.message : String(queueErr)), assetJobId]
-          );
-        } catch { /* best effort */ }
-      }
+      await enqueueAssetJobWithFailureMark({
+        assetJobId,
+        sessionId,
+        sceneId: newSceneId,
+        promptJson: narrative.scene.artPrompt,
+        provider: process.env.IMAGE_PROVIDER || "mock",
+      }, { failureUpdate: "warn" });
     }
 
     const stateDiff: Record<string, number> = {};
@@ -309,7 +292,7 @@ export async function POST(
     }
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }

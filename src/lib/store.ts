@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Npc, PersistedChoice, ArtPrompt, BgmCue, Safety } from "@/lib/schemas";
 import { apiFetch, throwApiError, Schemas } from "@/lib/client-api";
+import { getErrorMessage } from "@/lib/errors";
 
 export interface SceneData {
   id: string;
@@ -81,7 +82,8 @@ function loadPersisted(): Pick<GameState, "sessionId" | "ownerToken"> {
     const sessionId = localStorage.getItem("game_sessionId");
     const ownerToken = localStorage.getItem("game_ownerToken");
     return { sessionId: sessionId || null, ownerToken: ownerToken || null };
-  } catch {
+  } catch (error) {
+    console.warn("[Store] Failed to load persisted session:", getErrorMessage(error));
     return { sessionId: null, ownerToken: null };
   }
 }
@@ -99,7 +101,9 @@ function persistState(state: Pick<GameState, "sessionId" | "ownerToken">) {
     } else {
       localStorage.removeItem("game_ownerToken");
     }
-  } catch {}
+  } catch (error) {
+    console.warn("[Store] Failed to persist session:", getErrorMessage(error));
+  }
 }
 
 const FALLBACK_ART_PROMPT: ArtPrompt = {
@@ -201,7 +205,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     } catch (error) {
       set({
         status: "error",
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
+        errorMessage: getErrorMessage(error),
         errorTraceId: (error as Error & { traceId?: string })?.traceId || null,
       });
     }
@@ -292,7 +296,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     } catch (error) {
       set({
         status: "error",
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
+        errorMessage: getErrorMessage(error),
         errorTraceId: (error as Error & { traceId?: string })?.traceId || null,
       });
     }

@@ -1,6 +1,8 @@
 import { Queue } from "bullmq";
 import Redis from "ioredis";
 import type { ArtPrompt } from "./schemas";
+import { readIntEnv } from "./env";
+import { getErrorMessage } from "./errors";
 
 const ASSET_QUEUE = "asset-generation";
 
@@ -126,8 +128,8 @@ export async function enqueueAssetJob(data: AssetJobData): Promise<{ queued: boo
       if (!ready) return { queued: false, reason: "Redis not available" };
     }
     const queue = getAssetQueue();
-    const attempts = parseInt(process.env.ASSET_JOB_ATTEMPTS || "3", 10);
-    const backoffDelay = parseInt(process.env.ASSET_JOB_BACKOFF_MS || "5000", 10);
+    const attempts = readIntEnv("ASSET_JOB_ATTEMPTS", 3, { min: 1 });
+    const backoffDelay = readIntEnv("ASSET_JOB_BACKOFF_MS", 5000, { min: 0 });
     await queue.add("generate-image", data, {
       attempts,
       backoff: { type: "exponential", delay: backoffDelay },
@@ -138,8 +140,9 @@ export async function enqueueAssetJob(data: AssetJobData): Promise<{ queued: boo
     return { queued: true };
   } catch (err) {
     _available = false;
-    console.warn("[AssetQueue] Failed to enqueue:", err instanceof Error ? err.message : err);
-    return { queued: false, reason: err instanceof Error ? err.message : "Unknown error" };
+    const reason = getErrorMessage(err);
+    console.warn("[AssetQueue] Failed to enqueue:", reason);
+    return { queued: false, reason };
   }
 }
 

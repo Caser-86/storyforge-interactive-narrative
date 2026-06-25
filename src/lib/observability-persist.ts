@@ -1,5 +1,7 @@
 import { query } from "./db";
 import type { LlmLogEntry, AssetLogEntry } from "./observability";
+import { readIntEnv } from "./env";
+import { getErrorMessage } from "./errors";
 
 function toDbBoolean(value: boolean): 1 | 0 {
   return value ? 1 : 0;
@@ -24,7 +26,7 @@ export async function persistLlmLog(entry: LlmLogEntry): Promise<void> {
       ]
     );
   } catch (err) {
-    console.warn("[Observability] Failed to persist LLM log:", err instanceof Error ? err.message : err);
+    console.warn("[Observability] Failed to persist LLM log:", getErrorMessage(err));
   }
 }
 
@@ -46,7 +48,7 @@ export async function persistAssetLog(entry: AssetLogEntry): Promise<void> {
       ]
     );
   } catch (err) {
-    console.warn("[Observability] Failed to persist asset log:", err instanceof Error ? err.message : err);
+    console.warn("[Observability] Failed to persist asset log:", getErrorMessage(err));
   }
 }
 
@@ -126,8 +128,8 @@ export function getDailyCost(): DailyCostEntry & { llmCostEstimate: number } {
   };
 }
 
-const DAILY_TOKEN_LIMIT = parseInt(process.env.DAILY_TOKEN_LIMIT || "1000000", 10);
-const DAILY_ASSET_LIMIT = parseInt(process.env.DAILY_ASSET_LIMIT || "500", 10);
+const DAILY_TOKEN_LIMIT = readIntEnv("DAILY_TOKEN_LIMIT", 1000000, { min: 0 });
+const DAILY_ASSET_LIMIT = readIntEnv("DAILY_ASSET_LIMIT", 500, { min: 0 });
 
 export function isWithinBudget(): boolean {
   return dailyCost.llmTokens < DAILY_TOKEN_LIMIT && dailyCost.assetCalls < DAILY_ASSET_LIMIT;

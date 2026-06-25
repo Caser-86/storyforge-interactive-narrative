@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { verifyToken, hashToken } from "@/lib/crypto";
+import { readIntEnv } from "@/lib/env";
+import { getErrorMessage } from "@/lib/errors";
 
 let dbInitialized = false;
 
@@ -47,7 +49,7 @@ export async function POST(
     const shareToken = crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36);
     const shareTokenHash = await hashToken(shareToken);
 
-    const shareTtlDays = parseInt(process.env.SHARE_TOKEN_TTL_DAYS || "30", 10);
+    const shareTtlDays = readIntEnv("SHARE_TOKEN_TTL_DAYS", 30, { min: 1 });
     const shareExpiresAt = new Date(Date.now() + shareTtlDays * 24 * 60 * 60 * 1000);
 
     await query(
@@ -64,7 +66,7 @@ export async function POST(
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }
@@ -110,7 +112,7 @@ export async function DELETE(
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }

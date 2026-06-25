@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { apiFetch, formatApiError } from "@/lib/client-api";
+import { getErrorMessage } from "@/lib/errors";
 
 interface ReplayScene {
   id?: string;
@@ -69,7 +70,7 @@ export default function SharePage() {
         });
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "加载失败");
+        setError(getErrorMessage(err, "加载失败"));
         setLoading(false);
       });
   }, [token]);

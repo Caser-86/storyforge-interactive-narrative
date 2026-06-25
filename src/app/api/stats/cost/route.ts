@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDailyCost, isWithinBudget } from "@/lib/observability-persist";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { verifyAdminToken } from "@/lib/crypto";
+import { readIntEnv } from "@/lib/env";
 
 export async function GET(request: Request) {
   if (process.env.NODE_ENV === "production") {
@@ -20,8 +21,8 @@ export async function GET(request: Request) {
     llmCostEstimate: cost.llmCostEstimate,
     withinBudget,
     limits: {
-      dailyTokenLimit: parseInt(process.env.DAILY_TOKEN_LIMIT || "1000000", 10),
-      dailyAssetLimit: parseInt(process.env.DAILY_ASSET_LIMIT || "500", 10),
+      dailyTokenLimit: readIntEnv("DAILY_TOKEN_LIMIT", 1000000, { min: 0 }),
+      dailyAssetLimit: readIntEnv("DAILY_ASSET_LIMIT", 500, { min: 0 }),
     },
   });
 }

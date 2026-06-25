@@ -3,6 +3,7 @@ import { initDb, query } from "@/lib/db";
 import { verifyToken } from "@/lib/crypto";
 import { signStreamToken } from "@/lib/crypto";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
+import { getErrorMessage } from "@/lib/errors";
 
 let dbInitialized = false;
 
@@ -43,6 +44,6 @@ export async function POST(
     const streamToken = signStreamToken(sessionId, ownerToken);
     return NextResponse.json({ streamToken });
   } catch (error) {
-    return apiError(ErrorCodes.INTERNAL, error instanceof Error ? error.message : "Internal server error", 500);
+    return apiError(ErrorCodes.INTERNAL, getErrorMessage(error, "Internal server error"), 500);
   }
 }

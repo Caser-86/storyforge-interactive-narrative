@@ -3,6 +3,7 @@ import { query, initDb } from "@/lib/db";
 import { enqueueAssetJob } from "@/lib/asset-queue";
 import { verifyStreamToken } from "@/lib/crypto";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
+import { getErrorMessage } from "@/lib/errors";
 import type { ArtPrompt } from "@/lib/schemas";
 
 let dbInitialized = false;
@@ -56,6 +57,14 @@ export async function GET(
           [sessionId]
         );
 
+        const closeController = () => {
+          try {
+            controller.close();
+          } catch (err) {
+            console.warn("[Events] Failed to close SSE controller:", getErrorMessage(err));
+          }
+        };
+
         for (const job of queuedJobs.rows) {
           try {
             await enqueueAssetJob({
@@ -68,7 +77,7 @@ export async function GET(
               provider: job.provider,
             });
           } catch (queueErr) {
-            console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
+            console.warn("Failed to enqueue asset job:", getErrorMessage(queueErr));
           }
         }
 
@@ -120,7 +129,7 @@ export async function GET(
           pollCount++;
           if (pollCount > 60) {
             clearInterval(interval);
-            try { controller.close(); } catch {}
+            closeController();
             return;
           }
 
@@ -131,7 +140,7 @@ export async function GET(
 
           if (Number(remaining.rows[0]?.cnt) === 0) {
             clearInterval(interval);
-            try { controller.close(); } catch {}
+            closeController();
             return;
           }
 
@@ -141,7 +150,7 @@ export async function GET(
         request.signal.addEventListener("abort", () => {
           closed = true;
           clearInterval(interval);
-          try { controller.close(); } catch {}
+          closeController();
         });
       },
     });
@@ -156,7 +165,7 @@ export async function GET(
   } catch (error) {
     console.error("GET /api/games/[sessionId]/events error:", error);
     return NextResponse.json(
-      { code: "INTERNAL", message: error instanceof Error ? error.message : "Internal server error", traceId: "events" },
+      { code: "INTERNAL", message: getErrorMessage(error, "Internal server error"), traceId: "events" },
       { status: 500 }
     );
   }

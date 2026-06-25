@@ -8,6 +8,7 @@ import { logLlmCall } from "./observability";
 import { isWithinBudget } from "./observability-persist";
 import { checkArtPromptSafety, checkInputSafety, getRatingPromptSuffix, checkOutputSafety } from "./safety-service";
 import { checkRiskCoverage, checkChoiceSimilarity, runAllQualityChecks } from "./narrative-quality";
+import { readIntEnv } from "./env";
 
 let _openai: OpenAI | null = null;
 
@@ -15,7 +16,7 @@ function getOpenAI(): OpenAI {
   if (!_openai) {
     _openai = new OpenAI({
       baseURL: process.env.OPENAI_BASE_URL || "https://api.deepseek.com",
-      timeout: parseInt(process.env.OPENAI_TIMEOUT_MS || "60000", 10),
+      timeout: readIntEnv("OPENAI_TIMEOUT_MS", 60000, { min: 1 }),
       maxRetries: 1,
     });
   }

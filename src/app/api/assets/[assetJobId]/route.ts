@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { query, initDb } from "@/lib/db";
 import { computePromptHash } from "@/lib/asset-service";
-import { enqueueAssetJob } from "@/lib/asset-queue";
+import { enqueueAssetJobWithFailureMark } from "@/lib/asset-job-service";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { verifyToken } from "@/lib/crypto";
+import { getErrorMessage } from "@/lib/errors";
 import type { ArtPrompt } from "@/lib/schemas";
 
 let dbInitialized = false;
@@ -79,7 +80,7 @@ export async function GET(
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }
@@ -161,29 +162,15 @@ export async function POST(
       [JSON.stringify(promptJson), newHash, assetJobId]
     );
 
-    try {
-      const enqueueResult = await enqueueAssetJob({
-        assetJobId,
-        sessionId: job.session_id,
-        sceneId: job.scene_id,
-        promptJson,
-        provider: job.provider,
-        quality,
-        bypassCache: true,
-      });
-      if (!enqueueResult.queued) {
-        await query(
-          `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-          ["Worker unavailable: " + (enqueueResult.reason || "unknown"), assetJobId]
-        );
-      }
-    } catch (queueErr) {
-      console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
-      await query(
-        `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-        ["Worker unavailable: " + (queueErr instanceof Error ? queueErr.message : String(queueErr)), assetJobId]
-      );
-    }
+    await enqueueAssetJobWithFailureMark({
+      assetJobId,
+      sessionId: job.session_id,
+      sceneId: job.scene_id,
+      promptJson,
+      provider: job.provider,
+      quality,
+      bypassCache: true,
+    });
 
     return NextResponse.json({
       id: job.id,
@@ -194,7 +181,7 @@ export async function POST(
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "storyforge-interactive-narrative",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "StoryForge - 基于 LLM 的互动叙事生成器",
   "repository": {

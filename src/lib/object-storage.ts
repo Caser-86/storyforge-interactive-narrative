@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getErrorMessage } from "./errors";
 
 export interface ObjectStorageConfig {
   endpoint: string;
@@ -110,7 +111,7 @@ export async function downloadAndStore(
     console.log(`[Storage] Stored ${storageKey} (${buffer.length} bytes)`);
     return storedUrl;
   } catch (err) {
-    console.warn(`[Storage] downloadAndStore failed, using remote URL:`, err instanceof Error ? err.message : err);
+    console.warn(`[Storage] downloadAndStore failed, using remote URL:`, getErrorMessage(err));
     return remoteUrl;
   }
 }

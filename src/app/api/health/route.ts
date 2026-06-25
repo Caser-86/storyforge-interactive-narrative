@@ -3,6 +3,7 @@ import { query, getStorageDriverInfo } from "@/lib/db";
 import { getQueueHealth, isQueueAvailable } from "@/lib/asset-queue";
 import { getDailyCost, isCircuitOpen, isWithinBudget } from "@/lib/observability-persist";
 import { computeOverallStatus } from "@/lib/health-status";
+import { getErrorMessage } from "@/lib/errors";
 
 export async function GET() {
   const checks: Record<string, { status: string; latencyMs?: number; error?: string; details?: unknown }> = {};
@@ -12,7 +13,7 @@ export async function GET() {
     await query("SELECT 1");
     checks.database = { status: "ok", latencyMs: Date.now() - dbStart };
   } catch (e) {
-    checks.database = { status: "error", error: e instanceof Error ? e.message : "Unknown" };
+    checks.database = { status: "error", error: getErrorMessage(e, "Unknown") };
   }
 
   if (isQueueAvailable()) {
@@ -25,7 +26,7 @@ export async function GET() {
         checks.redis = { status: "error", error: "Queue unavailable" };
       }
     } catch (e) {
-      checks.redis = { status: "error", error: e instanceof Error ? e.message : "Unknown" };
+      checks.redis = { status: "error", error: getErrorMessage(e, "Unknown") };
     }
   } else {
     checks.redis = { status: "disabled", error: "Redis not configured (build phase or DISABLE_REDIS=true)" };

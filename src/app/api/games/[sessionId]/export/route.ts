@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { verifyToken } from "@/lib/crypto";
+import { getErrorMessage } from "@/lib/errors";
 
 let dbInitialized = false;
 
@@ -144,7 +145,7 @@ export async function GET(
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }

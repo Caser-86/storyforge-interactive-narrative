@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useGameStore } from "@/lib/store";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function ErrorScreen() {
   const { errorMessage, errorTraceId, reset, retryLast, lastAction } = useGameStore();
@@ -13,7 +14,9 @@ export default function ErrorScreen() {
       await navigator.clipboard.writeText(errorTraceId);
       setTraceCopied(true);
       setTimeout(() => setTraceCopied(false), 2000);
-    } catch {}
+    } catch (err) {
+      console.warn("[ErrorScreen] Failed to copy traceId:", getErrorMessage(err));
+    }
   };
 
   return (

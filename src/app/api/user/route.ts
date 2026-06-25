@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOrCreateUser, getUserGames, updateUserNickname, deleteUser } from "@/lib/user-service";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
+import { getErrorMessage } from "@/lib/errors";
 
 function requireFingerprint(request: Request): string | null {
   const fp = request.headers.get("x-user-fingerprint");
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ user, games });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error";
+    const message = getErrorMessage(err, "Internal server error");
     return apiError(ErrorCodes.INTERNAL, message, 500);
   }
 }
@@ -39,7 +40,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error";
+    const message = getErrorMessage(err, "Internal server error");
     return apiError(ErrorCodes.INTERNAL, message, 500);
   }
 }
@@ -55,7 +56,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ deleted: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error";
+    const message = getErrorMessage(err, "Internal server error");
     return apiError(ErrorCodes.INTERNAL, message, 500);
   }
 }

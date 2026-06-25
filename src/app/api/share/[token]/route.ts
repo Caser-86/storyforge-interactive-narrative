@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, initDb } from "@/lib/db";
 import { hashToken } from "@/lib/crypto";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
+import { getErrorMessage } from "@/lib/errors";
 
 let dbInitialized = false;
 
@@ -40,7 +41,9 @@ export async function GET(
     try {
       const stateJson = typeof session.state_json === "string" ? JSON.parse(session.state_json) : session.state_json;
       endingType = stateJson?.endingType ?? null;
-    } catch {}
+    } catch (error) {
+      console.warn("[Share] Failed to parse shared session state:", getErrorMessage(error));
+    }
 
     const scenesRes = await query(
       `SELECT id, turn, title, location, time_of_day, mood, body, npcs_json, chapter_goal FROM scenes WHERE session_id = $1 ORDER BY turn`,
@@ -72,7 +75,7 @@ export async function GET(
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }

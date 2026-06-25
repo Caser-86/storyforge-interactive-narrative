@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import type { ArtPrompt } from "./schemas";
 import { isCircuitOpen, recordFailure, recordSuccess, isWithinBudget } from "./observability-persist";
+import { readIntEnv } from "./env";
 
 export type GenerateImageInput = {
   prompt: string;
@@ -46,7 +47,7 @@ export async function generateImageBfl(input: GenerateImageInput): Promise<Gener
     ? (process.env.BFL_HD_MODEL || "flux-2-pro")
     : (process.env.BFL_DEFAULT_MODEL || "flux-2-klein");
   const start = Date.now();
-  const BFL_TIMEOUT_MS = parseInt(process.env.BFL_TIMEOUT_MS || "120000", 10);
+  const BFL_TIMEOUT_MS = readIntEnv("BFL_TIMEOUT_MS", 120000, { min: 1 });
 
   const qualityScale: Record<string, number> = {
     draft: 0.5,

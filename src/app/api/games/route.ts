@@ -4,13 +4,14 @@ import { generateNarrative, generateFallbackNarrative } from "@/lib/narrative-se
 import { createInitialState } from "@/lib/story-state-service";
 import { computePromptHash } from "@/lib/asset-service";
 import { checkInputSafety } from "@/lib/safety-service";
-import { enqueueAssetJob } from "@/lib/asset-queue";
-import { initDb, withTransaction, query } from "@/lib/db";
+import { enqueueAssetJobWithFailureMark } from "@/lib/asset-job-service";
+import { initDb, withTransaction } from "@/lib/db";
 import { apiError, ErrorCodes } from "@/lib/api-errors";
 import { getOrCreateUser } from "@/lib/user-service";
 import { hashToken } from "@/lib/crypto";
 import { shouldGenerateImages } from "@/lib/feature-flags";
 import { CreateGameResponseSchema, CreateGameOptionsSchema, validateResponse } from "@/lib/api-contracts";
+import { getErrorMessage } from "@/lib/errors";
 import type { StoryLengthPreset } from "@/lib/schemas";
 
 let dbInitialized = false;
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
       llmMs = result.latencyMs;
     } catch (llmErr) {
       usedFallback = true;
-      llmError = llmErr instanceof Error ? llmErr.message : String(llmErr);
+      llmError = getErrorMessage(llmErr);
       llmMode = "fallback";
       if (!process.env.OPENAI_API_KEY) llmHint = "OPENAI_API_KEY not configured";
       narrative = generateFallbackNarrative({
@@ -184,31 +185,13 @@ export async function POST(request: Request) {
     });
 
     if (enableImages && assetJobId) {
-      try {
-        const enqueueResult = await enqueueAssetJob({
-          assetJobId,
-          sessionId,
-          sceneId,
-          promptJson: narrative.scene.artPrompt,
-          provider: process.env.IMAGE_PROVIDER || "mock",
-        });
-        if (!enqueueResult.queued) {
-          try {
-            await query(
-              `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-              ["Worker unavailable: " + (enqueueResult.reason || "unknown"), assetJobId]
-            );
-          } catch { /* best effort */ }
-        }
-      } catch (queueErr) {
-        console.warn("Failed to enqueue asset job:", queueErr instanceof Error ? queueErr.message : queueErr);
-        try {
-          await query(
-            `UPDATE asset_jobs SET status = 'failed', error = $1 WHERE id = $2`,
-            ["Worker unavailable: " + (queueErr instanceof Error ? queueErr.message : String(queueErr)), assetJobId]
-          );
-        } catch { /* best effort */ }
-      }
+      await enqueueAssetJobWithFailureMark({
+        assetJobId,
+        sessionId,
+        sceneId,
+        promptJson: narrative.scene.artPrompt,
+        provider: process.env.IMAGE_PROVIDER || "mock",
+      }, { failureUpdate: "warn" });
     }
 
     return NextResponse.json(validateResponse(CreateGameResponseSchema, {
@@ -257,7 +240,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return apiError(
       ErrorCodes.INTERNAL,
-      error instanceof Error ? error.message : "Internal server error"
+      getErrorMessage(error, "Internal server error")
     );
   }
 }

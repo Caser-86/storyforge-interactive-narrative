@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useGameStore } from "@/lib/store";
 import { apiFetch, formatApiError } from "@/lib/client-api";
+import { getErrorMessage } from "@/lib/errors";
 import ChoiceList from "./ChoiceList";
 import LlmStatusBanner from "./LlmStatusBanner";
 
@@ -51,7 +52,8 @@ export default function StoryPanel() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      console.warn("[StoryPanel] Export failed:", getErrorMessage(err));
       setExportError("导出失败，请重试");
     }
   };
@@ -68,7 +70,9 @@ export default function StoryPanel() {
         setShareCopied(true);
         setTimeout(() => setShareCopied(false), 2000);
       }
-    } catch {}
+    } catch (err) {
+      console.warn("[StoryPanel] Share failed:", getErrorMessage(err));
+    }
   };
 
   return (
