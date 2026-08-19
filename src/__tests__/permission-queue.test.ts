@@ -131,11 +131,19 @@ describe("Asset queue: enqueueAssetJob graceful degradation", () => {
     delete process.env.DISABLE_REDIS;
     vi.resetModules();
 
-    const { isQueueConfigured, ensureQueueReady, getQueueHealth } = await import("@/lib/asset-queue");
+    const { enqueueAssetJob, isQueueConfigured, ensureQueueReady, getQueueHealth } = await import("@/lib/asset-queue");
+    const result = await enqueueAssetJob({
+      assetJobId: "test",
+      sessionId: "s1",
+      sceneId: "sc1",
+      promptJson: { prompt: "", negativePrompt: "", aspectRatio: "16:9" as const, seedHint: 0, styleLock: "" },
+      provider: "mock",
+    });
 
     expect(isQueueConfigured()).toBe(false);
     await expect(ensureQueueReady()).resolves.toBe(false);
     await expect(getQueueHealth()).resolves.toBe("disabled");
+    expect(result).toEqual({ queued: false, reason: "Redis queue not configured" });
 
     delete process.env.ENABLE_IMAGE_GENERATION;
     delete process.env.REDIS_URL;

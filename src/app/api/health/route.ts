@@ -99,7 +99,7 @@ export async function GET() {
 
     const imageEnabled = process.env.ENABLE_IMAGE_GENERATION === "true";
     if (imageEnabled) {
-      if (!process.env.REDIS_URL) {
+      if (!process.env.REDIS_URL?.trim()) {
         checks.redisRequired = {
           status: "error",
           error: "REDIS_URL required when ENABLE_IMAGE_GENERATION=true",
