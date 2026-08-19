@@ -5,6 +5,7 @@ Status: implemented Task 2 authoring persistence with scoped foreign-key integri
 Commits:
 - `4176a8f feat: add authoring sqlite repository`
 - `6a021fd fix: scope authoring foreign keys`
+- `66e98b4 docs: record authoring integrity follow-up`
 
 Tests:
 - RED: `npm test -- src/__tests__/authoring/repository.test.ts` exited 1 with expected missing module failure for `@/lib/authoring/database`.
