@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { computeOverallStatus } from "@/lib/health-status";
 
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
 describe("health status", () => {
   const originalImageFlag = process.env.ENABLE_IMAGE_GENERATION;
   const originalRedisUrl = process.env.REDIS_URL;
@@ -11,13 +19,13 @@ describe("health status", () => {
   const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 
   afterEach(() => {
-    process.env.ENABLE_IMAGE_GENERATION = originalImageFlag;
-    process.env.REDIS_URL = originalRedisUrl;
-    process.env.NODE_ENV = originalNodeEnv;
-    process.env.IMAGE_PROVIDER = originalImageProvider;
-    process.env.ADMIN_TOKEN = originalAdminToken;
-    process.env.TOKEN_SALT = originalTokenSalt;
-    process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+    restoreEnv("ENABLE_IMAGE_GENERATION", originalImageFlag);
+    restoreEnv("REDIS_URL", originalRedisUrl);
+    restoreEnv("NODE_ENV", originalNodeEnv);
+    restoreEnv("IMAGE_PROVIDER", originalImageProvider);
+    restoreEnv("ADMIN_TOKEN", originalAdminToken);
+    restoreEnv("TOKEN_SALT", originalTokenSalt);
+    restoreEnv("OPENAI_API_KEY", originalOpenAiApiKey);
     delete process.env.DISABLE_REDIS;
     vi.resetModules();
   });
