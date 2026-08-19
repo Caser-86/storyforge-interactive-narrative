@@ -1,8 +1,30 @@
 import { z } from "zod";
 
+const projectSizePresets = ["micro", "short", "medium", "custom"] as const;
+const storyNodeKinds = ["start", "scene", "ending"] as const;
+const versionKinds = ["draft", "snapshot"] as const;
+
+export type ProjectSizePreset = (typeof projectSizePresets)[number];
+export type StoryNodeKind = (typeof storyNodeKinds)[number];
+export type VersionKind = (typeof versionKinds)[number];
+
+export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+export type JsonArray = JsonValue[];
+
+export const ProjectSizePresetSchema = z.enum(projectSizePresets);
+export const StoryNodeKindSchema = z.enum(storyNodeKinds);
+export const VersionKindSchema = z.enum(versionKinds);
+
+export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(JsonValueSchema), z.record(JsonValueSchema)]),
+);
+
 export const ProjectSizeSchema = z
   .object({
-    preset: z.enum(["micro", "short", "medium", "custom"]),
+    preset: ProjectSizePresetSchema,
     targetNodes: z.number().int().min(8).max(80),
     targetEndings: z.number().int().min(2).max(10),
   })
@@ -13,15 +35,15 @@ export const StoryVersionSchema = z
     id: z.string().min(1),
     projectId: z.string().min(1),
     versionNumber: z.number().int().min(1),
-    kind: z.enum(["draft", "snapshot"]),
-    sourceVersionId: z.string().min(1).nullable().optional(),
+    kind: VersionKindSchema,
+    sourceVersionId: z.string().min(1).nullable(),
     status: z.enum(["planning", "generating", "review_required", "valid", "invalid"]),
-    briefJson: z.record(z.string(), z.unknown()),
-    storyBibleJson: z.record(z.string(), z.unknown()),
-    outlineJson: z.record(z.string(), z.unknown()),
-    canonJson: z.record(z.string(), z.unknown()),
+    briefJson: JsonValueSchema,
+    storyBibleJson: JsonValueSchema,
+    outlineJson: JsonValueSchema,
+    canonJson: JsonValueSchema,
     createdAt: z.string().min(1),
-    sealedAt: z.string().min(1).nullable().optional(),
+    sealedAt: z.string().min(1).nullable(),
   })
   .strict();
 
@@ -44,7 +66,7 @@ export const StoryNodeSchema = z
     versionId: z.string().min(1),
     chapterId: z.string().min(1),
     nodeKey: z.string().min(1),
-    kind: z.enum(["start", "scene", "ending"]),
+    kind: StoryNodeKindSchema,
     title: z.string().min(1),
     body: z.string().min(1),
     summary: z.string().min(1),
@@ -91,12 +113,12 @@ export const ProjectSchema = z
     tone: z.string().min(1),
     pointOfView: z.string().min(1),
     rating: z.string().min(1),
-    sizePreset: z.enum(["micro", "short", "medium", "custom"]),
+    sizePreset: ProjectSizePresetSchema,
     targetNodeCount: z.number().int().min(8).max(80),
     targetEndingCount: z.number().int().min(2).max(10),
     status: z.enum(["draft", "generating", "ready", "archived"]),
     activeDraftVersionId: z.string().min(1).nullable(),
-    settingsJson: z.record(z.string(), z.unknown()),
+    settingsJson: JsonValueSchema,
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })
@@ -110,12 +132,12 @@ export const ValidationIssueSchema = z
     severity: z.enum(["blocking", "warning"]),
     code: z.string().min(1),
     message: z.string().min(1),
-    nodeId: z.string().min(1).nullable().optional(),
-    edgeId: z.string().min(1).nullable().optional(),
-    detailsJson: z.record(z.string(), z.unknown()),
+    nodeId: z.string().min(1).nullable(),
+    edgeId: z.string().min(1).nullable(),
+    detailsJson: JsonValueSchema,
     status: z.enum(["open", "resolved", "dismissed"]),
     createdAt: z.string().min(1),
-    resolvedAt: z.string().min(1).nullable().optional(),
+    resolvedAt: z.string().min(1).nullable(),
   })
   .strict();
 
