@@ -360,13 +360,9 @@ function runQuery(sql: string, params: unknown[]): { rows: Record<string, unknow
     return { rows: [], changes: 0 };
   }
 
-  try {
-    const stmt = database.prepare(trimmed);
-    const rows = stmt.all(...params) as Record<string, unknown>[];
-    return { rows, changes: 0 };
-  } catch {
-    return { rows: [], changes: 0 };
-  }
+  const stmt = database.prepare(trimmed);
+  const rows = stmt.all(...params) as Record<string, unknown>[];
+  return { rows, changes: 0 };
 }
 
 export async function sqliteQuery(text: string, params: unknown[] = []): Promise<QueryResult> {
