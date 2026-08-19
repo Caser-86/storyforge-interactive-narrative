@@ -3,6 +3,11 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 
 it("exits before database or Redis setup when the asset queue is disabled", () => {
+  const childEnv = { ...process.env };
+  for (const key of ["NODE_OPTIONS", "VITEST", "VITEST_POOL_ID", "VITEST_WORKER_ID"]) {
+    delete childEnv[key];
+  }
+
   const result = spawnSync(
     process.execPath,
     ["--import", "tsx", "src/scripts/asset-worker.ts"],
@@ -12,7 +17,7 @@ it("exits before database or Redis setup when the asset queue is disabled", () =
       timeout: 10000,
       windowsHide: true,
       env: {
-        ...process.env,
+        ...childEnv,
         DISABLE_REDIS: "true",
         ENABLE_IMAGE_GENERATION: "false",
         REDIS_URL: "",
@@ -26,4 +31,4 @@ it("exits before database or Redis setup when the asset queue is disabled", () =
   expect(result.stdout).toContain("[Worker] Asset worker is disabled; skipping startup.");
   expect(`${result.stdout}${result.stderr}`).not.toContain("Initializing database");
   expect(`${result.stdout}${result.stderr}`).not.toContain("Redis connection");
-});
+}, 15000);

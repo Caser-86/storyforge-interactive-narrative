@@ -4,6 +4,7 @@
 - Branch: `codex/storyforge-phase-0`
 - Runtime: Node `v24.18.0`, npm `11.16.0`
 - Remote GitHub Actions: not executed from this environment.
+- Local runtime smoke check: `GET /api/health` returned HTTP `200`.
 
 ## Final Dependency Set
 
@@ -63,18 +64,23 @@ Observed: exit code `0`; `3` files and `10` tests passed. The worker exits befor
 
 ## Fresh Install And Full Gate Status
 
-The required fresh command was attempted exactly as follows:
+The clean install completed through the npm mirror because the default registry connection stalled while fetching the three large platform tarballs:
 
 ```powershell
-npm ci
+$env:npm_config_registry='https://registry.npmmirror.com'; npm ci --no-audit --no-fund
 ```
 
-It did not complete on this Windows/Node 24/npm 11 host. Three attempts stalled after npm fetched or extracted the Next, sharp, and SWC tarballs, with no child process and no further npm log progress. An `npm cache verify` between attempts completed successfully but did not change the outcome. The hung npm processes were terminated.
+Observed: exit code `0`; `534` packages added in `25s` on Node `v24.18.0` / npm `11.16.0`.
 
-The partial reinstall removed development command shims, so the final `npm run verify` could not run because `vitest` was not found. The prior full-suite count was `241`; this wave adds four tests, so the expected final count is `245`, but it was not observed in a final run. The production build was not run after the failed fresh install, so no final build-success claim is made.
+The final gate then ran with Redis, image generation, and LLM calls disabled or mocked:
+
+- `npm run verify`: exit code `0`; typecheck passed, lint passed with one existing Next navigation warning, `31` test files and `245` tests passed, and the Next `16.3.1` production build completed successfully.
+- `npm audit --omit=dev --json`: exit code `0`; `0` vulnerabilities, including `0` high and `0` critical.
+- `npm ls ioredis --json`: exit code `0`; root and `bullmq@5.76.9` both resolve `ioredis@5.10.1`.
+- `GET http://localhost:3000/api/health`: HTTP `200`; SQLite `ok`, Redis `disabled`, and mock LLM/image providers active.
 
 ## Residual Concerns
 
-- No known production audit vulnerabilities remain in the fresh `npm audit --omit=dev --json` result.
-- A successful clean `npm ci` and exact mock-environment `npm run verify` must be rerun on a host where npm installation completes before Phase 0 can be declared fully verified.
+- The default npm registry remains slow for the large Next/SWC/sharp tarballs on this host; use the mirror command above when reproducing the clean install locally.
+- The one remaining lint warning is the existing `window.location.href` warning in `src/components/error-boundary.tsx`; it is non-fatal and does not block the gate.
 - Remote GitHub Actions remain unexecuted.
