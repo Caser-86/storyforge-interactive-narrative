@@ -20,6 +20,7 @@
     "db:smoke": "tsx src/scripts/db-smoke-test.ts",
     "db:sqlite:smoke": "tsx src/scripts/sqlite-smoke-test.ts",
     "db:sqlite:backup": "tsx src/scripts/sqlite-backup.ts",
+    "db:authoring:smoke": "tsx src/scripts/authoring-db-smoke.ts",
     "llm:smoke": "tsx src/scripts/llm-smoke-test.ts",
     "worker": "tsx src/scripts/asset-worker.ts",
     "test": "vitest run",
