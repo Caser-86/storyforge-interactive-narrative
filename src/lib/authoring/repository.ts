@@ -462,7 +462,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
             source.targetNodeCount,
             source.targetEndingCount,
             source.status,
-            copiedVersionId,
+            null,
             stringifyJson(source.settingsJson, {}),
             timestamp,
             timestamp,
@@ -490,6 +490,10 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
             sourceDraft.canon_json,
             timestamp,
           );
+
+        this.db
+          .prepare("UPDATE projects SET active_draft_version_id = ?, updated_at = ? WHERE id = ?")
+          .run(copiedVersionId, timestamp, copiedProjectId);
 
         this.copyVersionGraph(source.activeDraftVersionId, copiedVersionId);
 

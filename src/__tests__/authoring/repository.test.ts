@@ -97,13 +97,13 @@ function edge(
 }
 
 function populatedGraph(versionId: string): StoryGraph {
-  const firstChapter = chapter("chapter-source", versionId);
-  const startNode = node("node-source-start", versionId, firstChapter.id, {
+  const firstChapter = chapter(`${versionId}-chapter-source`, versionId);
+  const startNode = node(`${versionId}-node-source-start`, versionId, firstChapter.id, {
     nodeKey: "start",
     kind: "start",
     title: "Start",
   });
-  const endingNode = node("node-source-ending", versionId, firstChapter.id, {
+  const endingNode = node(`${versionId}-node-source-ending`, versionId, firstChapter.id, {
     nodeKey: "ending",
     kind: "ending",
     title: "Ending",
@@ -114,7 +114,7 @@ function populatedGraph(versionId: string): StoryGraph {
     versionId,
     chapters: [firstChapter],
     nodes: [startNode, endingNode],
-    edges: [edge("edge-source", versionId, startNode.id, endingNode.id)],
+    edges: [edge(`${versionId}-edge-source`, versionId, startNode.id, endingNode.id)],
   };
 }
 
@@ -169,6 +169,46 @@ describe("authoring repository", () => {
     expect((await repo.getProjectGraph(project.id)).edges).toEqual([]);
   });
 
+  it("rejects a node chapter from another version and preserves the draft graph", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(fixtureBrief());
+    const graph = await repo.replaceDraftGraph(project.id, populatedGraph(project.activeDraftVersionId!), 0);
+    const otherProject = await repo.createProject(fixtureBrief({ title: "Other Orchard" }));
+    const otherGraph = await repo.replaceDraftGraph(
+      otherProject.id,
+      populatedGraph(otherProject.activeDraftVersionId!),
+      0,
+    );
+    const invalidGraph: StoryGraph = {
+      ...graph,
+      nodes: [{ ...graph.nodes[0], chapterId: otherGraph.chapters[0].id }, graph.nodes[1]],
+    };
+
+    await expect(repo.replaceDraftGraph(project.id, invalidGraph, 1)).rejects.toThrow();
+
+    expect(await repo.getProjectGraph(project.id)).toEqual(graph);
+  });
+
+  it("rejects an edge endpoint from another version and preserves the draft graph", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(fixtureBrief());
+    const graph = await repo.replaceDraftGraph(project.id, populatedGraph(project.activeDraftVersionId!), 0);
+    const otherProject = await repo.createProject(fixtureBrief({ title: "Other Orchard" }));
+    const otherGraph = await repo.replaceDraftGraph(
+      otherProject.id,
+      populatedGraph(otherProject.activeDraftVersionId!),
+      0,
+    );
+    const invalidGraph: StoryGraph = {
+      ...graph,
+      edges: [{ ...graph.edges[0], sourceNodeId: otherGraph.nodes[0].id }],
+    };
+
+    await expect(repo.replaceDraftGraph(project.id, invalidGraph, 1)).rejects.toThrow();
+
+    expect(await repo.getProjectGraph(project.id)).toEqual(graph);
+  });
+
   it("duplicates a project without sharing mutable row ids", async () => {
     const repo = createRepo();
     const project = await repo.createProject(fixtureBrief());
@@ -197,7 +237,7 @@ describe("authoring repository", () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('projects', 'story_versions')")
         .all();
 
-      expect(migrations).toEqual([{ version: 1 }]);
+      expect(migrations).toEqual([{ version: 1 }, { version: 2 }]);
       expect(projectTables).toEqual([{ name: "projects" }, { name: "story_versions" }]);
     } finally {
       db.close();
@@ -223,6 +263,42 @@ describe("authoring repository", () => {
       ).toEqual([]);
     } finally {
       backupDb.close();
+    }
+  });
+
+  it("enforces scoped authoring foreign keys and enables SQLite foreign keys", () => {
+    runAuthoringMigrations({ dbPath, backupDir });
+    const db = new Database(dbPath);
+
+    try {
+      expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
+
+      const foreignKeys = (tableName: string) =>
+        db
+          .prepare(`PRAGMA foreign_key_list(${tableName})`)
+          .all() as { id: number; seq: number; table: string; from: string; to: string }[];
+      const scopedForeignKey = (tableName: string, parentTable: string) =>
+        foreignKeys(tableName)
+          .filter((foreignKey) => foreignKey.table === parentTable)
+          .map((foreignKey) => [foreignKey.from, foreignKey.to])
+          .sort((left, right) => left.join(".").localeCompare(right.join(".")));
+
+      expect(scopedForeignKey("projects", "story_versions")).toEqual([
+        ["active_draft_version_id", "id"],
+        ["id", "project_id"],
+      ]);
+      expect(scopedForeignKey("story_nodes", "chapters")).toEqual([
+        ["chapter_id", "id"],
+        ["version_id", "version_id"],
+      ]);
+      expect(scopedForeignKey("story_edges", "story_nodes")).toEqual([
+        ["source_node_id", "id"],
+        ["target_node_id", "id"],
+        ["version_id", "version_id"],
+        ["version_id", "version_id"],
+      ]);
+    } finally {
+      db.close();
     }
   });
 
