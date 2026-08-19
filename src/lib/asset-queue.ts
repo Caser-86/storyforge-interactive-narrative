@@ -11,17 +11,22 @@ let _queue: Queue | null = null;
 let _available: boolean | null = null;
 
 function getRedisUrl(): string {
-  return process.env.REDIS_URL || "redis://localhost:6379";
+  const redisUrl = process.env.REDIS_URL?.trim();
+  if (!redisUrl) {
+    throw new Error("REDIS_URL is required when the asset queue is enabled");
+  }
+  return redisUrl;
 }
 
-function shouldEnableQueue(): boolean {
-  if (process.env.NEXT_PHASE === "phase-production-build") return false;
-  if (process.env.DISABLE_REDIS === "true") return false;
-  return true;
+export function isQueueConfigured(env = process.env): boolean {
+  return env.ENABLE_IMAGE_GENERATION === "true"
+    && env.DISABLE_REDIS !== "true"
+    && typeof env.REDIS_URL === "string"
+    && env.REDIS_URL.trim().length > 0;
 }
 
 async function probeRedis(): Promise<boolean> {
-  if (!shouldEnableQueue()) return false;
+  if (!isQueueConfigured()) return false;
   try {
     const conn = new Redis(getRedisUrl(), {
       lazyConnect: true,
@@ -101,8 +106,8 @@ export function getConnection(): ConnectionOptions {
 
 export function getRedisClient(): Redis {
   if (!_connection) {
-    if (!shouldEnableQueue()) {
-      throw new Error("Redis connection not available during build or when DISABLE_REDIS=true");
+    if (!isQueueConfigured()) {
+      throw new Error("Redis connection not available when the asset queue is disabled");
     }
     _connection = createRedisClient();
   }
@@ -111,17 +116,21 @@ export function getRedisClient(): Redis {
 
 export function getAssetQueue(): Queue {
   if (!_queue) {
+    if (!isQueueConfigured()) {
+      throw new Error("Asset queue is not configured");
+    }
     _queue = new Queue(ASSET_QUEUE, { connection: getConnection() });
   }
   return _queue;
 }
 
 export function isQueueAvailable(): boolean {
-  if (!shouldEnableQueue()) return false;
+  if (!isQueueConfigured()) return false;
   return _available !== false;
 }
 
 export async function ensureQueueReady(): Promise<boolean> {
+  if (!isQueueConfigured()) return false;
   if (_available !== null) return _available;
   return probeRedis();
 }
@@ -137,8 +146,8 @@ export interface AssetJobData {
 }
 
 export async function enqueueAssetJob(data: AssetJobData): Promise<{ queued: boolean; reason?: string }> {
-  if (!shouldEnableQueue()) {
-    return { queued: false, reason: "Redis unavailable or build phase" };
+  if (!isQueueConfigured()) {
+    return { queued: false, reason: "Redis queue not configured" };
   }
 
   if (_available === false) {
@@ -170,7 +179,8 @@ export async function enqueueAssetJob(data: AssetJobData): Promise<{ queued: boo
 }
 
 export async function getQueueHealth() {
-  if (!shouldEnableQueue() || _available === false) return null;
+  if (!isQueueConfigured()) return "disabled" as const;
+  if (_available === false) return null;
 
   try {
     const queue = getAssetQueue();

@@ -84,6 +84,8 @@ describe("API Permission: owner token required for private sessions", () => {
 describe("Asset queue: enqueueAssetJob graceful degradation", () => {
   it("returns queued=false when Redis is disabled", async () => {
     process.env.DISABLE_REDIS = "true";
+    process.env.ENABLE_IMAGE_GENERATION = "true";
+    process.env.REDIS_URL = "redis://example.test:6379";
     vi.resetModules();
 
     const { enqueueAssetJob } = await import("@/lib/asset-queue");
@@ -99,6 +101,44 @@ describe("Asset queue: enqueueAssetJob graceful degradation", () => {
     expect(result.reason).toBeTruthy();
 
     delete process.env.DISABLE_REDIS;
+    delete process.env.ENABLE_IMAGE_GENERATION;
+    delete process.env.REDIS_URL;
+  });
+
+  it("reports queue unconfigured when image generation is disabled", async () => {
+    process.env.ENABLE_IMAGE_GENERATION = "false";
+    delete process.env.REDIS_URL;
+    vi.resetModules();
+
+    const { enqueueAssetJob, ensureQueueReady, getQueueHealth, isQueueConfigured } = await import("@/lib/asset-queue");
+    const result = await enqueueAssetJob({
+      assetJobId: "test",
+      sessionId: "s1",
+      sceneId: "sc1",
+      promptJson: { prompt: "", negativePrompt: "", aspectRatio: "16:9" as const, seedHint: 0, styleLock: "" },
+      provider: "mock",
+    });
+
+    expect(isQueueConfigured()).toBe(false);
+    await expect(ensureQueueReady()).resolves.toBe(false);
+    await expect(getQueueHealth()).resolves.toBe("disabled");
+    expect(result).toEqual({ queued: false, reason: "Redis queue not configured" });
+  });
+
+  it("requires a non-empty REDIS_URL when images are enabled", async () => {
+    process.env.ENABLE_IMAGE_GENERATION = "true";
+    process.env.REDIS_URL = "   ";
+    delete process.env.DISABLE_REDIS;
+    vi.resetModules();
+
+    const { isQueueConfigured, ensureQueueReady, getQueueHealth } = await import("@/lib/asset-queue");
+
+    expect(isQueueConfigured()).toBe(false);
+    await expect(ensureQueueReady()).resolves.toBe(false);
+    await expect(getQueueHealth()).resolves.toBe("disabled");
+
+    delete process.env.ENABLE_IMAGE_GENERATION;
+    delete process.env.REDIS_URL;
   });
 });
 

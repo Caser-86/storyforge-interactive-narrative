@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, getStorageDriverInfo } from "@/lib/db";
-import { getQueueHealth, isQueueAvailable } from "@/lib/asset-queue";
+import { getQueueHealth, isQueueAvailable, isQueueConfigured } from "@/lib/asset-queue";
 import { getDailyCost, isCircuitOpen, isWithinBudget } from "@/lib/observability-persist";
 import { computeOverallStatus } from "@/lib/health-status";
 import { getErrorMessage } from "@/lib/errors";
@@ -16,11 +16,13 @@ export async function GET() {
     checks.database = { status: "error", error: getErrorMessage(e, "Unknown") };
   }
 
-  if (isQueueAvailable()) {
+  if (!isQueueConfigured()) {
+    checks.redis = { status: "disabled", error: "Redis not configured for image generation" };
+  } else if (isQueueAvailable()) {
     const redisStart = Date.now();
     try {
       const queueHealth = await getQueueHealth();
-      if (queueHealth) {
+      if (queueHealth && queueHealth !== "disabled") {
         checks.redis = { status: "ok", latencyMs: Date.now() - redisStart, details: queueHealth };
       } else {
         checks.redis = { status: "error", error: "Queue unavailable" };
@@ -29,7 +31,7 @@ export async function GET() {
       checks.redis = { status: "error", error: getErrorMessage(e, "Unknown") };
     }
   } else {
-    checks.redis = { status: "disabled", error: "Redis not configured (build phase or DISABLE_REDIS=true)" };
+    checks.redis = { status: "error", error: "Queue unavailable" };
   }
 
   const mockLlm = process.env.MOCK_LLM === "true";
