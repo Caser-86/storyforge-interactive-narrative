@@ -1,15 +1,17 @@
-import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 
 it("installs one ioredis version", () => {
-  const tree = JSON.parse(
-    execFileSync("npm", ["ls", "ioredis", "--json"], {
-      encoding: "utf8",
-      shell: true,
-    })
-  );
-  const root = tree.dependencies.ioredis.version;
-  const bull = tree.dependencies.bullmq.dependencies?.ioredis?.version ?? root;
+  const lockfile = JSON.parse(
+    readFileSync(new URL("../../package-lock.json", import.meta.url), "utf8")
+  ) as {
+    packages: {
+      "": { dependencies?: Record<string, string> };
+      "node_modules/bullmq"?: { dependencies?: Record<string, string> };
+    };
+  };
+  const root = lockfile.packages[""].dependencies?.ioredis;
+  const bull = lockfile.packages["node_modules/bullmq"]?.dependencies?.ioredis ?? root;
 
   expect(root).toBe("5.10.1");
   expect(bull).toBe(root);

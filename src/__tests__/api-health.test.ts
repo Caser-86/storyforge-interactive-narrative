@@ -10,6 +10,7 @@ function restoreEnv(name: string, value: string | undefined) {
 }
 
 describe("health status", () => {
+  const originalDisableRedis = process.env.DISABLE_REDIS;
   const originalImageFlag = process.env.ENABLE_IMAGE_GENERATION;
   const originalRedisUrl = process.env.REDIS_URL;
   const originalNodeEnv = process.env.NODE_ENV;
@@ -19,6 +20,7 @@ describe("health status", () => {
   const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 
   afterEach(() => {
+    restoreEnv("DISABLE_REDIS", originalDisableRedis);
     restoreEnv("ENABLE_IMAGE_GENERATION", originalImageFlag);
     restoreEnv("REDIS_URL", originalRedisUrl);
     restoreEnv("NODE_ENV", originalNodeEnv);
@@ -26,7 +28,6 @@ describe("health status", () => {
     restoreEnv("ADMIN_TOKEN", originalAdminToken);
     restoreEnv("TOKEN_SALT", originalTokenSalt);
     restoreEnv("OPENAI_API_KEY", originalOpenAiApiKey);
-    delete process.env.DISABLE_REDIS;
     vi.resetModules();
   });
 
@@ -74,7 +75,7 @@ describe("health status", () => {
   });
 
   it("reports redisRequired in production when REDIS_URL is whitespace only", async () => {
-    process.env.NODE_ENV = "production";
+    restoreEnv("NODE_ENV", "production");
     process.env.ENABLE_IMAGE_GENERATION = "true";
     process.env.REDIS_URL = "   ";
     process.env.IMAGE_PROVIDER = "replicate";

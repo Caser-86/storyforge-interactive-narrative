@@ -1,5 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { signStreamToken, verifyStreamToken } from "@/lib/crypto";
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
 
 const mockQuery = vi.fn();
 vi.mock("@/lib/db", () => ({
@@ -33,8 +41,20 @@ vi.mock("@/lib/api-errors", () => ({
 }));
 
 describe("API Permission: owner token required for private sessions", () => {
+  const originalDisableRedis = process.env.DISABLE_REDIS;
+  const originalImageGeneration = process.env.ENABLE_IMAGE_GENERATION;
+  const originalRedisUrl = process.env.REDIS_URL;
+
   beforeEach(() => {
     mockQuery.mockReset();
+  });
+
+  afterEach(() => {
+    restoreEnv("DISABLE_REDIS", originalDisableRedis);
+    restoreEnv("ENABLE_IMAGE_GENERATION", originalImageGeneration);
+    restoreEnv("REDIS_URL", originalRedisUrl);
+    vi.resetModules();
+    vi.restoreAllMocks();
   });
 
   it("GET /api/games/[sessionId] returns 403 when token missing for private session", async () => {
@@ -99,10 +119,6 @@ describe("Asset queue: enqueueAssetJob graceful degradation", () => {
 
     expect(result.queued).toBe(false);
     expect(result.reason).toBeTruthy();
-
-    delete process.env.DISABLE_REDIS;
-    delete process.env.ENABLE_IMAGE_GENERATION;
-    delete process.env.REDIS_URL;
   });
 
   it("reports queue unconfigured when image generation is disabled", async () => {
@@ -144,9 +160,6 @@ describe("Asset queue: enqueueAssetJob graceful degradation", () => {
     await expect(ensureQueueReady()).resolves.toBe(false);
     await expect(getQueueHealth()).resolves.toBe("disabled");
     expect(result).toEqual({ queued: false, reason: "Redis queue not configured" });
-
-    delete process.env.ENABLE_IMAGE_GENERATION;
-    delete process.env.REDIS_URL;
   });
 });
 

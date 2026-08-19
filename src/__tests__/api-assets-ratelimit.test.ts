@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/db", () => ({
   initDb: vi.fn(),
@@ -6,11 +6,27 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { query } from "@/lib/db";
-import { checkRateLimit } from "@/lib/rate-limit";
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
 
 describe("Asset job status transitions", () => {
+  const originalDisableRedis = process.env.DISABLE_REDIS;
+  const originalRedisUrl = process.env.REDIS_URL;
+
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    restoreEnv("DISABLE_REDIS", originalDisableRedis);
+    restoreEnv("REDIS_URL", originalRedisUrl);
+    vi.resetModules();
   });
 
   it("GET /api/assets/[id] returns 404 for non-existent job", async () => {
@@ -56,6 +72,7 @@ describe("Asset job status transitions", () => {
 
 describe("Rate limit", () => {
   it("allows requests within limits", async () => {
+    const { checkRateLimit } = await import("@/lib/rate-limit");
     const result = await checkRateLimit("sess_test", "127.0.0.1", {
       perSession: 50,
       perIp: 100,
@@ -66,6 +83,7 @@ describe("Rate limit", () => {
   });
 
   it("blocks requests exceeding session limit", async () => {
+    const { checkRateLimit } = await import("@/lib/rate-limit");
     for (let i = 0; i < 51; i++) {
       await checkRateLimit("sess_limit_test", "127.0.0.1", {
         perSession: 50,
