@@ -1,4 +1,4 @@
-import { Queue } from "bullmq";
+import { Queue, type ConnectionOptions } from "bullmq";
 import Redis from "ioredis";
 import type { ArtPrompt } from "./schemas";
 import { readIntEnv } from "./env";
@@ -10,6 +10,10 @@ let _connection: Redis | null = null;
 let _queue: Queue | null = null;
 let _available: boolean | null = null;
 
+function getRedisUrl(): string {
+  return process.env.REDIS_URL || "redis://localhost:6379";
+}
+
 function shouldEnableQueue(): boolean {
   if (process.env.NEXT_PHASE === "phase-production-build") return false;
   if (process.env.DISABLE_REDIS === "true") return false;
@@ -19,7 +23,7 @@ function shouldEnableQueue(): boolean {
 async function probeRedis(): Promise<boolean> {
   if (!shouldEnableQueue()) return false;
   try {
-    const conn = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+    const conn = new Redis(getRedisUrl(), {
       lazyConnect: true,
       connectTimeout: 3000,
       maxRetriesPerRequest: 1,
@@ -38,8 +42,8 @@ async function probeRedis(): Promise<boolean> {
   }
 }
 
-function createRedisConnection(): Redis {
-  const conn = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+function createRedisClient(): Redis {
+  const conn = new Redis(getRedisUrl(), {
     maxRetriesPerRequest: 3,
     lazyConnect: true,
     connectTimeout: 5000,
@@ -76,12 +80,31 @@ function createRedisConnection(): Redis {
   return conn;
 }
 
-export function getConnection(): Redis {
+export function getConnection(): ConnectionOptions {
+  return {
+    url: getRedisUrl(),
+    maxRetriesPerRequest: 3,
+    lazyConnect: true,
+    connectTimeout: 5000,
+    retryStrategy: (times) => {
+      if (times > 10) {
+        console.error("[Redis] Max retry attempts reached, giving up");
+        return null;
+      }
+      const delay = Math.min(times * 1000, 5000);
+      console.warn(`[Redis] Retry connection in ${delay}ms (attempt ${times})`);
+      return delay;
+    },
+    enableOfflineQueue: true,
+  };
+}
+
+export function getRedisClient(): Redis {
   if (!_connection) {
     if (!shouldEnableQueue()) {
       throw new Error("Redis connection not available during build or when DISABLE_REDIS=true");
     }
-    _connection = createRedisConnection();
+    _connection = createRedisClient();
   }
   return _connection;
 }

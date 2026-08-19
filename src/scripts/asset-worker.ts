@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import { generateImage, computePromptHash, type GenerateImageInput } from "../lib/asset-service";
 import { query, initDb } from "../lib/db";
 import { logAssetCall } from "../lib/observability";
-import { getConnection, type AssetJobData } from "../lib/asset-queue";
+import { getConnection, getRedisClient, type AssetJobData } from "../lib/asset-queue";
 import { isObjectStorageConfigured, downloadAndStore, buildAssetKey } from "../lib/object-storage";
 import { readIntEnv } from "../lib/env";
 import { getErrorMessage } from "../lib/errors";
@@ -180,7 +180,7 @@ async function gracefulShutdown(signal: string) {
   if (worker) {
     await worker.close();
   }
-  const connection = getConnection();
+  const connection = getRedisClient();
   await connection.quit();
   process.exit(0);
 }
@@ -197,7 +197,7 @@ async function main() {
   console.log("[Worker] Database connection OK");
 
   try {
-    const connection = getConnection();
+    const connection = getRedisClient();
     const pingRes = await connection.ping();
     if (pingRes !== "PONG") {
       console.warn("[Worker] Redis ping returned:", pingRes);
