@@ -361,6 +361,11 @@ function runQuery(sql: string, params: unknown[]): { rows: Record<string, unknow
   }
 
   const stmt = database.prepare(trimmed);
+  if (!stmt.reader) {
+    stmt.run(...params);
+    return { rows: [], changes: 0 };
+  }
+
   const rows = stmt.all(...params) as Record<string, unknown>[];
   return { rows, changes: 0 };
 }
