@@ -378,6 +378,39 @@ Observed:
 - The user-requested `npm.cmd` installed-tree check is implemented via npm's underlying CLI entrypoint because `execFileSync('npm.cmd', ...)` is not executable without shell on this Windows / Node 24 environment
 - GitHub Actions itself was not run from this environment; CI confidence comes from the committed workflow config plus the successful local `npm run verify`
 
+## Final Branch Review Fix Wave
+
+- Date: Wednesday, August 19, 2026
+- Scope: production dependency remediation, worker startup boundary, SQLite test isolation, npm fallback portability, and release evidence refresh.
+
+### Source Changes
+
+- Pinned `next`, `@next/env`, and `eslint-config-next` to `16.3.1`, and raised the existing Next PostCSS override to `8.5.23`.
+- Added `getWorkerConnection()` with `maxRetriesPerRequest: null`; producer connections retain their bounded retry configuration.
+- Made the worker return before database, Redis, or BullMQ construction when the image/Redis queue is disabled.
+- Moved SQLite query-error tests to a dynamic `:memory:` import, restored `SQLITE_DB_PATH`, and compared default user database file metadata before and after each test.
+- Replaced the Windows fallback from non-executable `npm.cmd` to `node <node-install>/node_modules/npm/bin/npm-cli.js`, preserving no-shell invocation.
+
+### Observed Commands
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'; npm test -- src/__tests__/asset-worker-startup.test.ts src/__tests__/asset-queue-types.test.ts src/__tests__/sqlite-query-errors.test.ts
+```
+
+- Exit code `0`; `3 passed` files and `10 passed` tests.
+
+```powershell
+npm audit --omit=dev --json
+npm ls ioredis --json
+```
+
+- Audit exit code `0`; `0` vulnerabilities, including `0` high production findings.
+- Installed tree exit code `0`; root and BullMQ both resolve `ioredis@5.10.1`.
+
+### Verification Blocker
+
+The required fresh `npm ci` was attempted three times, including after `npm cache verify`, but stalled after Next/sharp/SWC extraction without further logs or a child process. The hung npm processes were stopped. Its partial reinstall removed the local Vitest shim, so the final mock-environment `npm run verify` and full expected `245`-test count could not be observed. The final build was not run. Remote GitHub Actions were not executed.
+
 ## Fix Report: Review Finding Round 2
 
 - Date: Wednesday, August 19, 2026
@@ -443,3 +476,9 @@ Observed:
 ### Residual Concerns
 
 - The Ubuntu behavior is covered by the new invocation-selection tests plus the `npm_execpath`/platform fallback logic, but Ubuntu GitHub Actions itself was not re-run from this local environment
+
+## Final Review Addendum
+
+This addendum supersedes the earlier full-gate claims for the final branch review wave. The focused worker, queue, and SQLite regressions passed: `3` files and `10` tests. `npm audit --omit=dev --json` exited `0` with `0` vulnerabilities, and `npm ls ioredis --json` exited `0` with root and BullMQ both resolving `5.10.1`.
+
+The required fresh `npm ci` was attempted three times and stalled after Next/sharp/SWC extraction. After the partial reinstall removed the local Vitest shim, the final mock-environment `npm run verify`, full expected `245`-test count, and final build could not be observed. Remote GitHub Actions were not executed.

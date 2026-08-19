@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 type NpmDependencyTree = {
   version?: string;
@@ -29,11 +31,24 @@ function getNpmInvocation({
     };
   }
 
-  return {
-    command: platform === "win32" ? "npm.cmd" : "npm",
-    args: ["ls", "ioredis", "--json"],
-  };
+  if (platform === "win32") {
+    return {
+      command: process.execPath,
+      args: [
+        path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+        "ls",
+        "ioredis",
+        "--json",
+      ],
+    };
+  }
+
+  return { command: "npm", args: ["ls", "ioredis", "--json"] };
 }
+
+afterEach(() => {
+  vi.resetModules();
+});
 
 it("prefers npm_execpath when available", () => {
   expect(getNpmInvocation({ npmExecPath: "/tmp/npm-cli.js" })).toEqual({
@@ -42,16 +57,83 @@ it("prefers npm_execpath when available", () => {
   });
 });
 
-it("falls back to a platform npm launcher when npm_execpath is absent", () => {
+it("uses a Node-executable npm CLI on Windows when npm_execpath is absent", () => {
   expect(getNpmInvocation({ npmExecPath: null, platform: "win32" })).toEqual({
-    command: "npm.cmd",
-    args: ["ls", "ioredis", "--json"],
+    command: process.execPath,
+    args: [
+      path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+      "ls",
+      "ioredis",
+      "--json",
+    ],
   });
 
   expect(getNpmInvocation({ npmExecPath: null, platform: "linux" })).toEqual({
     command: "npm",
     args: ["ls", "ioredis", "--json"],
   });
+});
+
+it("keeps the Windows npm CLI fallback executable without a shell", () => {
+  const { command, args } = getNpmInvocation({ npmExecPath: null, platform: "win32" });
+
+  expect(command).toBe(process.execPath);
+  expect(fs.existsSync(args[0])).toBe(true);
+});
+
+it("rejects worker connection creation when the queue is disabled", async () => {
+  const original = {
+    DISABLE_REDIS: process.env.DISABLE_REDIS,
+    ENABLE_IMAGE_GENERATION: process.env.ENABLE_IMAGE_GENERATION,
+    REDIS_URL: process.env.REDIS_URL,
+  };
+  process.env.DISABLE_REDIS = "true";
+  process.env.ENABLE_IMAGE_GENERATION = "false";
+  delete process.env.REDIS_URL;
+
+  try {
+    const assetQueue = await import("@/lib/asset-queue") as typeof import("@/lib/asset-queue") & {
+      getWorkerConnection: () => unknown;
+    };
+
+    expect(() => assetQueue.getWorkerConnection()).toThrow("Asset queue is not configured");
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+it("uses blocking-worker retry options only when the queue is configured", async () => {
+  const original = {
+    DISABLE_REDIS: process.env.DISABLE_REDIS,
+    ENABLE_IMAGE_GENERATION: process.env.ENABLE_IMAGE_GENERATION,
+    REDIS_URL: process.env.REDIS_URL,
+  };
+  process.env.DISABLE_REDIS = "false";
+  process.env.ENABLE_IMAGE_GENERATION = "true";
+  process.env.REDIS_URL = "redis://127.0.0.1:6379";
+
+  try {
+    const { getWorkerConnection } = await import("@/lib/asset-queue");
+
+    expect(getWorkerConnection()).toMatchObject({
+      url: "redis://127.0.0.1:6379",
+      maxRetriesPerRequest: null,
+    });
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
 });
 
 it(

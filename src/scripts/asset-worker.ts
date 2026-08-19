@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import { generateImage, computePromptHash, type GenerateImageInput } from "../lib/asset-service";
 import { query, initDb } from "../lib/db";
 import { logAssetCall } from "../lib/observability";
-import { getConnection, getRedisClient, type AssetJobData } from "../lib/asset-queue";
+import { getWorkerConnection, getRedisClient, isQueueConfigured, type AssetJobData } from "../lib/asset-queue";
 import { isObjectStorageConfigured, downloadAndStore, buildAssetKey } from "../lib/object-storage";
 import { readIntEnv } from "../lib/env";
 import { getErrorMessage } from "../lib/errors";
@@ -50,7 +50,7 @@ async function writeAssetVersion(assetJobId: string, url: string | null, promptJ
 }
 
 function startWorker() {
-  const connection = getConnection();
+  const connection = getWorkerConnection();
 
   worker = new Worker<AssetJobData>(
     "asset-generation",
@@ -186,6 +186,11 @@ async function gracefulShutdown(signal: string) {
 }
 
 async function main() {
+  if (!isQueueConfigured()) {
+    console.log("[Worker] Asset worker is disabled; skipping startup.");
+    return;
+  }
+
   console.log("Initializing database...");
   await initDb();
 

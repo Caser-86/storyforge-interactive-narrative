@@ -18,6 +18,12 @@ function getRedisUrl(): string {
   return redisUrl;
 }
 
+function assertQueueConfigured(): void {
+  if (!isQueueConfigured()) {
+    throw new Error("Asset queue is not configured");
+  }
+}
+
 export function isQueueConfigured(env = process.env): boolean {
   return env.ENABLE_IMAGE_GENERATION === "true"
     && env.DISABLE_REDIS !== "true"
@@ -86,6 +92,7 @@ function createRedisClient(): Redis {
 }
 
 export function getConnection(): ConnectionOptions {
+  assertQueueConfigured();
   return {
     url: getRedisUrl(),
     maxRetriesPerRequest: 3,
@@ -104,11 +111,29 @@ export function getConnection(): ConnectionOptions {
   };
 }
 
+export function getWorkerConnection(): ConnectionOptions {
+  assertQueueConfigured();
+  return {
+    url: getRedisUrl(),
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+    connectTimeout: 5000,
+    retryStrategy: (times) => {
+      if (times > 10) {
+        console.error("[Redis] Max retry attempts reached, giving up");
+        return null;
+      }
+      const delay = Math.min(times * 1000, 5000);
+      console.warn(`[Redis] Retry connection in ${delay}ms (attempt ${times})`);
+      return delay;
+    },
+    enableOfflineQueue: true,
+  };
+}
+
 export function getRedisClient(): Redis {
   if (!_connection) {
-    if (!isQueueConfigured()) {
-      throw new Error("Redis connection not available when the asset queue is disabled");
-    }
+    assertQueueConfigured();
     _connection = createRedisClient();
   }
   return _connection;
@@ -116,9 +141,7 @@ export function getRedisClient(): Redis {
 
 export function getAssetQueue(): Queue {
   if (!_queue) {
-    if (!isQueueConfigured()) {
-      throw new Error("Asset queue is not configured");
-    }
+    assertQueueConfigured();
     _queue = new Queue(ASSET_QUEUE, { connection: getConnection() });
   }
   return _queue;
