@@ -18,10 +18,12 @@
 ## Rulings
 
 - Ruling: Use the current checkout on a dedicated `codex/storyforge-phase-0` branch rather than creating a second physical worktree. The user approved implementation mode and the environment exposes one shared project workspace; a second checkout would duplicate the active local runtime and data context. Cost if wrong: branch isolation protects commits, but uncommitted workspace artifacts remain shared.
+- Ruling: The initial Task 1 dependency audit deferral is superseded by commit `62957f6`, which updates the production dependency tree and records `npm audit --omit=dev` with zero vulnerabilities. Cost if wrong: the audit result still needs a fresh clean-install verification because the local install is currently incomplete.
+- Ruling: Treat Phase 0 source remediation as complete but do not claim the full gate passed until a clean `npm ci`, mock `npm run verify`, and build are observed; repeated npm extraction hangs are an environment blocker, not evidence of success. Cost if wrong: release confidence remains lower than the approved completion gate requires.
 
 ## Task tracking
 
-- Task 1: minor (deferred): `npm install` reported 6 high-severity audit findings and native/postinstall `allow-scripts` warnings; dependency remediation is outside Task 1 and remains visible for later review.
+- Task 1: minor (resolved): initial `npm install` reported 6 high-severity audit findings; final dependency remediation in `62957f6` reports 0 production audit findings, pending clean-install confirmation.
 - Task 1: complete (commits ce0310f..ee53287, review clean)
 - Task 2: fix round 1/5 (1 addressed, 0 open - added required Redis/images-disabled command evidence; no source changes or new commit)
 - Task 2: complete (commits ee53287..08a4fc5, review clean)
@@ -32,4 +34,5 @@
 - Task 4: complete (commits 6e05e0a..88d38a8, review clean)
 - Task 5: fix round 1/5 (4 addressed, 1 new portability finding - CI env, test hook scope, and installed-tree check restored; commit 5ecf1fb..b3fa8ac)
 - Task 5: fix round 2/5 (1 addressed, 0 open - npm CLI invocation made cross-platform; commit b3fa8ac..18951c9; evidence note commit 47356dd)
-- Task 5: complete (commits 88d38a8..47356dd, review clean)
+- Task 5: final review fix wave (commits 47356dd..62957f6, prior findings resolved; focused regressions and audit passed, full clean-install gate blocked)
+- Task 5: source complete (commits 88d38a8..62957f6, final scoped review clean; Phase 0 gate pending clean npm install/verify/build evidence)
