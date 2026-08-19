@@ -27,6 +27,18 @@ export interface CreateProjectInput {
   settingsJson?: JsonValue;
 }
 
+export interface UpdateProjectInput {
+  title?: string;
+  premise?: string;
+  genre?: string;
+  tone?: string;
+  pointOfView?: string;
+  rating?: string;
+  size?: ProjectSize;
+  status?: ProjectStatus;
+  settingsJson?: JsonValue;
+}
+
 export type ProjectSummary = Project & {
   draftRevision: number | null;
   versionCount: number;
@@ -35,7 +47,9 @@ export type ProjectSummary = Project & {
 
 export interface AuthoringRepository {
   createProject(input: CreateProjectInput): Promise<Project>;
+  getProject(projectId: string): Promise<Project>;
   listProjects(): Promise<ProjectSummary[]>;
+  updateProject(projectId: string, input: UpdateProjectInput): Promise<Project>;
   getProjectGraph(projectId: string, versionId?: string): Promise<StoryGraph>;
   replaceDraftGraph(projectId: string, graph: StoryGraph, expectedRevision: number): Promise<StoryGraph>;
   createSnapshot(projectId: string): Promise<StoryVersion>;
@@ -296,6 +310,14 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
     }
   }
 
+  public async getProject(projectId: string): Promise<Project> {
+    try {
+      return this.requireProject(projectId);
+    } catch (error) {
+      throw storageError(error, "Failed to read authoring project");
+    }
+  }
+
   public async listProjects(): Promise<ProjectSummary[]> {
     try {
       const rows = this.db
@@ -323,6 +345,65 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
       }));
     } catch (error) {
       throw storageError(error, "Failed to list authoring projects");
+    }
+  }
+
+  public async updateProject(projectId: string, input: UpdateProjectInput): Promise<Project> {
+    if (input.status !== undefined && !["draft", "generating", "ready", "archived"].includes(input.status)) {
+      throw new AuthoringError("VALIDATION", "Invalid project status", { status: input.status });
+    }
+
+    try {
+      const update = this.db.transaction(() => {
+        const current = this.requireProject(projectId);
+        const size = input.size ?? {
+          preset: current.sizePreset,
+          targetNodes: current.targetNodeCount,
+          targetEndings: current.targetEndingCount,
+        };
+
+        this.db
+          .prepare(
+            `
+              UPDATE projects
+              SET
+                title = ?,
+                premise = ?,
+                genre = ?,
+                tone = ?,
+                point_of_view = ?,
+                rating = ?,
+                size_preset = ?,
+                target_node_count = ?,
+                target_ending_count = ?,
+                status = ?,
+                settings_json = ?,
+                updated_at = ?
+              WHERE id = ?
+            `,
+          )
+          .run(
+            input.title ?? current.title,
+            input.premise ?? current.premise,
+            input.genre ?? current.genre,
+            input.tone ?? current.tone,
+            input.pointOfView ?? current.pointOfView,
+            input.rating ?? current.rating,
+            size.preset,
+            size.targetNodes,
+            size.targetEndings,
+            input.status ?? current.status,
+            stringifyJson(input.settingsJson, current.settingsJson),
+            nowIso(),
+            projectId,
+          );
+
+        return this.requireProject(projectId);
+      });
+
+      return update();
+    } catch (error) {
+      throw storageError(error, "Failed to update authoring project");
     }
   }
 
