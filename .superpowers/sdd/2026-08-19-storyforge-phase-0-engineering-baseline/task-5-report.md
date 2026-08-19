@@ -377,3 +377,69 @@ Observed:
 
 - The user-requested `npm.cmd` installed-tree check is implemented via npm's underlying CLI entrypoint because `execFileSync('npm.cmd', ...)` is not executable without shell on this Windows / Node 24 environment
 - GitHub Actions itself was not run from this environment; CI confidence comes from the committed workflow config plus the successful local `npm run verify`
+
+## Fix Report: Review Finding Round 2
+
+- Date: Wednesday, August 19, 2026
+- Reviewed base commit: `b3fa8ac`
+- Fix commit hash: `18951c9`
+- Scope: fix only the cross-platform npm CLI resolution in `src/__tests__/asset-queue-types.test.ts`
+
+### Finding Addressed
+
+- `src/__tests__/asset-queue-types.test.ts`
+  - Removed the Windows-only `dirname(process.execPath)` npm CLI derivation
+  - Preferred `process.env.npm_execpath` when the test is launched through `npm`
+  - Kept the no-shell `execFileSync` path by invoking `process.execPath` with `npm_execpath`
+  - Added a safe fallback launcher: `npm.cmd` on `win32`, `npm` elsewhere
+  - Preserved the per-test timeout and the exact `ioredis` `5.10.1` assertions against the real installed dependency tree
+
+### Exact Commands And Outcomes
+
+Red-phase focused run after adding the new cross-platform expectations:
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'; npm test -- src/__tests__/asset-queue-types.test.ts
+```
+
+Observed:
+
+- Exit code `1`
+- `1 failed` file
+- `2 failed | 1 passed` tests
+- Failure proved the old implementation ignored `npm_execpath` and had no platform fallback
+
+Green-phase focused run after the minimal fix:
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'; npm test -- src/__tests__/asset-queue-types.test.ts
+```
+
+Observed:
+
+- Exit code `0`
+- `1 passed` file
+- `3 passed` tests
+- Vitest duration `1.24s`
+
+Required full verification:
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'; npm run verify
+```
+
+Observed:
+
+- Exit code `0`
+- `typecheck`: success
+- `lint`: success
+- `npm test`: `30 passed` files, `241 passed` tests, Vitest duration `1.92s`
+- `npm run build`: success
+- Build highlights:
+  - `Compiled successfully in 2.1s`
+  - `Finished TypeScript in 4.6s`
+  - `Generating static pages using 15 workers (12/12) in 299ms`
+
+### Residual Concerns
+
+- The Ubuntu behavior is covered by the new invocation-selection tests plus the `npm_execpath`/platform fallback logic, but Ubuntu GitHub Actions itself was not re-run from this local environment
