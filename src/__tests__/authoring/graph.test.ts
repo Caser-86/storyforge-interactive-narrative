@@ -10,6 +10,7 @@ import {
   graphOverNodeLimit,
   graphWithBrokenEdge,
   graphWithCycle,
+  graphWithCycleAndAcyclicTail,
   graphWithDeadEnd,
   graphWithDuplicateChoices,
   graphWithEmptyChoice,
@@ -86,6 +87,21 @@ describe("authoring graph validation", () => {
     expect(() => topologicalSort(graphWithCycle())).toThrowError(
       expect.objectContaining({
         code: "VALIDATION",
+      } satisfies Partial<AuthoringError>),
+    );
+  });
+
+  it("identifies only actual cycle nodes when a cycle has an acyclic tail", () => {
+    const graph = graphWithCycleAndAcyclicTail();
+    const cycleIssues = validateStoryGraph(graph, testLimits()).filter((issue) => issue.code === "CYCLE");
+
+    expect(cycleIssues.map((issue) => issue.nodeId)).toEqual(["node-a", "node-b"]);
+    expect(cycleIssues.map((issue) => issue.nodeId)).not.toContain("node-c");
+    expect(cycleIssues.map((issue) => issue.nodeId)).not.toContain("node-ending");
+
+    expect(() => topologicalSort(graph)).toThrowError(
+      expect.objectContaining({
+        details: { cycleNodeIds: ["node-a", "node-b"] },
       } satisfies Partial<AuthoringError>),
     );
   });

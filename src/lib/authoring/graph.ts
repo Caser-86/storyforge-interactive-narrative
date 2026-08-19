@@ -271,10 +271,7 @@ export function topologicalSort(graph: StoryGraph): string[] {
   }
 
   if (orderedNodeIds.length !== index.nodes.length) {
-    const cycleNodeIds = index.nodes
-      .map((node) => node.id)
-      .filter((nodeId) => !orderedNodeIds.includes(nodeId))
-      .sort((left, right) => compareNodeIds(left, right, index.nodesById));
+    const cycleNodeIds = findCycleNodeIds(index.nodes, index.outgoingValidEdges, index.nodesById);
 
     throw new AuthoringError("VALIDATION", "Graph contains a directed cycle.", {
       cycleNodeIds,
@@ -530,39 +527,77 @@ function findCycleNodeIds(
   outgoingValidEdges: Map<string, StoryEdge[]>,
   nodesById: Map<string, StoryNode>,
 ): string[] {
-  const indegreeByNodeId = createIndegreeMap(nodes, outgoingValidEdges);
-  const readyNodeIds = nodes
-    .filter((node) => (indegreeByNodeId.get(node.id) ?? 0) === 0)
-    .map((node) => node.id)
-    .sort((left, right) => compareNodeIds(left, right, nodesById));
-  const visitedNodeIds = new Set<string>();
+  let nextIndex = 0;
+  const indexByNodeId = new Map<string, number>();
+  const lowLinkByNodeId = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const cycleNodeIds = new Set<string>();
 
-  while (readyNodeIds.length > 0) {
-    const nodeId = readyNodeIds.shift();
+  const visit = (nodeId: string): void => {
+    indexByNodeId.set(nodeId, nextIndex);
+    lowLinkByNodeId.set(nodeId, nextIndex);
+    nextIndex += 1;
+    stack.push(nodeId);
+    onStack.add(nodeId);
 
-    if (nodeId === undefined) {
-      continue;
+    const outgoingEdges = [...(outgoingValidEdges.get(nodeId) ?? [])].sort((left, right) =>
+      compareOutgoingEdges(left, right, nodesById),
+    );
+
+    for (const edge of outgoingEdges) {
+      const targetNodeId = edge.targetNodeId;
+
+      if (!indexByNodeId.has(targetNodeId)) {
+        visit(targetNodeId);
+        lowLinkByNodeId.set(
+          nodeId,
+          Math.min(lowLinkByNodeId.get(nodeId) ?? Number.POSITIVE_INFINITY, lowLinkByNodeId.get(targetNodeId) ?? 0),
+        );
+      } else if (onStack.has(targetNodeId)) {
+        lowLinkByNodeId.set(
+          nodeId,
+          Math.min(lowLinkByNodeId.get(nodeId) ?? Number.POSITIVE_INFINITY, indexByNodeId.get(targetNodeId) ?? 0),
+        );
+      }
     }
 
-    visitedNodeIds.add(nodeId);
+    if (lowLinkByNodeId.get(nodeId) !== indexByNodeId.get(nodeId)) {
+      return;
+    }
 
-    for (const edge of [...(outgoingValidEdges.get(nodeId) ?? [])].sort((left, right) =>
-      compareOutgoingEdges(left, right, nodesById),
-    )) {
-      const nextIndegree = (indegreeByNodeId.get(edge.targetNodeId) ?? 0) - 1;
-      indegreeByNodeId.set(edge.targetNodeId, nextIndegree);
+    const componentNodeIds: string[] = [];
+    let componentNodeId: string | undefined;
 
-      if (nextIndegree === 0) {
-        readyNodeIds.push(edge.targetNodeId);
-        readyNodeIds.sort((left, right) => compareNodeIds(left, right, nodesById));
+    do {
+      componentNodeId = stack.pop();
+
+      if (componentNodeId === undefined) {
+        break;
       }
+
+      onStack.delete(componentNodeId);
+      componentNodeIds.push(componentNodeId);
+    } while (componentNodeId !== nodeId);
+
+    if (
+      componentNodeIds.length > 1 ||
+      (componentNodeIds.length === 1 &&
+        outgoingEdges.some((edge) => edge.targetNodeId === componentNodeIds[0]))
+    ) {
+      for (const componentNodeId of componentNodeIds) {
+        cycleNodeIds.add(componentNodeId);
+      }
+    }
+  };
+
+  for (const node of nodes) {
+    if (!indexByNodeId.has(node.id)) {
+      visit(node.id);
     }
   }
 
-  return nodes
-    .map((node) => node.id)
-    .filter((nodeId) => !visitedNodeIds.has(nodeId))
-    .sort((left, right) => compareNodeIds(left, right, nodesById));
+  return [...cycleNodeIds].sort((left, right) => compareNodeIds(left, right, nodesById));
 }
 
 function findReachableNodeIds(

@@ -128,6 +128,25 @@ export function graphWithCycle(): StoryGraph {
   );
 }
 
+export function graphWithCycleAndAcyclicTail(): StoryGraph {
+  const start = node("start", "start");
+  const a = node("a", "scene", { topologicalRank: 1 });
+  const b = node("b", "scene", { topologicalRank: 2 });
+  const c = node("c", "scene", { topologicalRank: 3 });
+  const ending = node("ending", "ending", { topologicalRank: 4 });
+
+  return graph(
+    [start, a, b, c, ending],
+    [
+      edge(start.id, a.id, "Enter the loop", 0, { id: "edge-start-a" }),
+      edge(a.id, b.id, "Advance", 0, { id: "edge-a-b" }),
+      edge(b.id, a.id, "Return", 0, { id: "edge-b-a" }),
+      edge(a.id, c.id, "Take the exit", 1, { id: "edge-a-c" }),
+      edge(c.id, ending.id, "Finish", 0, { id: "edge-c-ending" }),
+    ],
+  );
+}
+
 export function graphWithOrphan(): StoryGraph {
   const base = validConvergingGraph();
   const orphan = node("orphan", "scene", { topologicalRank: 99 });
