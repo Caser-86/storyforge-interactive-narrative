@@ -15,18 +15,18 @@ function restoreEnv(name: string, value: string | undefined) {
   process.env[name] = value;
 }
 
-describe("Asset job status transitions", () => {
-  const originalDisableRedis = process.env.DISABLE_REDIS;
-  const originalRedisUrl = process.env.REDIS_URL;
+const originalDisableRedis = process.env.DISABLE_REDIS;
+const originalRedisUrl = process.env.REDIS_URL;
 
+afterEach(() => {
+  restoreEnv("DISABLE_REDIS", originalDisableRedis);
+  restoreEnv("REDIS_URL", originalRedisUrl);
+  vi.resetModules();
+});
+
+describe("Asset job status transitions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    restoreEnv("DISABLE_REDIS", originalDisableRedis);
-    restoreEnv("REDIS_URL", originalRedisUrl);
-    vi.resetModules();
   });
 
   it("GET /api/assets/[id] returns 404 for non-existent job", async () => {

@@ -9,6 +9,12 @@ on:
 jobs:
   typecheck:
     runs-on: ubuntu-latest
+    env:
+      DISABLE_REDIS: "true"
+      ENABLE_IMAGE_GENERATION: "false"
+      IMAGE_PROVIDER: "mock"
+      MOCK_LLM: "true"
+      OPENAI_API_KEY: sk-test-mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,6 +26,12 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    env:
+      DISABLE_REDIS: "true"
+      ENABLE_IMAGE_GENERATION: "false"
+      IMAGE_PROVIDER: "mock"
+      MOCK_LLM: "true"
+      OPENAI_API_KEY: sk-test-mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,6 +43,12 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      DISABLE_REDIS: "true"
+      ENABLE_IMAGE_GENERATION: "false"
+      IMAGE_PROVIDER: "mock"
+      MOCK_LLM: "true"
+      OPENAI_API_KEY: sk-test-mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,6 +61,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [typecheck, lint, test]
+    env:
+      DISABLE_REDIS: "true"
+      ENABLE_IMAGE_GENERATION: "false"
+      IMAGE_PROVIDER: "mock"
+      MOCK_LLM: "true"
+      OPENAI_API_KEY: sk-test-mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,9 +75,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-        env:
-          DISABLE_REDIS: "true"
-          ENABLE_IMAGE_GENERATION: "false"
 
   db-smoke:
     runs-on: ubuntu-latest
@@ -87,6 +108,12 @@ jobs:
   e2e-text:
     runs-on: ubuntu-latest
     needs: [build]
+    env:
+      DISABLE_REDIS: "true"
+      ENABLE_IMAGE_GENERATION: "false"
+      IMAGE_PROVIDER: "mock"
+      MOCK_LLM: "true"
+      OPENAI_API_KEY: sk-test-mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -96,11 +123,4 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-        env:
-          DISABLE_REDIS: "true"
-          ENABLE_IMAGE_GENERATION: "false"
       - run: npx playwright test e2e/text-flow.spec.ts
-        env:
-          DISABLE_REDIS: "true"
-          ENABLE_IMAGE_GENERATION: "false"
-          MOCK_LLM: "true"

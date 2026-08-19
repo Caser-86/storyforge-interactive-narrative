@@ -40,21 +40,21 @@ vi.mock("@/lib/api-errors", () => ({
   },
 }));
 
-describe("API Permission: owner token required for private sessions", () => {
-  const originalDisableRedis = process.env.DISABLE_REDIS;
-  const originalImageGeneration = process.env.ENABLE_IMAGE_GENERATION;
-  const originalRedisUrl = process.env.REDIS_URL;
+const originalDisableRedis = process.env.DISABLE_REDIS;
+const originalImageGeneration = process.env.ENABLE_IMAGE_GENERATION;
+const originalRedisUrl = process.env.REDIS_URL;
 
+afterEach(() => {
+  restoreEnv("DISABLE_REDIS", originalDisableRedis);
+  restoreEnv("ENABLE_IMAGE_GENERATION", originalImageGeneration);
+  restoreEnv("REDIS_URL", originalRedisUrl);
+  vi.resetModules();
+  vi.restoreAllMocks();
+});
+
+describe("API Permission: owner token required for private sessions", () => {
   beforeEach(() => {
     mockQuery.mockReset();
-  });
-
-  afterEach(() => {
-    restoreEnv("DISABLE_REDIS", originalDisableRedis);
-    restoreEnv("ENABLE_IMAGE_GENERATION", originalImageGeneration);
-    restoreEnv("REDIS_URL", originalRedisUrl);
-    vi.resetModules();
-    vi.restoreAllMocks();
   });
 
   it("GET /api/games/[sessionId] returns 403 when token missing for private session", async () => {

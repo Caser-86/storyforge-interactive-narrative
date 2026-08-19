@@ -4,7 +4,7 @@
 - Branch: `codex/storyforge-phase-0`
 - Node: `v24.18.0`
 - npm: `11.16.0`
-- Commit hash: `PENDING_POST_COMMIT`
+- Commit hash: `5ecf1fb`
 
 ## Requirements Status
 
@@ -271,3 +271,109 @@ Observed:
 - `npm audit` still reports `6 high severity vulnerabilities`; not addressed in this task
 - Local untracked files `dev-server.log` and `dev-server.err.log` were preserved because they predated this task
 - The release verification is based on local Windows / Node 24 / npm 11 evidence; CI parity is inferred from configuration, not re-run remotely
+
+## Fix Report: Review Findings Round 1
+
+- Date: Wednesday, August 19, 2026
+- Base implementation commit reviewed: `5ecf1fb`
+- Goal: fix all four Task 5 review findings in one follow-up round without amending the base commit
+
+### Findings Addressed
+
+1. `.github/workflows/ci.yml`
+   - Added explicit job-level `DISABLE_REDIS=true` and `ENABLE_IMAGE_GENERATION=false` to `typecheck`, `lint`, `test`, `build`, and `e2e-text`
+   - Preserved no-paid-provider behavior with `IMAGE_PROVIDER=mock`, `MOCK_LLM=true`, and `OPENAI_API_KEY=sk-test-mock`
+2. `src/__tests__/permission-queue.test.ts`
+   - Moved env/module cleanup to file scope so it applies to every sibling test that mutates queue env vars
+3. `src/__tests__/api-assets-ratelimit.test.ts`
+   - Moved env/module cleanup to file scope so it applies to the rate-limit tests that import the singleton module
+4. `src/__tests__/asset-queue-types.test.ts`
+   - Restored a real installed-tree assertion against the resolved `ioredis` dependency tree
+   - Added a per-test timeout only for this test
+   - Asserted both the root project and `bullmq` resolve `ioredis` to `5.10.1`
+
+### Exact Commands And Outcomes
+
+Pre-fix focused baseline:
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'; npm test -- src/__tests__/permission-queue.test.ts src/__tests__/api-assets-ratelimit.test.ts
+```
+
+Observed:
+
+- Exit code `0`
+- `2 passed` files
+- `21 passed` tests
+- Vitest duration `454ms`
+
+Installed-tree proof before restoring the test:
+
+```powershell
+npm.cmd ls ioredis --json
+```
+
+Observed:
+
+- Exit code `0`
+- Root dependency resolved `ioredis.version = 5.10.1`
+- `bullmq.dependencies.ioredis.version = 5.10.1`
+
+No-shell platform diagnostic gathered during the fix:
+
+```powershell
+node -e "const {execFileSync}=require('node:child_process'); try { const out = execFileSync('npm.cmd',['ls','ioredis','--json'],{encoding:'utf8'}); console.log(out); } catch (error) { console.error(error); process.exitCode = 1; }"
+```
+
+Observed:
+
+- Exit code `1`
+- Windows / Node 24 returned `spawnSync npm.cmd EINVAL`
+- The committed test therefore invokes the same npm CLI entrypoint directly via `process.execPath` and `C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js`, still without shell
+
+Post-fix focused tests:
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'; npm test -- src/__tests__/permission-queue.test.ts src/__tests__/api-assets-ratelimit.test.ts src/__tests__/asset-queue-types.test.ts
+```
+
+Observed:
+
+- Exit code `0`
+- `3 passed` files
+- `22 passed` tests
+- Vitest duration `1.25s`
+
+Full verification required by the review:
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'; npm run verify
+```
+
+Observed:
+
+- Exit code `0`
+- `typecheck`: success
+- `lint`: success
+- `npm test`: `30 passed` files, `239 passed` tests, Vitest duration `1.95s`
+- `npm run build`: success
+- Build highlights:
+  - `Compiled successfully in 2.3s`
+  - `Finished TypeScript in 4.6s`
+  - `Generating static pages using 15 workers (12/12) in 342ms`
+
+Supporting verification:
+
+```powershell
+git diff --check
+```
+
+Observed:
+
+- Exit code `0`
+- Only CRLF conversion warnings were reported for touched files
+
+### Concerns
+
+- The user-requested `npm.cmd` installed-tree check is implemented via npm's underlying CLI entrypoint because `execFileSync('npm.cmd', ...)` is not executable without shell on this Windows / Node 24 environment
+- GitHub Actions itself was not run from this environment; CI confidence comes from the committed workflow config plus the successful local `npm run verify`
