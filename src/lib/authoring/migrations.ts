@@ -342,4 +342,52 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_generation_candidates_node ON generation_candidates(version_id, node_id);
     `,
   },
+  {
+    version: 5,
+    name: "validation_runs_and_issues",
+    up: `
+      CREATE TABLE IF NOT EXISTS validation_runs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        version_id TEXT NOT NULL,
+        draft_revision INTEGER NOT NULL,
+        sources_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed')),
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        completed_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id, version_id) REFERENCES story_versions(project_id, id) ON DELETE CASCADE,
+        UNIQUE (project_id, version_id, id)
+      );
+
+      CREATE TABLE IF NOT EXISTS validation_issues (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        version_id TEXT NOT NULL,
+        run_id TEXT,
+        draft_revision INTEGER NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('structural', 'rule', 'ai_review')),
+        severity TEXT NOT NULL CHECK (severity IN ('blocking', 'warning')),
+        code TEXT NOT NULL,
+        message TEXT NOT NULL,
+        node_id TEXT,
+        edge_id TEXT,
+        details_json TEXT NOT NULL DEFAULT '{}',
+        fingerprint TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('open', 'resolved', 'dismissed')),
+        created_at TEXT NOT NULL,
+        resolved_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id, version_id) REFERENCES story_versions(project_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (run_id) REFERENCES validation_runs(id) ON DELETE SET NULL,
+        UNIQUE (version_id, draft_revision, source, fingerprint)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_validation_runs_project ON validation_runs(project_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_validation_runs_version_revision ON validation_runs(version_id, draft_revision);
+      CREATE INDEX IF NOT EXISTS idx_validation_issues_project_status ON validation_issues(project_id, status, severity);
+      CREATE INDEX IF NOT EXISTS idx_validation_issues_version_revision ON validation_issues(version_id, draft_revision, source);
+    `,
+  },
 ];
