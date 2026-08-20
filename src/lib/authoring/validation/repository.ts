@@ -18,6 +18,7 @@ export interface ValidationRepositoryOptions {
 export interface ValidationRepository {
   createRun(projectId: string, versionId: string, draftRevision: number, sources: ValidationSource[]): Promise<ValidationRun>;
   completeRun(runId: string, status?: "completed" | "failed", errorMessage?: string): Promise<ValidationRun>;
+  listRuns(projectId: string, versionId?: string, draftRevision?: number): Promise<ValidationRun[]>;
   replaceIssues(versionId: string, draftRevision: number, source: ValidationSource, issues: ValidationIssueInput[], runId?: string): Promise<ValidationIssueRecord[]>;
   listIssues(projectId: string, versionId?: string, draftRevision?: number): Promise<ValidationIssueRecord[]>;
   resolveIssue(issueId: string): Promise<ValidationIssueRecord>;
@@ -145,6 +146,27 @@ export class BetterSqliteValidationRepository implements ValidationRepository {
       return this.getRun(runId);
     } catch (error) {
       throw storageError(error, "Failed to complete validation run");
+    }
+  }
+
+  public async listRuns(projectId: string, versionId?: string, draftRevision?: number): Promise<ValidationRun[]> {
+    try {
+      const clauses = ["project_id = ?"];
+      const params: Array<string | number> = [projectId];
+      if (versionId !== undefined) {
+        clauses.push("version_id = ?");
+        params.push(versionId);
+      }
+      if (draftRevision !== undefined) {
+        clauses.push("draft_revision = ?");
+        params.push(draftRevision);
+      }
+      const rows = this.db
+        .prepare(`SELECT * FROM validation_runs WHERE ${clauses.join(" AND ")} ORDER BY created_at ASC, id ASC`)
+        .all(...params) as RunRow[];
+      return rows.map(toRun);
+    } catch (error) {
+      throw storageError(error, "Failed to list validation runs");
     }
   }
 
