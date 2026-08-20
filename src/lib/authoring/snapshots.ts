@@ -483,43 +483,47 @@ export function toReaderStoryGraph(graph: StoryGraph): ReaderStoryGraph {
   });
 }
 
+export function sealSnapshotInDatabase(db: Database.Database, projectId: string): StoryVersion {
+  const seal = db.transaction(() => {
+    const project = requireProject(db, projectId);
+    if (project.activeDraftVersionId === null) {
+      throw new AuthoringError("NOT_FOUND", "Active draft version not found", { projectId });
+    }
+
+    const draft = requireVersionRow(db, projectId, project.activeDraftVersionId);
+    if (draft.kind !== "draft") {
+      throw new AuthoringError("IMMUTABLE_VERSION", "Active version is not a mutable draft", {
+        versionId: draft.id,
+      });
+    }
+
+    const draftGraph = readGraphByVersionId(db, draft.id);
+    const issues = validateStoryGraph(draftGraph, {
+      maxNodes: project.targetNodeCount,
+      maxEndings: project.targetEndingCount,
+    });
+    const blockingIssues = issues.filter((issue) => issue.severity === "blocking");
+
+    if (blockingIssues.length > 0) {
+      throw new AuthoringError("BLOCKING_ISSUES", "Cannot seal a snapshot while blocking graph issues remain", {
+        issues: blockingIssues,
+      });
+    }
+
+    const snapshot = insertVersionCopy(db, projectId, draft, "snapshot", draft.id, "valid", nowIso());
+    copyGraphRows(db, draft.id, snapshot.id);
+
+    return toStoryVersion(snapshot);
+  });
+
+  return seal();
+}
+
 export async function sealSnapshot(projectId: string): Promise<StoryVersion> {
   const db = initializeAuthoringDatabase();
 
   try {
-    const seal = db.transaction(() => {
-      const project = requireProject(db, projectId);
-      if (project.activeDraftVersionId === null) {
-        throw new AuthoringError("NOT_FOUND", "Active draft version not found", { projectId });
-      }
-
-      const draft = requireVersionRow(db, projectId, project.activeDraftVersionId);
-      if (draft.kind !== "draft") {
-        throw new AuthoringError("IMMUTABLE_VERSION", "Active version is not a mutable draft", {
-          versionId: draft.id,
-        });
-      }
-
-      const draftGraph = readGraphByVersionId(db, draft.id);
-      const issues = validateStoryGraph(draftGraph, {
-        maxNodes: project.targetNodeCount,
-        maxEndings: project.targetEndingCount,
-      });
-      const blockingIssues = issues.filter((issue) => issue.severity === "blocking");
-
-      if (blockingIssues.length > 0) {
-        throw new AuthoringError("BLOCKING_ISSUES", "Cannot seal a snapshot while blocking graph issues remain", {
-          issues: blockingIssues,
-        });
-      }
-
-      const snapshot = insertVersionCopy(db, projectId, draft, "snapshot", draft.id, "valid", nowIso());
-      copyGraphRows(db, draft.id, snapshot.id);
-
-      return toStoryVersion(snapshot);
-    });
-
-    return seal();
+    return sealSnapshotInDatabase(db, projectId);
   } catch (error) {
     throw storageError(error, "Failed to seal authoring snapshot");
   } finally {

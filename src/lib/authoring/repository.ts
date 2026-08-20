@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { AuthoringError } from "./errors";
 import { initializeAuthoringDatabase } from "./database";
 import type { AuthoringDatabaseOptions } from "./database";
+import { sealSnapshotInDatabase } from "./snapshots";
 import type {
   Chapter,
   JsonValue,
@@ -457,20 +458,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
 
   public async createSnapshot(projectId: string): Promise<StoryVersion> {
     try {
-      const create = this.db.transaction(() => {
-        const project = this.requireProject(projectId);
-        if (!project.activeDraftVersionId) {
-          throw new AuthoringError("NOT_FOUND", "Active draft version not found", { projectId });
-        }
-
-        const draft = this.requireVersion(projectId, project.activeDraftVersionId);
-        const snapshot = this.createVersionCopy(projectId, draft, "snapshot", draft.id, nowIso());
-        this.copyVersionGraph(draft.id, snapshot.id);
-
-        return snapshot;
-      });
-
-      return create();
+      return sealSnapshotInDatabase(this.db, projectId);
     } catch (error) {
       throw storageError(error, "Failed to create authoring snapshot");
     }
@@ -494,10 +482,6 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         this.db
           .prepare("UPDATE projects SET active_draft_version_id = ?, updated_at = ? WHERE id = ?")
           .run(newDraft.id, nowIso(), projectId);
-
-        if (project.activeDraftVersionId) {
-          this.db.prepare("DELETE FROM story_versions WHERE id = ?").run(project.activeDraftVersionId);
-        }
 
         return newDraft;
       });

@@ -118,6 +118,26 @@ function populatedGraph(versionId: string): StoryGraph {
   };
 }
 
+function graphWithoutEnding(versionId: string): StoryGraph {
+  const validGraph = populatedGraph(versionId);
+  const startNode = validGraph.nodes.find((item) => item.kind === "start");
+  if (!startNode) {
+    throw new Error("Fixture must contain a start node");
+  }
+
+  const sceneNode = node(`${versionId}-node-source-scene`, versionId, validGraph.chapters[0].id, {
+    nodeKey: "scene",
+    topologicalRank: 1,
+    title: "Scene",
+  });
+
+  return {
+    ...validGraph,
+    nodes: [startNode, sceneNode],
+    edges: [edge(`${versionId}-edge-source-scene`, versionId, startNode.id, sceneNode.id)],
+  };
+}
+
 function createRepo(): AuthoringRepository {
   const repo = createAuthoringRepository({ dbPath, backupDir });
   repos.push(repo);
@@ -317,6 +337,7 @@ describe("authoring repository", () => {
   it("rejects graph writes to snapshot versions", async () => {
     const repo = createRepo();
     const project = await repo.createProject(fixtureBrief());
+    await repo.replaceDraftGraph(project.id, populatedGraph(project.activeDraftVersionId!), 0);
     const snapshot = await repo.createSnapshot(project.id);
 
     await expect(
@@ -326,9 +347,87 @@ describe("authoring repository", () => {
     } satisfies Partial<AuthoringError>);
   });
 
+  it("rejects blocking draft graphs before creating a facade snapshot", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(fixtureBrief());
+    const graph = graphWithoutEnding(project.activeDraftVersionId!);
+
+    await repo.replaceDraftGraph(project.id, graph, 0);
+
+    await expect(repo.createSnapshot(project.id)).rejects.toMatchObject({
+      code: "BLOCKING_ISSUES",
+    } satisfies Partial<AuthoringError>);
+
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      expect(
+        db.prepare("SELECT COUNT(*) AS count FROM story_versions WHERE project_id = ? AND kind = 'snapshot'").get(
+          project.id,
+        ),
+      ).toEqual({ count: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("creates valid snapshots through the repository facade", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(fixtureBrief());
+    await repo.replaceDraftGraph(project.id, populatedGraph(project.activeDraftVersionId!), 0);
+
+    const snapshot = await repo.createSnapshot(project.id);
+
+    expect(snapshot).toMatchObject({
+      kind: "snapshot",
+      status: "valid",
+      sourceVersionId: project.activeDraftVersionId,
+    });
+  });
+
+  it("preserves historical snapshot metadata when restoring through the repository facade", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(fixtureBrief());
+    await repo.replaceDraftGraph(project.id, populatedGraph(project.activeDraftVersionId!), 0);
+    const snapshot = await repo.createSnapshot(project.id);
+    const db = new Database(dbPath);
+
+    try {
+      const metadataBefore = db
+        .prepare(
+          `
+            SELECT id, project_id, version_number, kind, source_version_id, status,
+                   brief_json, story_bible_json, outline_json, canon_json, draft_revision,
+                   created_at, sealed_at
+            FROM story_versions
+            WHERE id = ?
+          `,
+        )
+        .get(snapshot.id);
+
+      const restored = await repo.restoreSnapshot(project.id, snapshot.id);
+      const metadataAfter = db
+        .prepare(
+          `
+            SELECT id, project_id, version_number, kind, source_version_id, status,
+                   brief_json, story_bible_json, outline_json, canon_json, draft_revision,
+                   created_at, sealed_at
+            FROM story_versions
+            WHERE id = ?
+          `,
+        )
+        .get(snapshot.id);
+
+      expect(restored.sourceVersionId).toBe(snapshot.id);
+      expect(metadataAfter).toEqual(metadataBefore);
+    } finally {
+      db.close();
+    }
+  });
+
   it("round-trips JSON metadata through projects and versions", async () => {
     const repo = createRepo();
     const project = await repo.createProject(fixtureBrief());
+    await repo.replaceDraftGraph(project.id, populatedGraph(project.activeDraftVersionId!), 0);
     const listedProject = (await repo.listProjects()).find((item) => item.id === project.id);
     const version = await repo.createSnapshot(project.id);
 
