@@ -50,3 +50,4 @@ export const GenerationNextResponseSchema = z
 
 export type GenerationCreateInput = z.infer<typeof GenerationCreateInputSchema>;
 export type GenerationActionInput = z.infer<typeof GenerationActionInputSchema>;
+export type GenerationStatusResponse = z.infer<typeof GenerationStatusResponseSchema>;

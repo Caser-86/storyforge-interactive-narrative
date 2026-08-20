@@ -1,6 +1,14 @@
 import { CreateProjectResponseSchema } from "@/lib/authoring/api-contracts";
 import type { CreateProjectInputPayload } from "@/lib/authoring/api-contracts";
 import type { Project } from "@/lib/authoring/schemas";
+import {
+  GenerationListResponseSchema,
+  GenerationNextResponseSchema,
+  GenerationResponseSchema,
+  GenerationStatusResponseSchema,
+} from "@/lib/authoring/generation/api-contracts";
+import type { GenerationStatusResponse } from "@/lib/authoring/generation/api-contracts";
+import type { GenerationRun } from "@/lib/authoring/generation/schemas";
 
 async function responseError(response: Response): Promise<Error> {
   try {
@@ -21,4 +29,46 @@ export async function createProject(input: CreateProjectInputPayload): Promise<P
   if (!response.ok) throw await responseError(response);
 
   return CreateProjectResponseSchema.parse(await response.json()).project;
+}
+
+async function parseJson<T>(response: Response, parse: (value: unknown) => T): Promise<T> {
+  if (!response.ok) throw await responseError(response);
+  return parse(await response.json());
+}
+
+export async function listGenerationRuns(projectId: string): Promise<GenerationRun[]> {
+  const response = await fetch(`/api/projects/${projectId}/generation`);
+  return parseJson(response, (value) => GenerationListResponseSchema.parse(value).runs);
+}
+
+export async function createGenerationRun(projectId: string): Promise<GenerationRun> {
+  const response = await fetch(`/api/projects/${projectId}/generation`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return parseJson(response, (value) => GenerationResponseSchema.parse(value).run);
+}
+
+export async function getGenerationStatus(projectId: string, runId: string): Promise<GenerationStatusResponse> {
+  const response = await fetch(`/api/projects/${projectId}/generation/${runId}`);
+  return parseJson(response, (value) => GenerationStatusResponseSchema.parse(value));
+}
+
+export async function advanceGeneration(projectId: string, runId: string) {
+  const response = await fetch(`/api/projects/${projectId}/generation/${runId}/next`, { method: "POST" });
+  return parseJson(response, (value) => GenerationNextResponseSchema.parse(value));
+}
+
+export async function generationAction(
+  projectId: string,
+  runId: string,
+  action: "pause" | "resume" | "cancel",
+): Promise<GenerationRun> {
+  const response = await fetch(`/api/projects/${projectId}/generation/${runId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action }),
+  });
+  return parseJson(response, (value) => GenerationResponseSchema.parse(value).run);
 }

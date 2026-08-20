@@ -795,7 +795,7 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
     try {
       const resume = this.db.transaction(() => {
         const current = this.requireRunRow(runId);
-        if (current.status !== "paused") {
+        if (current.status !== "paused" && current.status !== "failed") {
           return toRun(current);
         }
 
@@ -803,10 +803,25 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
         this.db
           .prepare(
             `
+              UPDATE generation_steps
+              SET status = 'queued',
+                  next_attempt_at = NULL,
+                  error_code = NULL,
+                  error_message = NULL,
+                  updated_at = ?
+              WHERE run_id = ? AND status = 'failed'
+            `,
+          )
+          .run(timestamp, runId);
+
+        this.db
+          .prepare(
+            `
               UPDATE generation_runs
               SET status = 'queued',
                   last_error_code = NULL,
                   last_error_message = NULL,
+                  completed_at = NULL,
                   updated_at = ?
               WHERE id = ?
             `,
