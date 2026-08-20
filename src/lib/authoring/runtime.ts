@@ -103,3 +103,16 @@ export function chooseEdge(
     isEnding: targetNode.kind === "ending",
   };
 }
+
+export function replayEdgePath(
+  graph: ReaderStoryGraph,
+  edgePath: string[],
+): StoryRuntimeState {
+  let state = createRuntime(graph);
+
+  for (const edgeId of edgePath) {
+    state = chooseEdge(graph, state, edgeId);
+  }
+
+  return state;
+}

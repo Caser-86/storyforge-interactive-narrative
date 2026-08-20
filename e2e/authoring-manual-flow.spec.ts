@@ -78,7 +78,7 @@ test.describe("authoring manual closed loop", () => {
       assertOk(createSnapshot, "create snapshot");
       expect(createSnapshot.status()).toBe(201);
       const snapshotPayload = await createSnapshot.json();
-      const snapshot = snapshotPayload.snapshot as { id: string };
+      const snapshot = snapshotPayload.snapshot as { id: string; versionNumber: number };
 
       const preview = await request.post(`/api/projects/${project.id}/preview`, {
         data: {
@@ -129,6 +129,29 @@ test.describe("authoring manual closed loop", () => {
 
       const offlinePage = await offlineContext.newPage();
       await offlinePage.goto(pathToFileURL(exportPath).href);
+      await expect(offlinePage.getByRole("heading", { name: "Courtyard Gate" })).toBeVisible();
+
+      await offlinePage.evaluate(
+        ({ projectId, versionNumber, endingEdgeId, sceneEdgeId, endingNodeId }) => {
+          localStorage.setItem(
+            `storyforge:${projectId}:${versionNumber}`,
+            JSON.stringify({
+              currentNodeId: endingNodeId,
+              nodePath: [endingNodeId],
+              edgePath: [endingEdgeId, sceneEdgeId],
+              isEnding: true,
+            }),
+          );
+        },
+        {
+          projectId: project.id,
+          versionNumber: snapshot.versionNumber,
+          endingEdgeId: previewEndingEdge.id,
+          sceneEdgeId: previewSceneEdge.id,
+          endingNodeId: previewEnding.id,
+        },
+      );
+      await offlinePage.reload();
       await expect(offlinePage.getByRole("heading", { name: "Courtyard Gate" })).toBeVisible();
 
       await offlinePage.getByRole("button", { name: "Enter the archive" }).click();

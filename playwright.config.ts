@@ -9,7 +9,7 @@ export default defineConfig({
   retries: 0,
   use: {
     baseURL: "http://localhost:3105",
-    channel: "chrome",
+    channel: process.env.PLAYWRIGHT_CHROME_CHANNEL || undefined,
     headless: true,
   },
   webServer: {

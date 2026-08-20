@@ -229,15 +229,54 @@ function renderShell(storyJson: string): string {
         const stored = localStorage.getItem(story.storageKey);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (nodesById.has(parsed.currentNodeId)) {
-            return parsed;
+          const restored = replayEdgePath(parsed);
+          if (restored && statesMatch(restored, parsed)) {
+            return restored;
           }
         }
       } catch {
-        return story.initialState;
+        localStorage.removeItem(story.storageKey);
       }
 
+      localStorage.removeItem(story.storageKey);
       return story.initialState;
+    }
+
+    function statesMatch(left, right) {
+      return (
+        left.currentNodeId === right.currentNodeId &&
+        left.isEnding === right.isEnding &&
+        JSON.stringify(left.nodePath) === JSON.stringify(right.nodePath) &&
+        JSON.stringify(left.edgePath) === JSON.stringify(right.edgePath)
+      );
+    }
+
+    function replayEdgePath(edgePath) {
+      if (!Array.isArray(edgePath) || edgePath.some((edgeId) => typeof edgeId !== "string")) {
+        return null;
+      }
+
+      let nextState = story.initialState;
+      for (const edgeId of edgePath) {
+        const edge = story.graph.edges.find((candidate) => candidate.id === edgeId);
+        if (!edge || edge.sourceNodeId !== nextState.currentNodeId) {
+          return null;
+        }
+
+        const targetNode = nodesById.get(edge.targetNodeId);
+        if (!targetNode) {
+          return null;
+        }
+
+        nextState = {
+          currentNodeId: targetNode.id,
+          nodePath: [...nextState.nodePath, targetNode.id],
+          edgePath: [...nextState.edgePath, edge.id],
+          isEnding: targetNode.kind === "ending",
+        };
+      }
+
+      return nextState;
     }
 
     function saveState() {
@@ -279,22 +318,11 @@ function renderShell(storyJson: string): string {
     }
 
     function choose(edgeId) {
-      const edge = story.graph.edges.find((candidate) => candidate.id === edgeId);
-      if (!edge || edge.sourceNodeId !== state.currentNodeId) {
+      const nextState = replayEdgePath([...state.edgePath, edgeId]);
+      if (!nextState) {
         return;
       }
-
-      const targetNode = nodesById.get(edge.targetNodeId);
-      if (!targetNode) {
-        return;
-      }
-
-      state = {
-        currentNodeId: targetNode.id,
-        nodePath: [...state.nodePath, targetNode.id],
-        edgePath: [...state.edgePath, edge.id],
-        isEnding: targetNode.kind === "ending",
-      };
+      state = nextState;
       saveState();
       render();
     }
@@ -310,26 +338,12 @@ function renderShell(storyJson: string): string {
         return;
       }
 
-      const nextEdgePath = state.edgePath.slice(0, -1);
-      let nextState = story.initialState;
-      for (const edgeId of nextEdgePath) {
-        const edge = story.graph.edges.find((candidate) => candidate.id === edgeId);
-        if (!edge) {
-          break;
-        }
-        const targetNode = nodesById.get(edge.targetNodeId);
-        if (!targetNode) {
-          break;
-        }
-        nextState = {
-          currentNodeId: targetNode.id,
-          nodePath: [...nextState.nodePath, targetNode.id],
-          edgePath: [...nextState.edgePath, edge.id],
-          isEnding: targetNode.kind === "ending",
-        };
+      const nextState = replayEdgePath(state.edgePath.slice(0, -1));
+      if (!nextState) {
+        state = story.initialState;
+      } else {
+        state = nextState;
       }
-
-      state = nextState;
       saveState();
       render();
     }

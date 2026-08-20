@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AuthoringError } from "@/lib/authoring/errors";
-import { chooseEdge, createRuntime } from "@/lib/authoring/runtime";
+import { chooseEdge, createRuntime, replayEdgePath } from "@/lib/authoring/runtime";
 import type { ReaderStoryGraph } from "@/lib/authoring/runtime";
 
 function readerGraph(): ReaderStoryGraph {
@@ -136,5 +136,19 @@ describe("reader story runtime", () => {
       edgePath: ["edge_start_left", "edge_left_ending"],
       isEnding: true,
     });
+  });
+
+  it("replays an edge path with the same source and target checks as a choice", () => {
+    const graph = readerGraph();
+
+    expect(replayEdgePath(graph, ["edge_start_left", "edge_left_ending"])).toEqual({
+      currentNodeId: "ending",
+      nodePath: ["left", "ending"],
+      edgePath: ["edge_start_left", "edge_left_ending"],
+      isEnding: true,
+    });
+    expect(() => replayEdgePath(graph, ["edge_start_right", "edge_left_ending"])).toThrow(
+      expect.objectContaining({ code: "VALIDATION" }),
+    );
   });
 });
