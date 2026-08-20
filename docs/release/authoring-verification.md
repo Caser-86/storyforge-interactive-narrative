@@ -85,6 +85,36 @@ The final gate then ran with Redis, image generation, and LLM calls disabled or 
 - The one remaining lint warning is the existing `window.location.href` warning in `src/components/error-boundary.tsx`; it is non-fatal and does not block the gate.
 - Remote GitHub Actions remain unexecuted.
 
+## Phase 1 Manual Authoring Closed Loop
+
+- Date: 2026-08-21
+- Branch: `codex/storyforge-phase-0`
+- Scope: provider-free private authoring flow; no auth, LLM, images, Redis, or legacy session-table reuse.
+- Final Phase 1 code head: `3af5487`.
+
+The Phase 1 loop now covers project creation, finite graph editing and validation, immutable snapshot sealing, reader-safe preview, standalone HTML export, and offline story playback. The authoring tables are isolated from the legacy game/session tables, and snapshot restore creates a new draft instead of mutating historical snapshot rows.
+
+Required local verification environment:
+
+```powershell
+$env:DISABLE_REDIS='true'; $env:ENABLE_IMAGE_GENERATION='false'; $env:IMAGE_PROVIDER='mock'; $env:MOCK_LLM='true'; $env:OPENAI_API_KEY='sk-test-mock'
+```
+
+Commands and observed results:
+
+- `npm run verify`: exit code `0`; typecheck passed, lint passed with the one pre-existing `src/components/error-boundary.tsx` navigation warning, `38` test files and `320` tests passed, and the Next production build completed successfully.
+- `npm run db:authoring:smoke`: exit code `0`; authoring migrations were initialized twice, a project was created/read/deleted, and the temporary SQLite database was cleaned up.
+- `npm audit --omit=dev --json`: exit code `0`; `0` vulnerabilities, including `0` high and `0` critical.
+- `$env:PLAYWRIGHT_CHROME_CHANNEL='chrome'; npm run test:e2e -- e2e/authoring-manual-flow.spec.ts`: exit code `0`; `1` test passed. The test edits a release-sized graph, seals a snapshot, previews it, exports an HTML file, opens it through `file://` with network requests blocked, exercises back/restart, reaches an ending offline, and repeats navigation with all Storage methods throwing to verify the in-memory fallback.
+
+The Playwright config defaults to its managed Chromium when available. This host did not have the bundled executable, so the browser verification used the installed Chrome channel through `PLAYWRIGHT_CHROME_CHANNEL=chrome`; the initial managed-browser download attempt was interrupted after stalling. Generated `test-results/` output is local-only and is not part of the implementation.
+
+## Phase 1 Remaining Risks
+
+- Remote GitHub Actions were not executed from this environment.
+- The existing `window.location.href` lint warning in `src/components/error-boundary.tsx` remains outside the Phase 1 authoring change set.
+- Phase 1 intentionally stops at manual text authoring. Provider-backed generation, editor UI, quality-loop workflows, release packaging, and legacy-flow retirement remain in later phases.
+
 # StoryForge Phase 1 Task 6 Verification Record
 
 - Date: 2026-08-21
@@ -117,15 +147,15 @@ Phase 1 authoring suite:
 npm test -- src/__tests__/authoring
 ```
 
-Observed final result: exit code `0`; `7` test files and `73` tests passed.
+Observed at the Task 6 checkpoint: exit code `0`; `7` test files and `73` tests passed. The final authoring suite passed `74` tests after the release-gap regressions were added, and the final full gate passed `320` tests.
 
 Named manual closed-loop E2E:
 
 ```powershell
-npm run test:e2e -- e2e/authoring-manual-flow.spec.ts
+$env:PLAYWRIGHT_CHROME_CHANNEL='chrome'; npm run test:e2e -- e2e/authoring-manual-flow.spec.ts
 ```
 
-Observed final result: exit code `0`; `1` test passed. The E2E created a project, replaced and edited the draft graph, sealed a snapshot, previewed it, downloaded the HTML, loaded it offline from `file://`, exercised back/restart/choice transitions, and reached an ending without network requests.
+Observed final result: exit code `0`; `1` test passed. The E2E created a project, replaced and edited an 8-node/2-ending draft graph, sealed a snapshot, previewed it, downloaded the HTML, loaded it offline from `file://`, exercised back/restart/choice transitions, verified Storage failure fallback, and reached an ending without network requests.
 
 Typecheck:
 
@@ -137,5 +167,6 @@ Observed final result: exit code `0`; `tsc --noEmit` completed successfully.
 
 ## Task 6 Residual Concerns
 
-- The earlier failed Playwright run generated `test-results/.last-run.json`; it was removed and is not part of the commit.
+- Playwright `test-results/` output is generated locally and is not part of the implementation.
 - The local Playwright browser download from `npx playwright install chromium` was slow/stalled on this host, so E2E now depends on an installed Chrome channel.
+- The final scoped code review approved the release-floor, frozen-snapshot-limit, and offline-storage fixes with no Critical, Important, or Major findings.
