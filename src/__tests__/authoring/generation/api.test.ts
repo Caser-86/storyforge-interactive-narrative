@@ -16,6 +16,7 @@ type ProjectContext = { params: Promise<{ projectId: string; runId: string }> };
 let tempDir: string;
 let originalSqliteDbPath: string | undefined;
 let originalSqliteBackupDir: string | undefined;
+let originalGenerationProvider: string | undefined;
 
 function request(url: string, method: string, body?: unknown): Request {
   return new Request(url, {
@@ -59,9 +60,11 @@ describe("generation control API", () => {
   beforeEach(() => {
     originalSqliteDbPath = process.env.SQLITE_DB_PATH;
     originalSqliteBackupDir = process.env.SQLITE_BACKUP_DIR;
+    originalGenerationProvider = process.env.GENERATION_PROVIDER;
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "storyforge-generation-api-"));
     process.env.SQLITE_DB_PATH = path.join(tempDir, "authoring.sqlite");
     process.env.SQLITE_BACKUP_DIR = path.join(tempDir, "backups");
+    process.env.GENERATION_PROVIDER = "fake";
   });
 
   afterEach(() => {
@@ -69,6 +72,8 @@ describe("generation control API", () => {
     else process.env.SQLITE_DB_PATH = originalSqliteDbPath;
     if (originalSqliteBackupDir === undefined) delete process.env.SQLITE_BACKUP_DIR;
     else process.env.SQLITE_BACKUP_DIR = originalSqliteBackupDir;
+    if (originalGenerationProvider === undefined) delete process.env.GENERATION_PROVIDER;
+    else process.env.GENERATION_PROVIDER = originalGenerationProvider;
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 

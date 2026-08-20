@@ -34,8 +34,6 @@ export const DEFAULT_GENERATION_STEP_DESCRIPTORS: GenerationStepDescriptor[] = [
   { stepKey: "bible:main", stage: "bible", sortOrder: 1 },
   { stepKey: "outline:main", stage: "outline", sortOrder: 2 },
   { stepKey: "graph:main", stage: "graph", sortOrder: 3 },
-  { stepKey: "structural_check:main", stage: "structural_check", sortOrder: 4 },
-  { stepKey: "continuity_review:main", stage: "continuity_review", sortOrder: 5 },
 ];
 
 export interface CreateGenerationRunOptions {
@@ -79,6 +77,7 @@ export interface GenerationRepository {
   getStep(stepId: string): Promise<GenerationStep>;
   leaseNextSteps(runId: string, now: Date, limit: number): Promise<GenerationStep[]>;
   recoverExpiredSteps(runId: string, now: Date): Promise<number>;
+  appendSteps(runId: string, steps: GenerationStepDescriptor[], now?: Date): Promise<GenerationStep[]>;
   completeStep(stepId: string, input: CompleteGenerationStepInput): Promise<GenerationStep>;
   failStep(stepId: string, input: FailGenerationStepInput): Promise<GenerationStep>;
   pauseRun(runId: string, now: Date, error?: PauseGenerationRunError): Promise<GenerationRun>;
@@ -558,6 +557,73 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
     }
   }
 
+  public async appendSteps(runId: string, steps: GenerationStepDescriptor[], now?: Date): Promise<GenerationStep[]> {
+    try {
+      const append = this.db.transaction(() => {
+        const run = this.requireRunRow(runId);
+        if (["failed", "canceled", "completed"].includes(run.status) && steps.length > 0) {
+          throw new AuthoringError("CONFLICT", "Cannot append generation steps to a terminal run", { runId });
+        }
+
+        const parsed = steps.map((step) => GenerationStepDescriptorSchema.parse(step));
+        ensureUniqueStepKeys(parsed);
+        const ordered = ensureStepOrder(parsed);
+        const timestamp = nowIso(now);
+        const insertStep = this.db.prepare(
+          `
+            INSERT INTO generation_steps (
+              id, run_id, step_key, stage, subject_id, status, attempt, sort_order,
+              lease_expires_at, next_attempt_at, model, request_json, raw_response,
+              parsed_response_json, input_tokens, output_tokens, error_code,
+              error_message, created_at, updated_at, completed_at
+            ) VALUES (?, ?, ?, ?, ?, 'queued', 0, ?, NULL, NULL, NULL, ?, NULL, NULL, 0, 0, NULL, NULL, ?, ?, NULL)
+          `,
+        );
+        let inserted = 0;
+
+        for (const step of ordered) {
+          const existing = this.db
+            .prepare("SELECT stage, subject_id, sort_order FROM generation_steps WHERE run_id = ? AND step_key = ?")
+            .get(runId, step.stepKey) as { stage: GenerationStep["stage"]; subject_id: string | null; sort_order: number } | undefined;
+          if (existing) {
+            if (existing.stage !== step.stage || existing.subject_id !== (step.subjectId ?? null) || existing.sort_order !== step.sortOrder) {
+              throw new AuthoringError("CONFLICT", "Generation step descriptor conflicts with an existing step", {
+                runId,
+                stepKey: step.stepKey,
+              });
+            }
+            continue;
+          }
+
+          insertStep.run(
+            randomUUID(),
+            runId,
+            step.stepKey,
+            step.stage,
+            step.subjectId ?? null,
+            step.sortOrder,
+            JSON.stringify(step.request ?? {}),
+            timestamp,
+            timestamp,
+          );
+          inserted += 1;
+        }
+
+        if (inserted > 0) {
+          this.db
+            .prepare("UPDATE generation_runs SET progress_total = progress_total + ?, updated_at = ? WHERE id = ?")
+            .run(inserted, timestamp, runId);
+        }
+
+        return this.listStepsSync(runId);
+      });
+
+      return append();
+    } catch (error) {
+      throw storageError(error, "Failed to append generation steps");
+    }
+  }
+
   public async completeStep(
     stepId: string,
     input: CompleteGenerationStepInput,
@@ -900,6 +966,13 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
 
   private requireStep(stepId: string): GenerationStep {
     return toStep(this.requireStepRow(stepId));
+  }
+
+  private listStepsSync(runId: string): GenerationStep[] {
+    const rows = this.db
+      .prepare("SELECT * FROM generation_steps WHERE run_id = ? ORDER BY sort_order ASC, created_at ASC, id ASC")
+      .all(runId) as GenerationStepRow[];
+    return rows.map(toStep);
   }
 
   private requireStepRow(stepId: string): GenerationStepRow {

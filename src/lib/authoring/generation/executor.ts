@@ -1,6 +1,7 @@
 import type { JsonValue } from "../schemas";
 import type { GenerationRepository } from "./repository";
 import type { GenerationRun, GenerationStage, GenerationStep } from "./schemas";
+import type { GenerationStepDescriptor } from "./schemas";
 import { ProviderError } from "./provider-errors";
 import { retryDecision } from "./retry";
 
@@ -10,6 +11,7 @@ export interface GenerationStepExecutionResult {
   model?: string | null;
   inputTokens?: number;
   outputTokens?: number;
+  nextSteps?: GenerationStepDescriptor[];
 }
 
 export type GenerationStepHandler = (
@@ -55,6 +57,9 @@ export class GenerationExecutor {
         }
 
         const result = await handler(step, run);
+        if (result.nextSteps && result.nextSteps.length > 0) {
+          await this.repository.appendSteps(runId, result.nextSteps, now);
+        }
         await this.repository.completeStep(step.id, {
           attempt: step.attempt,
           leaseExpiresAt: step.leaseExpiresAt!,

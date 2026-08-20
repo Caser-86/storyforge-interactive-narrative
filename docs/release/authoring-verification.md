@@ -170,3 +170,29 @@ Observed final result: exit code `0`; `tsc --noEmit` completed successfully.
 - Playwright `test-results/` output is generated locally and is not part of the implementation.
 - The local Playwright browser download from `npx playwright install chromium` was slow/stalled on this host, so E2E now depends on an installed Chrome channel.
 - The final scoped code review approved the release-floor, frozen-snapshot-limit, and offline-storage fixes with no Critical, Important, or Major findings.
+
+## Phase 2 Generation Pipeline Verification
+
+- Date: 2026-08-21
+- Scope: persisted staged generation from brief through continuity review; private local controls; no login layer; image generation unchanged.
+- Provider evidence: all automated generation tests used a deterministic fake provider. No real DeepSeek request was made during this verification.
+
+Commands and observed results:
+
+- `npm test -- src/__tests__/authoring/generation`: exit code `0`; `7` files and `41` tests passed.
+- `npm test -- src/__tests__/authoring`: exit code `0`; `13` files and `115` tests passed at the API checkpoint.
+- `npm test`: exit code `0`; `45` files and `361` tests passed during the project gate.
+- `npm run typecheck`: exit code `0`.
+- `npm run lint`: exit code `0`; one existing warning remains in `src/components/error-boundary.tsx`; no new generation warning remains.
+- `npm run build`: exit code `0`; Next `16.3.1` production build completed and lists the three generation routes.
+- `npm run db:authoring:smoke`: exit code `0`.
+- `npm run authoring:llm:smoke -- --preset micro --dry-run`: exit code `0`; target `8` nodes, `2` endings, maximum `13` provider calls, model/base URL printed, key redacted, and no provider client/network request created.
+- `npm run test:e2e -- e2e/authoring-generation-flow.spec.ts`: exit code `0`; `1` test passed using `GENERATION_PROVIDER=fake`. The E2E created a project, started generation, paused/resumed, completed all `8` node steps, and verified progress equality and raw-response redaction.
+
+The Phase 2 implementation now includes generation run/step/candidate persistence, lease reclaim, capped retry, structured provider errors, stable-ID planning stages, structural precheck, bounded node context, warning-only continuity review, private control APIs, and persisted run metrics. The real DeepSeek path is configured through `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL`; the smoke command intentionally does not call it.
+
+## Phase 2 Remaining Risks
+
+- The fixed-provider E2E validates the resumable state machine without an external network dependency; a real-key smoke has not been executed in this environment.
+- Generation is currently controlled through API endpoints; a dedicated authoring UI for generation progress and review remains a later phase.
+- Remote GitHub Actions were not executed from this environment.

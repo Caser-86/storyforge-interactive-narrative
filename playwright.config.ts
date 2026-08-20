@@ -21,6 +21,7 @@ export default defineConfig({
       DISABLE_REDIS: "true",
       IMAGE_PROVIDER: "mock",
       OPENAI_API_KEY: "sk-test-mock",
+      GENERATION_PROVIDER: "fake",
       SQLITE_DB_PATH: path.join(process.cwd(), "output", "playwright", "authoring-e2e.sqlite"),
       USE_MEMORY_DB: "true",
     },

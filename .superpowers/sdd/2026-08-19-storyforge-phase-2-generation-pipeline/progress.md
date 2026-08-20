@@ -21,7 +21,7 @@
 - Task 4: complete. Structural precheck, bounded node context/batching, node output validation, and warning-only continuity review are implemented.
 - Task 5: complete. The bounded executor now leases at most two steps, persists completions/failures, applies capped transient backoff, pauses auth failures, and recovers expired leases.
 - Task 6: complete. Private local generation controls, safe run/step summaries, pause/resume/cancel, bounded lease endpoint, and persisted run metrics are implemented.
-- Task 7: in progress.
+- Task 7: complete. Fixed-provider pipeline E2E, safe dry-run smoke, runtime wiring, and Phase 2 release evidence are complete.
 
 ## Task 1 verification
 
@@ -36,6 +36,23 @@
 - `npm run typecheck`: passed.
 - API payloads omit `requestJson`, `rawResponse`, and `parsedResponseJson` from step summaries.
 - The `/next` control endpoint leases at most two steps; provider execution wiring is the remaining Task 7 integration boundary.
+
+## Task 7 verification
+
+- `npm test -- src/__tests__/authoring/generation`: 7 files, 41 tests passed.
+- `npm test`: 45 files, 361 tests passed.
+- `npm run verify`: passed; typecheck, lint, full tests, and production build succeeded. Lint retains only the pre-existing `error-boundary.tsx` warning.
+- `npm run test:e2e -- e2e/authoring-generation-flow.spec.ts`: 1 test passed with fixed provider; pause/resume and 8-node completion verified.
+- `npm run authoring:llm:smoke -- --preset micro --dry-run`: passed without constructing a provider client or making a network request.
+
+## Phase 2 gate status
+
+- Persisted run/step/candidate state: complete.
+- Structured provider isolation and error taxonomy: complete.
+- Invalid graph plans stop before node prose generation: complete.
+- Node execution bounded to two calls per `/next` request: complete.
+- Provider errors never produce fallback prose: complete.
+- Fixed-provider E2E and network-free dry-run smoke: complete.
 - `npm run db:authoring:smoke`: passed.
 
 ## Task 5 verification
