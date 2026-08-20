@@ -74,8 +74,10 @@ export interface GenerationRepository {
   createRun(projectId: string, versionId: string, options?: CreateGenerationRunOptions): Promise<GenerationRun>;
   getRun(runId: string): Promise<GenerationRun>;
   listRuns(projectId: string): Promise<GenerationRun[]>;
+  listActiveRuns(): Promise<GenerationRun[]>;
   getStep(stepId: string): Promise<GenerationStep>;
   leaseNextSteps(runId: string, now: Date, limit: number): Promise<GenerationStep[]>;
+  recoverExpiredSteps(runId: string, now: Date): Promise<number>;
   completeStep(stepId: string, input: CompleteGenerationStepInput): Promise<GenerationStep>;
   failStep(stepId: string, input: FailGenerationStepInput): Promise<GenerationStep>;
   pauseRun(runId: string, now: Date, error?: PauseGenerationRunError): Promise<GenerationRun>;
@@ -373,6 +375,18 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
     }
   }
 
+  public async listActiveRuns(): Promise<GenerationRun[]> {
+    try {
+      const rows = this.db
+        .prepare("SELECT * FROM generation_runs WHERE status IN ('queued', 'running') ORDER BY created_at ASC, id ASC")
+        .all() as GenerationRunRow[];
+
+      return rows.map(toRun);
+    } catch (error) {
+      throw storageError(error, "Failed to list active generation runs");
+    }
+  }
+
   public async getStep(stepId: string): Promise<GenerationStep> {
     try {
       return this.requireStep(stepId);
@@ -485,6 +499,48 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
       return lease();
     } catch (error) {
       throw storageError(error, "Failed to lease generation steps");
+    }
+  }
+
+  public async recoverExpiredSteps(runId: string, now: Date): Promise<number> {
+    try {
+      const recover = this.db.transaction(() => {
+        const timestamp = nowIso(now);
+        const result = this.db
+          .prepare(
+            `
+              UPDATE generation_steps
+              SET status = 'queued',
+                  lease_expires_at = NULL,
+                  updated_at = ?
+              WHERE run_id = ?
+                AND status = 'running'
+                AND lease_expires_at IS NOT NULL
+                AND lease_expires_at <= ?
+            `,
+          )
+          .run(timestamp, runId, timestamp);
+
+        if (result.changes > 0) {
+          this.db
+            .prepare(
+              `
+                UPDATE generation_runs
+                SET status = CASE WHEN status = 'running' THEN 'queued' ELSE status END,
+                    lease_expires_at = CASE WHEN status = 'running' THEN NULL ELSE lease_expires_at END,
+                    updated_at = ?
+                WHERE id = ?
+              `,
+            )
+            .run(timestamp, runId);
+        }
+
+        return result.changes;
+      });
+
+      return recover();
+    } catch (error) {
+      throw storageError(error, "Failed to recover expired generation steps");
     }
   }
 

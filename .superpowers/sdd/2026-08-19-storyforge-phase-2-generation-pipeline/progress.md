@@ -19,14 +19,21 @@
 - Task 2: complete. Provider contracts, OpenAI-compatible DeepSeek adapter, error taxonomy, and deterministic fake provider are implemented and tested.
 - Task 3: complete. Brief, bible, outline, and graph stages now use structured prompts, stable IDs, project budgets, and bounded next-step descriptors.
 - Task 4: complete. Structural precheck, bounded node context/batching, node output validation, and warning-only continuity review are implemented.
-- Task 5: in progress.
-- Task 6: pending.
+- Task 5: complete. The bounded executor now leases at most two steps, persists completions/failures, applies capped transient backoff, pauses auth failures, and recovers expired leases.
+- Task 6: in progress.
 - Task 7: pending.
 
 ## Task 1 verification
 
 - `npm test -- src/__tests__/authoring/generation/repository.test.ts`: 12 tests passed.
 - `npm test -- src/__tests__/authoring`: 8 files, 87 tests passed.
+- `npm run typecheck`: passed.
+- `npm run db:authoring:smoke`: passed.
+
+## Task 5 verification
+
+- `npm test -- src/__tests__/authoring/generation/executor.test.ts`: 5 tests passed.
+- `npm test -- src/__tests__/authoring`: 12 files, 111 tests passed.
 - `npm run typecheck`: passed.
 - `npm run db:authoring:smoke`: passed.
 - No provider call, Redis dependency, raw API response, or legacy session/game table was added to Task 1.
