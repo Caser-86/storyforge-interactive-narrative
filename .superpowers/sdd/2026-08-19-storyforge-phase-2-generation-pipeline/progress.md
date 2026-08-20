@@ -16,8 +16,8 @@
 ## Task tracking
 
 - Task 1: complete. Generation run/step/candidate schemas, migration v4, bounded leases, retry scheduling, terminal-safe transitions, and repository tests are implemented.
-- Task 2: in progress.
-- Task 3: pending.
+- Task 2: complete. Provider contracts, OpenAI-compatible DeepSeek adapter, error taxonomy, and deterministic fake provider are implemented and tested.
+- Task 3: in progress.
 - Task 4: pending.
 - Task 5: pending.
 - Task 6: pending.
@@ -30,3 +30,10 @@
 - `npm run typecheck`: passed.
 - `npm run db:authoring:smoke`: passed.
 - No provider call, Redis dependency, raw API response, or legacy session/game table was added to Task 1.
+
+## Task 2 verification
+
+- `npm test -- src/__tests__/authoring/generation/provider.test.ts`: 11 tests passed.
+- `npm test -- src/__tests__/authoring`: 9 files, 98 tests passed.
+- `npm run typecheck`: passed.
+- Provider tests inject a fake client; no external LLM request was made.
