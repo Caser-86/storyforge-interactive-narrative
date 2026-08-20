@@ -8,7 +8,7 @@ import { createAutosaveController, type AutosaveController, type AutosaveState }
 type NodeEditorProps = {
   projectId: string;
   node: StoryNode;
-  onSaved?: (node: StoryNode) => void;
+  onSaved?: (node: StoryNode, draftRevision: number) => void;
 };
 
 type DraftValues = Pick<StoryNode, "title" | "body" | "summary" | "objective">;
@@ -32,7 +32,7 @@ export function NodeEditor({ projectId, node, onSaved }: NodeEditorProps) {
         setRevision(result.node.contentRevision);
         setDraft(valuesFromNode(result.node));
         setSaveError(null);
-        onSaved?.(result.node);
+        onSaved?.(result.node, result.draftRevision);
       },
       onStateChange: (state, error) => {
         setSaveState(state);

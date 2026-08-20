@@ -196,3 +196,19 @@ The Phase 2 implementation now includes generation run/step/candidate persistenc
 - The fixed-provider E2E validates the resumable state machine without an external network dependency; a real-key smoke has not been executed in this environment.
 - Generation is currently controlled through API endpoints; a dedicated authoring UI for generation progress and review remains a later phase.
 - Remote GitHub Actions were not executed from this environment.
+
+## Phase 3 Authoring Editor Verification
+
+- Date: 2026-08-21
+- Scope: project library, brief creation, resumable generation UI, three-pane editor, revision-safe node and choice editing, downstream review marking, protected AI candidates, and sealed-snapshot preview.
+- Commits: `ade31fa`, `4aeea71`, `521e572`, `dfb0a9f`, `f1aabcc`.
+
+Commands and observed results:
+
+- `npm test`: exit code `0`; `53` test files and `382` tests passed.
+- `npm run typecheck`: exit code `0`; `tsc --noEmit` completed successfully after the production build regenerated `.next/types`.
+- `npm run lint`: exit code `0`; one existing warning remains in `src/components/error-boundary.tsx`; no new Phase 3 warning remains.
+- `npm run build`: exit code `0`; production build lists `/projects/[projectId]/edit`, `/projects/[projectId]/generate`, and `/projects/[projectId]/preview`, plus node regeneration and candidate routes.
+- `npm run test:e2e -- e2e/authoring-editor-flow.spec.ts`: not completed. The configured web server could not start because the existing user-owned `next dev` process held the repository Next lock; the request to `http://localhost:3105/api/projects` ended with `ECONNRESET` before the test body. The process was not stopped.
+
+Phase 3 implementation evidence includes component tests for project library, brief form, generation progress, outline tree, autosave, node editing, impact analysis, candidate persistence, and preview choice-to-ending behavior. The remaining release action is to rerun the named Playwright test after the existing dev server is released.

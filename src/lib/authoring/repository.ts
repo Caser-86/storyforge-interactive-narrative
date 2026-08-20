@@ -12,6 +12,7 @@ import type {
   Project,
   ProjectSize,
   StoryEdge,
+  StoryEdgePatch,
   StoryGraph,
   StoryNode,
   StoryNodePatch,
@@ -58,6 +59,8 @@ export interface AuthoringRepository {
   getProjectGraph(projectId: string, versionId?: string): Promise<StoryGraph>;
   replaceDraftGraph(projectId: string, graph: StoryGraph, expectedRevision: number): Promise<StoryGraph>;
   patchDraftNode(projectId: string, nodeId: string, patch: StoryNodePatch, expectedRevision: number): Promise<{ node: StoryNode; draftRevision: number }>;
+  patchDraftEdge(projectId: string, edgeId: string, patch: StoryEdgePatch, expectedRevision: number): Promise<{ edge: StoryEdge; draftRevision: number }>;
+  getDraftRevision(projectId: string): Promise<number>;
   createSnapshot(projectId: string): Promise<StoryVersion>;
   restoreSnapshot(projectId: string, snapshotId: string): Promise<StoryVersion>;
   duplicateProject(projectId: string): Promise<Project>;
@@ -430,6 +433,16 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
     }
   }
 
+  public async getDraftRevision(projectId: string): Promise<number> {
+    try {
+      const project = this.requireProject(projectId);
+      if (!project.activeDraftVersionId) throw new AuthoringError("NOT_FOUND", "Project has no active draft version", { projectId });
+      return this.requireVersion(projectId, project.activeDraftVersionId).draft_revision;
+    } catch (error) {
+      throw storageError(error, "Failed to read authoring draft revision");
+    }
+  }
+
   public async replaceDraftGraph(projectId: string, graph: StoryGraph, expectedRevision: number): Promise<StoryGraph> {
     try {
       const replace = this.db.transaction(() => {
@@ -554,6 +567,56 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
       return update();
     } catch (error) {
       throw storageError(error, "Failed to patch authoring node");
+    }
+  }
+
+  public async patchDraftEdge(
+    projectId: string,
+    edgeId: string,
+    patch: StoryEdgePatch,
+    expectedRevision: number,
+  ): Promise<{ edge: StoryEdge; draftRevision: number }> {
+    try {
+      const update = this.db.transaction(() => {
+        const project = this.requireProject(projectId);
+        if (!project.activeDraftVersionId) throw new AuthoringError("NOT_FOUND", "Project has no active draft version", { projectId });
+        const draft = this.requireVersion(projectId, project.activeDraftVersionId);
+        const current = this.db.prepare("SELECT * FROM story_edges WHERE id = ? AND version_id = ?").get(edgeId, draft.id) as StoryEdgeRow | undefined;
+        if (!current) throw new AuthoringError("NOT_FOUND", "Draft edge not found", { projectId, edgeId });
+        if (draft.draft_revision !== expectedRevision) {
+          throw new AuthoringError("CONFLICT", "Draft revision is stale", { expectedRevision, actualRevision: draft.draft_revision, edgeId });
+        }
+
+        const updatedAt = nowIso();
+        const graph = this.readProjectGraph(projectId, draft.id);
+        this.db
+          .prepare(
+            `UPDATE story_edges
+             SET label = ?, intent = ?, consequence_summary = ?, updated_at = ?
+             WHERE id = ? AND version_id = ?`,
+          )
+          .run(patch.label ?? current.label, patch.intent ?? current.intent, patch.consequenceSummary ?? current.consequence_summary, updatedAt, edgeId, draft.id);
+
+        const sourceNodeId = current.source_node_id;
+        const affectedNodeIds = findAffectedNodes(graph, sourceNodeId);
+        if (affectedNodeIds.length > 0) {
+          const placeholders = affectedNodeIds.map(() => "?").join(", ");
+          this.db
+            .prepare(
+              `UPDATE story_nodes SET content_status = 'review_required', updated_at = ?
+               WHERE version_id = ? AND id IN (${placeholders}) AND content_status <> 'author_edited'`,
+            )
+            .run(updatedAt, draft.id, ...affectedNodeIds);
+        }
+
+        this.db.prepare("UPDATE story_versions SET draft_revision = draft_revision + 1 WHERE id = ?").run(draft.id);
+        this.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run(updatedAt, projectId);
+        const updated = this.db.prepare("SELECT * FROM story_edges WHERE id = ? AND version_id = ?").get(edgeId, draft.id) as StoryEdgeRow;
+        return { edge: toStoryEdge(updated), draftRevision: draft.draft_revision + 1 };
+      });
+      return update();
+    } catch (error) {
+      throw storageError(error, "Failed to patch authoring edge");
     }
   }
 

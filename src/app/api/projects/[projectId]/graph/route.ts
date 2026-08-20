@@ -1,6 +1,8 @@
 import {
   GraphWriteInputSchema,
   GraphWriteResponseSchema,
+  EdgePatchInputSchema,
+  EdgePatchResponseSchema,
   NodePatchInputSchema,
   NodePatchResponseSchema,
   StoryGraphResponseSchema,
@@ -9,6 +11,7 @@ import {
   parseVersionIdFromRequest,
   readJsonBody,
 } from "@/lib/authoring/api-contracts";
+import { z } from "zod";
 import type { GraphWriteInputPayload } from "@/lib/authoring/api-contracts";
 import type { NodePatchInputPayload } from "@/lib/authoring/api-contracts";
 import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "@/lib/authoring/graph";
@@ -66,19 +69,23 @@ export async function PUT(request: Request, { params }: ProjectRouteContext): Pr
 
 export async function PATCH(request: Request, { params }: ProjectRouteContext): Promise<Response> {
   let projectId: string;
-  let input: NodePatchInputPayload;
+  let input: NodePatchInputPayload | z.infer<typeof EdgePatchInputSchema>;
 
   try {
     ({ projectId } = await params);
-    input = await readJsonBody(request, NodePatchInputSchema);
+    input = await readJsonBody(request, NodePatchInputSchema.or(EdgePatchInputSchema));
   } catch (error) {
     return errorResponse(error);
   }
 
   const repo = createAuthoringRepository();
   try {
-    const result = await repo.patchDraftNode(projectId, input.nodeId, input.patch, input.expectedRevision);
-    return json(NodePatchResponseSchema, result);
+    if ("nodeId" in input) {
+      const result = await repo.patchDraftNode(projectId, input.nodeId, input.patch, input.expectedRevision);
+      return json(NodePatchResponseSchema, result);
+    }
+    const result = await repo.patchDraftEdge(projectId, input.edgeId, input.patch, input.expectedRevision);
+    return json(EdgePatchResponseSchema, result);
   } catch (error) {
     return errorResponse(error);
   } finally {

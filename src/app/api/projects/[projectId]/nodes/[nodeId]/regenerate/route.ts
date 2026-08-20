@@ -3,6 +3,7 @@ import { AuthoringError } from "@/lib/authoring/errors";
 import { NodeRegenerateInputSchema, CandidateResponseSchema } from "@/lib/authoring/generation/api-contracts";
 import type { NodeRegenerateInput } from "@/lib/authoring/generation/api-contracts";
 import { OpenAICompatibleGenerationProvider } from "@/lib/authoring/generation/openai-provider";
+import { FakeGenerationProvider } from "@/lib/authoring/generation/fake-provider";
 import { createGenerationRepository } from "@/lib/authoring/generation/repository";
 import { executeNodeBatch } from "@/lib/authoring/generation/stages/nodes";
 import type { GenerationProjectContext } from "@/lib/authoring/generation/prompts";
@@ -51,7 +52,16 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
       nodes: graph.nodes.map(({ id, chapterId, kind, title, summary, objective, topologicalRank }) => ({ id, chapterId, kind, title, summary, objective, topologicalRank })),
       edges: graph.edges.map(({ id, sourceNodeId, targetNodeId, label, intent, consequenceSummary, sortOrder }) => ({ id, sourceNodeId, targetNodeId, label, intent, consequenceSummary, sortOrder })),
     };
-    const result = await executeNodeBatch({ provider: new OpenAICompatibleGenerationProvider(), graph: generationGraph, context, nodeIds: [nodeId] }, 1);
+    const provider = process.env.GENERATION_PROVIDER === "fake" ? new FakeGenerationProvider() : new OpenAICompatibleGenerationProvider();
+    if (provider instanceof FakeGenerationProvider) {
+      provider.reply("nodes", `nodes:${nodeId}`, {
+        nodeId,
+        body: `${node.title} receives a fresh author-review candidate.`,
+        summary: node.summary,
+        objective: node.objective,
+      });
+    }
+    const result = await executeNodeBatch({ provider, graph: generationGraph, context, nodeIds: [nodeId] }, 1);
     const output = result.outputs[0]!;
     const providerResult = result.providerResults[0]!;
     const candidate = await generation.createCandidate({

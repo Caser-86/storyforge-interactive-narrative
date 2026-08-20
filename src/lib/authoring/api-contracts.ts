@@ -5,6 +5,8 @@ import {
   ProjectSchema,
   ProjectSizeSchema,
   StoryGraphSchema,
+  StoryEdgePatchSchema,
+  StoryEdgeSchema,
   StoryNodePatchSchema,
   StoryNodeSchema,
   ValidationIssueSchema,
@@ -58,6 +60,21 @@ export const NodePatchInputSchema = z
 export const NodePatchResponseSchema = z
   .object({
     node: StoryNodeSchema,
+    draftRevision: z.number().int().min(0),
+  })
+  .strict();
+
+export const EdgePatchInputSchema = z
+  .object({
+    edgeId: z.string().min(1),
+    patch: StoryEdgePatchSchema,
+    expectedRevision: z.number().int().min(0),
+  })
+  .strict();
+
+export const EdgePatchResponseSchema = z
+  .object({
+    edge: StoryEdgeSchema,
     draftRevision: z.number().int().min(0),
   })
   .strict();

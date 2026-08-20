@@ -1,6 +1,6 @@
-import { CreateProjectResponseSchema, NodePatchResponseSchema } from "@/lib/authoring/api-contracts";
+import { CreateProjectResponseSchema, EdgePatchResponseSchema, NodePatchResponseSchema } from "@/lib/authoring/api-contracts";
 import type { CreateProjectInputPayload } from "@/lib/authoring/api-contracts";
-import type { Project, StoryNodePatch } from "@/lib/authoring/schemas";
+import type { Project, StoryEdgePatch, StoryNodePatch } from "@/lib/authoring/schemas";
 import {
   GenerationListResponseSchema,
   GenerationNextResponseSchema,
@@ -84,6 +84,15 @@ export async function patchNode(projectId: string, nodeId: string, patch: StoryN
     body: JSON.stringify({ nodeId, patch, expectedRevision }),
   });
   return parseJson(response, (value) => NodePatchResponseSchema.parse(value));
+}
+
+export async function patchEdge(projectId: string, edgeId: string, patch: StoryEdgePatch, expectedRevision: number) {
+  const response = await fetch(`/api/projects/${projectId}/graph`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ edgeId, patch, expectedRevision }),
+  });
+  return parseJson(response, (value) => EdgePatchResponseSchema.parse(value));
 }
 
 export async function regenerateNode(projectId: string, nodeId: string, expectedRevision: number) {

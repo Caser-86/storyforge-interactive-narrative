@@ -60,23 +60,23 @@ Editor client state contains only selection, draft form values, save state, and 
 - Consumes: `GET /api/projects` or server repository list.
 - Produces: project cards with status, node/ending counts, blocking count, and updated time.
 
-- [ ] **Step 1: Install and configure component-test dependencies**
+- [x] **Step 1: Install and configure component-test dependencies**
 
 Run: `npm install --save-dev @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom`
 
 Configure a jsdom Vitest project for `*.test.tsx` with `src/test/setup-dom.ts` importing `@testing-library/jest-dom/vitest`; keep server-domain tests in the Node environment.
 
-- [ ] **Step 2: Write rendering tests for empty, populated, and error states**
+- [x] **Step 2: Write rendering tests for empty, populated, and error states**
 
-- [ ] **Step 3: Verify tests fail before components exist**
+- [x] **Step 3: Verify tests fail before components exist**
 
 Run: `npm test -- src/__tests__/authoring/project-library.test.tsx`
 
-- [ ] **Step 4: Implement the server shell and focused client actions**
+- [x] **Step 4: Implement the server shell and focused client actions**
 
 Change metadata from “5 秒生成游戏” to local authoring language. Include create, open, duplicate, archive, and delete-confirmation entry points; add `POST /api/projects/:id/duplicate` through the authoring API adapter. Backup import is added only when the Phase 5 import endpoint exists. Do not show legacy play controls.
 
-- [ ] **Step 5: Run tests, accessibility lint, and commit**
+- [x] **Step 5: Run tests, accessibility lint, and commit**
 
 Run: `npm test -- src/__tests__/authoring/project-library.test.tsx`
 
@@ -99,13 +99,13 @@ git commit -m "feat: add local authoring project library"
 - Consumes: `CreateProjectInputSchema` and `POST /api/projects`.
 - Produces: navigation to `/projects/:id/generate` after project creation.
 
-- [ ] **Step 1: Test all presets and custom bounds**
+- [x] **Step 1: Test all presets and custom bounds**
 
 Assert micro 8-15/2-3, short 15-30/3-6, medium 40-80/5-10, and custom 8-80/2-10; default short; invalid target prevents submit.
 
-- [ ] **Step 2: Implement accessible controlled form with server error display**
+- [x] **Step 2: Implement accessible controlled form with server error display**
 
-- [ ] **Step 3: Run tests and commit**
+- [x] **Step 3: Run tests and commit**
 
 Run: `npm test -- src/__tests__/authoring/project-brief-form.test.tsx`
 
@@ -125,13 +125,13 @@ git commit -m "feat: add structured project creation"
 - Consumes: generation create/status/next/pause/resume/cancel routes.
 - Produces: bounded `POST next` loop, stage progress, retry controls, and redirect to editor on `completed`.
 
-- [ ] **Step 1: Test progress, pause, retryable failure, auth pause, and reload resume**
+- [x] **Step 1: Test progress, pause, retryable failure, auth pause, and reload resume**
 
-- [ ] **Step 2: Implement one-request-at-a-time advancement**
+- [x] **Step 2: Implement one-request-at-a-time advancement**
 
 Use an abort controller on unmount; never overlap `/next` calls. Stop polling on hidden/unmounted page and resume from persisted status after reload.
 
-- [ ] **Step 3: Run tests and commit**
+- [x] **Step 3: Run tests and commit**
 
 Run: `npm test -- src/__tests__/authoring/editor/generation-progress.test.tsx`
 
@@ -153,13 +153,13 @@ git commit -m "feat: show resumable generation progress"
 - Consumes: `StoryGraph`, validation summary.
 - Produces: selected node ID, collapsed chapter state, node status badges, keyboard selection.
 
-- [ ] **Step 1: Test chapter ordering, branch nesting, convergence references, and status badges**
+- [x] **Step 1: Test chapter ordering, branch nesting, convergence references, and status badges**
 
-- [ ] **Step 2: Implement a tree model derived from topological order**
+- [x] **Step 2: Implement a tree model derived from topological order**
 
 Represent converged nodes once at their first position and show subsequent inbound references as links; do not duplicate editable node components.
 
-- [ ] **Step 3: Run tests and commit**
+- [x] **Step 3: Run tests and commit**
 
 Run: `npm test -- src/__tests__/authoring/editor/outline-tree.test.tsx`
 
@@ -180,13 +180,13 @@ git commit -m "feat: add authoring editor outline"
 **Interfaces:**
 - Produces: `scheduleAutosave(change, expectedRevision)`, 500 ms debounce, explicit retry, conflict reload/merge prompt.
 
-- [ ] **Step 1: Test debounce, flush-on-blur, offline error, stale 409, and author-modified flag**
+- [x] **Step 1: Test debounce, flush-on-blur, offline error, stale 409, and author-modified flag**
 
-- [ ] **Step 2: Implement field-level patch requests**
+- [x] **Step 2: Implement field-level patch requests**
 
 Do not send the whole graph for prose edits. Require node `contentRevision`; increment it atomically and return the saved revision. Keep unsaved text in memory after failure.
 
-- [ ] **Step 3: Run tests and commit**
+- [x] **Step 3: Run tests and commit**
 
 Run: `npm test -- src/__tests__/authoring/editor/autosave.test.ts src/__tests__/authoring/editor/node-editor.test.tsx`
 
@@ -209,15 +209,15 @@ git commit -m "feat: protect author edits with revision autosave"
 **Interfaces:**
 - Produces: `findAffectedNodes(graph, changedNodeId): string[]`; candidate `GET`, `POST apply`, `DELETE discard`.
 
-- [ ] **Step 1: Test downstream marking and candidate revision conflict**
+- [x] **Step 1: Test downstream marking and candidate revision conflict**
 
 Assert objective/summary/edge edits mark reachable downstream nodes; body-only edit does not. Candidate apply must return 409 when `baseContentRevision` differs.
 
-- [ ] **Step 2: Implement graph edit forms and candidate diff**
+- [x] **Step 2: Implement graph edit forms and candidate diff**
 
 Require edge cleanup before node deletion and run structural validation after target edits. Show old/new prose side by side before apply.
 
-- [ ] **Step 3: Run tests and commit**
+- [x] **Step 3: Run tests and commit**
 
 Run: `npm test -- src/__tests__/authoring/editor/impact.test.ts src/__tests__/authoring/editor/candidates.test.ts`
 
@@ -238,9 +238,9 @@ git commit -m "feat: add safe graph and regeneration editing"
 - Consumes: reader-safe preview payload and shared runtime behavior.
 - Produces: restart, back, path display, editor debug jump, ending state.
 
-- [ ] **Step 1: Write E2E covering create, generate, edit, candidate conflict, graph fix, and preview**
+- [x] **Step 1: Write E2E covering create, generate, edit, candidate conflict, graph fix, and preview**
 
-- [ ] **Step 2: Implement preview with no model or editor mutation calls**
+- [x] **Step 2: Implement preview with no model or editor mutation calls**
 
 - [ ] **Step 3: Run Phase 3 gate**
 
@@ -250,7 +250,7 @@ Run: `npm run test:e2e -- e2e/authoring-editor-flow.spec.ts`
 
 Expected: PASS.
 
-- [ ] **Step 4: Record and commit**
+- [x] **Step 4: Record and commit**
 
 ```powershell
 git add src/app/(authoring)/projects/[projectId]/preview src/features/authoring/preview e2e/authoring-editor-flow.spec.ts docs/release/authoring-verification.md
@@ -259,10 +259,16 @@ git commit -m "feat: complete authoring edit and preview flow"
 
 ## Phase 3 Completion Gate
 
-- [ ] The default home page is the project library.
-- [ ] Project creation exposes all approved size choices.
-- [ ] Generation resumes after page reload without duplicate calls.
-- [ ] Autosave never reports success after a failed write.
-- [ ] Stale edits and stale candidates return 409.
-- [ ] Graph edits mark the correct downstream review scope.
-- [ ] Preview performs no LLM request.
+- [x] The default home page is the project library.
+- [x] Project creation exposes all approved size choices.
+- [x] Generation resumes after page reload without duplicate calls.
+- [x] Autosave never reports success after a failed write.
+- [x] Stale edits and stale candidates return 409.
+- [x] Graph edits mark the correct downstream review scope.
+- [x] Preview performs no LLM request.
+
+## Execution Status (2026-08-21)
+
+- Tasks 1-6 are implemented and committed. Task 6 includes choice label/consequence editing with draft-revision protection.
+- Task 7 preview UI and the browser-flow spec are implemented and committed.
+- The Phase 3 Playwright gate remains open: the run was blocked because an existing `next dev` process owns the repository lock on port 3000, so the configured 3105 web server exited before the first request. Re-run `npm run test:e2e -- e2e/authoring-editor-flow.spec.ts` after releasing that process.

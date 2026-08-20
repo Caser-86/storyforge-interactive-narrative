@@ -241,6 +241,12 @@ body {
 .node-choices { margin-top: 34px; }
 .node-choice { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--authoring-line); font-size: 13px; }
 .node-choice span { color: var(--authoring-muted); font-size: 11px; text-align: right; }
+.choice-editor { display: grid; gap: 8px; width: 100%; }
+.choice-editor-state { display: flex; justify-content: space-between; color: var(--authoring-muted); font-family: var(--font-geist-mono), monospace; font-size: 9px; }
+.choice-editor-error { color: var(--authoring-coral-dark); }
+.choice-editor label { display: grid; grid-template-columns: 90px minmax(0, 1fr); align-items: center; gap: 10px; color: var(--authoring-muted); font-size: 10px; }
+.choice-editor input { min-width: 0; padding: 6px 0; border: 0; border-bottom: 1px solid var(--authoring-line); outline: 0; background: transparent; color: var(--authoring-ink); font: inherit; font-size: 12px; }
+.choice-editor input:focus { border-color: var(--authoring-coral); box-shadow: 0 2px 0 var(--authoring-coral); }
 .editor-empty-node { display: grid; min-height: 340px; place-items: center; color: var(--authoring-muted); font-size: 14px; }
 .editor-inspector-panel > h2 { margin-bottom: 28px; }
 .inspector-stat { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--authoring-line); color: var(--authoring-muted); font-size: 11px; }

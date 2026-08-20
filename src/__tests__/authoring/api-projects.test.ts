@@ -4,6 +4,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CreateProjectResponseSchema,
+  EdgePatchResponseSchema,
   ErrorResponseSchema,
   GraphWriteResponseSchema,
   ListProjectsResponseSchema,
@@ -269,6 +270,40 @@ describe("authoring project API routes", () => {
     expect(unknown.status).toBe(400);
     expect(JSON.stringify(await malformed.json())).not.toMatch(/stack|sqlite|sql/i);
     expect(ErrorResponseSchema.parse(await unknown.json()).error.code).toBe("VALIDATION");
+  });
+
+  it("patches a choice and marks its downstream scope for review", async () => {
+    const routes = await importRoutes();
+    const project = await createProject();
+    const graph = graphForVersion(project.activeDraftVersionId!);
+    expect((await putGraph(project.id, graph, 0)).status).toBe(200);
+
+    const edge = graph.edges.find((candidate) => candidate.sourceNodeId === graph.nodes.find((node) => node.nodeKey === "start")?.id)!;
+    const patched = await routes.graph.PATCH(
+      request(`http://local/api/projects/${project.id}/graph`, "PATCH", {
+        edgeId: edge.id,
+        patch: { label: "Take the author-approved stair" },
+        expectedRevision: 1,
+      }),
+      projectContext(project.id),
+    );
+    expect(patched.status).toBe(200);
+    expect(EdgePatchResponseSchema.parse(await patched.json()).edge).toMatchObject({ id: edge.id, label: "Take the author-approved stair" });
+
+    const graphAfterPatch = await routes.graph.GET(request(`http://local/api/projects/${project.id}/graph`, "GET"), projectContext(project.id));
+    const parsedGraph = StoryGraphResponseSchema.parse(await graphAfterPatch.json()).graph;
+    expect(parsedGraph.nodes.find((node) => node.nodeKey === "left")?.contentStatus).toBe("review_required");
+
+    const stale = await routes.graph.PATCH(
+      request(`http://local/api/projects/${project.id}/graph`, "PATCH", {
+        edgeId: edge.id,
+        patch: { label: "Stale choice" },
+        expectedRevision: 1,
+      }),
+      projectContext(project.id),
+    );
+    expect(stale.status).toBe(409);
+    expect(ErrorResponseSchema.parse(await stale.json()).error.code).toBe("CONFLICT");
   });
 
   it("returns a stable not-found error for missing projects", async () => {
