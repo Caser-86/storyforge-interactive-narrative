@@ -1,5 +1,5 @@
 import { enumeratePaths } from "../graph";
-import type { StoryGraph, StoryNode } from "../schemas";
+import type { StoryGraph } from "../schemas";
 import type { ValidationIssueInput } from "./schemas";
 
 export const QUALITY_RULE_THRESHOLDS = {

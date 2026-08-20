@@ -246,7 +246,7 @@ export class BetterSqliteValidationRepository implements ValidationRepository {
   }
 
   private updateIssue(issueId: string, status: "resolved" | "dismissed"): ValidationIssueRecord {
-    const issue = this.getIssue(issueId);
+    this.getIssue(issueId);
     const resolvedAt = nowIso();
     this.db.prepare("UPDATE validation_issues SET status = ?, resolved_at = ? WHERE id = ?").run(status, resolvedAt, issueId);
     return this.getIssue(issueId);

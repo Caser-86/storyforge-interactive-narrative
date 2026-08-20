@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ValidationIssueRecord } from "@/lib/authoring/validation/schemas";
 
 type IssueFilter = "all" | "blocking" | "warning";
@@ -16,8 +16,10 @@ export function IssuePanel({ projectId, initialIssues = [], onSelectNode, refres
   const [issues, setIssues] = useState(initialIssues);
   const [filter, setFilter] = useState<IssueFilter>("all");
   const [error, setError] = useState<string | null>(null);
+  const requestEpoch = useRef(0);
 
   useEffect(() => {
+    const epoch = ++requestEpoch.current;
     let canceled = false;
     void fetch(`/api/projects/${projectId}/validate`)
       .then(async (response) => {
@@ -25,7 +27,7 @@ export function IssuePanel({ projectId, initialIssues = [], onSelectNode, refres
         return response.json() as Promise<{ issues?: ValidationIssueRecord[]; blocking?: ValidationIssueRecord[]; warnings?: ValidationIssueRecord[] }>;
       })
       .then((payload) => {
-        if (canceled) return;
+        if (canceled || requestEpoch.current !== epoch) return;
         setIssues(payload.issues ?? [...(payload.blocking ?? []), ...(payload.warnings ?? [])]);
       })
       .catch((loadError) => {
@@ -38,6 +40,7 @@ export function IssuePanel({ projectId, initialIssues = [], onSelectNode, refres
 
   async function updateIssue(issue: ValidationIssueRecord, action: "resolve" | "dismiss") {
     if (action === "dismiss" && !window.confirm("确认忽略这个 warning？它不会再阻止发布，但证据会保留在历史记录中。")) return;
+    requestEpoch.current += 1;
     setError(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/validation/${issue.id}`, {

@@ -24,6 +24,7 @@ export default defineConfig({
       GENERATION_PROVIDER: "fake",
       SQLITE_DB_PATH: path.join(process.cwd(), "output", "playwright", "authoring-e2e.sqlite"),
       USE_MEMORY_DB: "true",
+      NEXT_DIST_DIR: ".next-playwright",
     },
   },
 });

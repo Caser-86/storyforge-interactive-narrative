@@ -49,7 +49,11 @@ test.describe("authoring quality loop", () => {
 
     const warningGraph: StoryGraph = {
       ...validGraph,
-      edges: validGraph.edges.map((edge) => edge.id.endsWith("edge-archive-city") ? { ...edge, label: "Follow the keeper route" } : edge),
+      edges: validGraph.edges.map((edge) => {
+        if (edge.id.endsWith("edge-archive-chamber")) return { ...edge, label: "Follow the keeper route toward the old light" };
+        if (edge.id.endsWith("edge-archive-city")) return { ...edge, label: "Follow the keeper route toward the old dawn" };
+        return edge;
+      }),
     };
     expect((await request.put(`/api/projects/${project.id}/graph`, { data: { graph: warningGraph, expectedRevision: 2 } })).ok()).toBe(true);
     const warningValidation = await request.post(`/api/projects/${project.id}/validate`, { data: { sources: ["structural", "rule"] } });
@@ -57,10 +61,12 @@ test.describe("authoring quality loop", () => {
     expect(warningPayload.allowed).toBe(true);
     expect(warningPayload.warnings.map((issue: { code: string }) => issue.code)).toContain("SIMILAR_CHOICES");
 
-    page.on("dialog", (dialog) => void dialog.accept());
+    page.once("dialog", async (dialog) => { await dialog.accept(); });
     await page.goto(`/projects/${project.id}/edit`);
     await expect(page.getByText("SIMILAR_CHOICES")).toBeVisible();
-    await page.getByRole("button", { name: "忽略 warning" }).click();
+    const dismissResponse = page.waitForResponse((response) => response.url().includes(`/validation/`) && response.request().method() === "PATCH");
+    await page.locator(".quality-issue").filter({ hasText: "SIMILAR_CHOICES" }).getByRole("button", { name: "忽略 warning" }).click();
+    expect((await dismissResponse).ok()).toBe(true);
     await expect(page.getByText("SIMILAR_CHOICES")).not.toBeVisible();
 
     const staleGraph = {
@@ -81,7 +87,7 @@ test.describe("authoring quality loop", () => {
     await page.goto(`/projects/${project.id}/preview`);
     await expect(page.getByRole("heading", { name: "Courtyard Gate" })).toBeVisible();
     await page.getByRole("button", { name: "Enter the archive" }).click();
-    await page.getByRole("button", { name: "Share it with the city" }).click();
+    await page.getByRole("button", { name: "Follow the keeper route toward the old dawn" }).click();
     await expect(page.getByRole("heading", { name: "City of Lamps" })).toBeVisible();
     await expect(page.getByText("故事到达结局")).toBeVisible();
   });

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "../graph";
-import { AuthoringError } from "../errors";
 import type { AuthoringRepository } from "../repository";
 import { OpenAICompatibleGenerationProvider } from "../generation/openai-provider";
 import type { GenerationProvider } from "../generation/provider";
@@ -119,10 +118,9 @@ export class AuthoringValidationService {
   }
 
   public async getReleaseDecision(projectId: string): Promise<ValidationDecision> {
-    const project = await this.authoringRepository.getProject(projectId);
     const graph = await this.authoringRepository.getProjectGraph(projectId);
     const currentRevision = await this.authoringRepository.getDraftRevision(projectId);
-    return this.decisionForRevision(projectId, graph.versionId, currentRevision, project.status);
+    return this.decisionForRevision(projectId, graph.versionId, currentRevision);
   }
 
   private async resultForRevision(projectId: string, versionId: string, revision: number, run: ValidationRun): Promise<ValidationRunResult> {
@@ -131,7 +129,7 @@ export class AuthoringValidationService {
     return ValidationRunResultSchema.parse({ ...decision, run, issues });
   }
 
-  private async decisionForRevision(projectId: string, versionId: string, currentRevision: number, projectStatus?: string): Promise<ValidationDecision> {
+  private async decisionForRevision(projectId: string, versionId: string, currentRevision: number): Promise<ValidationDecision> {
     const issues = await this.validationRepository.listIssues(projectId, versionId, currentRevision);
     const runs = await this.validationRepository.listRuns(projectId, versionId, currentRevision);
     const completedRuns = runs.filter((run) => run.status === "completed");
