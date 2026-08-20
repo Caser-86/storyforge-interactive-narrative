@@ -4,6 +4,8 @@ import path from "path";
 export default defineConfig({
   test: {
     globals: true,
+    environment: "node",
+    setupFiles: ["./src/test/setup-dom.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", "**/e2e/**"],
   },
   resolve: {

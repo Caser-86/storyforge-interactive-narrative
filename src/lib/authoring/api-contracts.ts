@@ -49,6 +49,7 @@ export const ProjectSummarySchema = ProjectSchema.extend({
   draftRevision: z.number().int().min(0).nullable(),
   versionCount: z.number().int().min(0),
   snapshotCount: z.number().int().min(0),
+  blockingIssueCount: z.number().int().min(0),
 }).strict();
 
 export const ProjectResponseSchema = z

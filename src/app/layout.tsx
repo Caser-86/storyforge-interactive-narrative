@@ -5,19 +5,18 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StoryForge - LLM 驱动的互动叙事生成器",
+  title: "StoryForge 故事工作台",
   description:
-    "输入一句话灵感，AI 在 5 秒内生成可玩的互动文字冒险。支持赛博朋克、奇幻、恐怖等多种风格，每个选择都将改变故事走向。",
+    "面向私人创作的互动叙事项目工作台：从项目简报、故事结构到节点编辑，逐步完成一部可回溯的作品。",
   keywords: [
     "互动叙事",
-    "文字冒险",
-    "AI 生成",
-    "LLM 游戏",
+    "故事编辑器",
+    "项目库",
     "互动小说",
   ],
   openGraph: {
     title: "StoryForge",
-    description: "输入一句话灵感，5 秒内开始你的互动冒险",
+    description: "从项目简报开始，逐步完成一部互动叙事作品",
     type: "website",
     locale: "zh_CN",
   },
@@ -28,7 +27,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#0a0a1a",
+  themeColor: "#f2eee7",
 };
 
 export default function RootLayout({
@@ -41,7 +40,7 @@ export default function RootLayout({
       lang="zh-CN"
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#0a0a1a] text-white">
+      <body className="min-h-full flex flex-col">
         <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>

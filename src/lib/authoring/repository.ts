@@ -4,6 +4,7 @@ import { AuthoringError } from "./errors";
 import { initializeAuthoringDatabase } from "./database";
 import type { AuthoringDatabaseOptions } from "./database";
 import { sealSnapshotInDatabase } from "./snapshots";
+import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "./graph";
 import type {
   Chapter,
   JsonValue,
@@ -44,6 +45,7 @@ export type ProjectSummary = Project & {
   draftRevision: number | null;
   versionCount: number;
   snapshotCount: number;
+  blockingIssueCount: number;
 };
 
 export interface AuthoringRepository {
@@ -339,12 +341,20 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         )
         .all() as (ProjectRow & { draft_revision: number | null; version_count: number; snapshot_count: number | null })[];
 
-      return rows.map((row) => ({
-        ...toProject(row),
-        draftRevision: row.draft_revision,
-        versionCount: row.version_count,
-        snapshotCount: row.snapshot_count ?? 0,
-      }));
+      return rows.map((row) => {
+        const graph = this.readProjectGraph(row.id);
+        const blockingIssueCount = validateStoryGraph(graph, RELEASE_GRAPH_LIMITS).filter(
+          (issue) => issue.severity === "blocking",
+        ).length;
+
+        return {
+          ...toProject(row),
+          draftRevision: row.draft_revision,
+          versionCount: row.version_count,
+          snapshotCount: row.snapshot_count ?? 0,
+          blockingIssueCount,
+        };
+      });
     } catch (error) {
       throw storageError(error, "Failed to list authoring projects");
     }
