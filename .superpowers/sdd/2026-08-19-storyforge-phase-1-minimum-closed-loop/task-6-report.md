@@ -2,19 +2,25 @@
 
 Status: implemented and verified.
 
-Commit: recorded in the final Task 6 response after commit creation.
+Implementation commit: `2988c19e63c1e987bed6fe79250251cd0e31323b`
 
 Focused tests:
 
 - Initial red run: `npm test -- src/__tests__/authoring/export-html.test.ts` exited `1` with expected missing module `@/lib/authoring/export-html`.
 - Final export tests: `npm test -- src/__tests__/authoring/export-html.test.ts` exited `0`; `1` file, `10` tests passed.
-- Final authoring suite: `npm test -- src/__tests__/authoring` exited `0`; `7` files, `73` tests passed.
+- Runtime replay regression: the new test first failed because `replayEdgePath` was not exported, then passed after the shared replay helper and standalone parity logic were implemented.
+- Final authoring suite: `npm test -- src/__tests__/authoring` exited `0`; `7` files, `74` tests passed.
+
+Regression coverage:
+
+- Standalone progress now replays `edgePath` from the start, checks each edge source and target, removes invalid persisted state, and uses the same validated replay for choices and Back.
+- The named authoring E2E seeds an impossible persisted edge path and verifies the offline export resets to the start before exercising the normal path.
 
 E2E:
 
 - Initial E2E run exited `1` before test execution because the Playwright Chromium executable was missing.
 - `npx playwright install chromium` was stopped after slow/stalled progress on this host.
-- Final E2E run: `npm run test:e2e -- e2e/authoring-manual-flow.spec.ts` exited `0`; `1` test passed using installed Chrome channel.
+- Final E2E run: `PLAYWRIGHT_CHROME_CHANNEL=chrome npm run test:e2e -- e2e/authoring-manual-flow.spec.ts` exited `0`; `1` test passed using installed Chrome channel.
 - Offline file opened successfully through `file://` in a separate context with non-file requests blocked.
 
 Typecheck:
@@ -23,5 +29,6 @@ Typecheck:
 
 Concerns:
 
-- E2E depends on an installed Chrome channel on this host because the bundled Playwright browser was unavailable.
+- `playwright.config.ts` now defaults to managed Chromium and uses the installed Chrome channel only when `PLAYWRIGHT_CHROME_CHANNEL=chrome` is explicitly set.
+- The bundled Playwright browser was unavailable on this host, so `npx playwright install chromium` was stopped after slow/stalled progress.
 - Legacy UI/routes and legacy game endpoints were not modified.
