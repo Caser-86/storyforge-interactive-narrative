@@ -9,7 +9,7 @@ import type { ExportStory } from "@/lib/authoring/export-html";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository, CreateProjectInput } from "@/lib/authoring/repository";
 import type { StoryGraph } from "@/lib/authoring/schemas";
-import { validConvergingGraph } from "@/__tests__/fixtures/authoring-graphs";
+import { validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
 
 type ProjectContext = { params: Promise<{ projectId: string }> };
 
@@ -153,7 +153,7 @@ function request(url: string, method: string): Request {
 }
 
 function graphForVersion(versionId: string): StoryGraph {
-  const source = validConvergingGraph();
+  const source = validReleaseGraph();
   const chapterIdBySource = new Map<string, string>();
   const nodeIdBySource = new Map<string, string>();
   const chapters = source.chapters.map((chapter, index) => {

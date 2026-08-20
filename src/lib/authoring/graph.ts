@@ -2,9 +2,18 @@ import { AuthoringError } from "./errors";
 import type { StoryEdge, StoryGraph, StoryNode, ValidationIssue } from "./schemas";
 
 export interface GraphLimits {
+  minNodes: number;
+  minEndings: number;
   maxNodes: number;
   maxEndings: number;
 }
+
+export const RELEASE_GRAPH_LIMITS: GraphLimits = {
+  minNodes: 8,
+  minEndings: 2,
+  maxNodes: 80,
+  maxEndings: 10,
+};
 
 interface CoveredPath {
   nodeIds: string[];
@@ -71,10 +80,26 @@ export function validateStoryGraph(graph: StoryGraph, limits: GraphLimits): Vali
     });
   }
 
+  if (graph.nodes.length < limits.minNodes) {
+    issues.push({
+      code: "NODE_MIN_LIMIT",
+      message: `Graph has ${graph.nodes.length} nodes but the minimum is ${limits.minNodes}.`,
+      sortNodeKey: "",
+    });
+  }
+
   if (index.endingNodes.length > limits.maxEndings) {
     issues.push({
       code: "ENDING_LIMIT",
       message: `Graph has ${index.endingNodes.length} endings but the limit is ${limits.maxEndings}.`,
+      sortNodeKey: "",
+    });
+  }
+
+  if (index.endingNodes.length < limits.minEndings) {
+    issues.push({
+      code: "ENDING_MIN_LIMIT",
+      message: `Graph has ${index.endingNodes.length} endings but the minimum is ${limits.minEndings}.`,
       sortNodeKey: "",
     });
   }

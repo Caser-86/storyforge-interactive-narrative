@@ -7,7 +7,7 @@ import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository, CreateProjectInput } from "@/lib/authoring/repository";
 import { restoreSnapshot, sealSnapshot } from "@/lib/authoring/snapshots";
 import type { StoryGraph } from "@/lib/authoring/schemas";
-import { graphWithoutEnding, validConvergingGraph } from "@/__tests__/fixtures/authoring-graphs";
+import { graphWithoutEnding, validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
 
 type ProjectContext = { params: Promise<{ projectId: string }> };
 
@@ -55,7 +55,7 @@ function request(url: string, method: string, body?: unknown): Request {
   });
 }
 
-function graphForVersion(versionId: string, graph: StoryGraph = validConvergingGraph()): StoryGraph {
+function graphForVersion(versionId: string, graph: StoryGraph = validReleaseGraph()): StoryGraph {
   const chapterIdBySource = new Map<string, string>();
   const nodeIdBySource = new Map<string, string>();
   const chapters = graph.chapters.map((chapter, index) => {
@@ -95,7 +95,7 @@ function graphForVersion(versionId: string, graph: StoryGraph = validConvergingG
   };
 }
 
-async function createProjectWithGraph(graph: StoryGraph = validConvergingGraph()) {
+async function createProjectWithGraph(graph: StoryGraph = validReleaseGraph()) {
   const repo = createRepo();
   const project = await repo.createProject(fixtureProjectInput());
   const draftGraph = graphForVersion(project.activeDraftVersionId!, graph);
@@ -228,7 +228,7 @@ describe("authoring snapshots", () => {
   });
 
   it("returns reader-safe preview payloads and rejects drafts", async () => {
-    const graph = validConvergingGraph();
+    const graph = validReleaseGraph();
     graph.chapters[0] = { ...graph.chapters[0], goal: "SECRET_GOAL" };
     graph.nodes[0] = { ...graph.nodes[0], objective: "SECRET_OBJECTIVE" };
     graph.edges[0] = {
@@ -265,5 +265,54 @@ describe("authoring snapshots", () => {
     });
     expect(draftPreview.status).toBe(400);
     expect(ErrorResponseSchema.parse(await draftPreview.json()).error.code).toBe("VALIDATION");
+  });
+
+  it("uses the limits frozen at sealing instead of mutable project targets", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(
+      fixtureProjectInput({
+        size: { preset: "custom", targetNodes: 80, targetEndings: 10 },
+      }),
+    );
+    const graph = graphForVersion(project.activeDraftVersionId!, validReleaseGraph());
+    const mergeNode = graph.nodes.find((node) => node.nodeKey === "merge")!;
+    const keeperEnding = graph.nodes.find((node) => node.nodeKey === "keeper-ending")!;
+    const extraNode = {
+      ...mergeNode,
+      id: `${graph.versionId}-node-extra`,
+      nodeKey: "extra",
+      kind: "scene" as const,
+      title: "Extra Scene",
+      body: "A final scene preserves the historical release size.",
+      summary: "The story has one more scene than the new project target.",
+      objective: "Resolve the last clue.",
+      topologicalRank: 4,
+    };
+    const graphWithExtraNode: StoryGraph = {
+      ...graph,
+      nodes: [...graph.nodes, extraNode],
+      edges: graph.edges.map((edge) =>
+        edge.targetNodeId === keeperEnding.id ? { ...edge, targetNodeId: extraNode.id } : edge,
+      ).concat({
+        ...graph.edges.find((edge) => edge.targetNodeId === keeperEnding.id)!,
+        id: `${graph.versionId}-edge-extra-keeper`,
+        sourceNodeId: extraNode.id,
+        targetNodeId: keeperEnding.id,
+      }),
+    };
+
+    await repo.replaceDraftGraph(project.id, graphWithExtraNode, 0);
+    const snapshot = await sealSnapshot(project.id);
+    await repo.updateProject(project.id, {
+      size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+    });
+
+    const routes = await importRoutes();
+    const preview = await routes.preview.POST(
+      request(`http://local/api/projects/${project.id}/preview`, "POST", { snapshotId: snapshot.id }),
+      projectContext(project.id),
+    );
+
+    expect(preview.status).toBe(200);
   });
 });

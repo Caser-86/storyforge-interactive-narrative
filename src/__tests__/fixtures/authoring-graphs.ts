@@ -74,10 +74,37 @@ function graph(nodes: StoryNode[], edges: StoryEdge[]): StoryGraph {
 
 export function testLimits(overrides: Partial<GraphLimits> = {}): GraphLimits {
   return {
+    minNodes: 1,
+    minEndings: 1,
     maxNodes: 80,
     maxEndings: 10,
     ...overrides,
   };
+}
+
+export function validReleaseGraph(): StoryGraph {
+  const start = node("start", "start");
+  const left = node("left", "scene", { topologicalRank: 1 });
+  const leftDetail = node("left-detail", "scene", { topologicalRank: 2 });
+  const right = node("right", "scene", { topologicalRank: 1 });
+  const rightDetail = node("right-detail", "scene", { topologicalRank: 2 });
+  const merge = node("merge", "scene", { topologicalRank: 3 });
+  const keeperEnding = node("keeper-ending", "ending", { topologicalRank: 4 });
+  const cityEnding = node("city-ending", "ending", { topologicalRank: 4 });
+
+  return graph(
+    [start, left, leftDetail, right, rightDetail, merge, keeperEnding, cityEnding],
+    [
+      edge(start.id, left.id, "Take the left stair", 0, { id: "edge-start-left" }),
+      edge(start.id, right.id, "Take the right stair", 1, { id: "edge-start-right" }),
+      edge(left.id, leftDetail.id, "Search the left gallery", 0, { id: "edge-left-detail" }),
+      edge(leftDetail.id, merge.id, "Return to the archive", 0, { id: "edge-left-merge" }),
+      edge(right.id, rightDetail.id, "Search the right gallery", 0, { id: "edge-right-detail" }),
+      edge(rightDetail.id, merge.id, "Return to the archive", 0, { id: "edge-right-merge" }),
+      edge(merge.id, keeperEnding.id, "Keep the lantern", 0, { id: "edge-merge-keeper" }),
+      edge(merge.id, cityEnding.id, "Share the lantern", 1, { id: "edge-merge-city" }),
+    ],
+  );
 }
 
 export function validConvergingGraph(): StoryGraph {

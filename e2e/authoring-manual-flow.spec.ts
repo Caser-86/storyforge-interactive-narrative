@@ -192,6 +192,26 @@ test.describe("authoring manual closed loop", () => {
       expect(blockedNetworkRequests).toEqual([]);
 
       await offlineContext.close();
+
+      const storageUnavailableContext = await browser.newContext();
+      await storageUnavailableContext.addInitScript(() => {
+        Storage.prototype.getItem = () => {
+          throw new Error("storage blocked");
+        };
+        Storage.prototype.setItem = () => {
+          throw new Error("storage blocked");
+        };
+        Storage.prototype.removeItem = () => {
+          throw new Error("storage blocked");
+        };
+      });
+      const storageUnavailablePage = await storageUnavailableContext.newPage();
+      await storageUnavailablePage.goto(pathToFileURL(exportPath).href);
+      await expect(storageUnavailablePage.getByRole("heading", { name: "Courtyard Gate" })).toBeVisible();
+      await storageUnavailablePage.getByRole("button", { name: "Enter the archive" }).click();
+      await storageUnavailablePage.getByRole("button", { name: "Share it with the city" }).click();
+      await expect(storageUnavailablePage.getByText("Ending reached")).toBeVisible();
+      await storageUnavailableContext.close();
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

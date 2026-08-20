@@ -3,7 +3,8 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { initializeAuthoringDatabase } from "./database";
 import { AuthoringError } from "./errors";
-import { validateStoryGraph } from "./graph";
+import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "./graph";
+import type { GraphLimits } from "./graph";
 import {
   ChapterSchema,
   ProjectSchema,
@@ -52,6 +53,7 @@ type StoryVersionRow = {
   draft_revision: number;
   created_at: string;
   sealed_at: string | null;
+  validation_limits_json: string;
 };
 
 type ChapterRow = {
@@ -146,6 +148,25 @@ function nowIso(): string {
 
 function parseJson(text: string) {
   return JSON.parse(text) as unknown;
+}
+
+const StoredGraphLimitsSchema = z
+  .object({
+    minNodes: z.number().int().min(0),
+    minEndings: z.number().int().min(0),
+    maxNodes: z.number().int().min(1),
+    maxEndings: z.number().int().min(1),
+  })
+  .strict();
+
+function parseStoredGraphLimits(text: string): GraphLimits {
+  try {
+    return StoredGraphLimitsSchema.parse(JSON.parse(text));
+  } catch (error) {
+    throw new AuthoringError("STORAGE", "Snapshot validation limits are invalid", {
+      cause: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 function storageError(error: unknown, message: string): AuthoringError {
@@ -299,6 +320,7 @@ function insertVersionCopy(
   sourceVersionId: string,
   status: StoryVersion["status"],
   sealedAt: string | null,
+  validationLimitsJson = sourceVersion.validation_limits_json,
 ): StoryVersionRow {
   const versionId = randomUUID();
   const createdAt = nowIso();
@@ -308,9 +330,9 @@ function insertVersionCopy(
       INSERT INTO story_versions (
         id, project_id, version_number, kind, source_version_id, status,
         brief_json, story_bible_json, outline_json, canon_json, draft_revision,
-        created_at, sealed_at
+        created_at, sealed_at, validation_limits_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `,
   ).run(
     versionId,
@@ -325,6 +347,7 @@ function insertVersionCopy(
     sourceVersion.canon_json,
     createdAt,
     sealedAt,
+    validationLimitsJson,
   );
 
   return requireVersionRow(db, projectId, versionId);
@@ -498,10 +521,12 @@ export function sealSnapshotInDatabase(db: Database.Database, projectId: string)
     }
 
     const draftGraph = readGraphByVersionId(db, draft.id);
-    const issues = validateStoryGraph(draftGraph, {
+    const validationLimits: GraphLimits = {
+      ...RELEASE_GRAPH_LIMITS,
       maxNodes: project.targetNodeCount,
       maxEndings: project.targetEndingCount,
-    });
+    };
+    const issues = validateStoryGraph(draftGraph, validationLimits);
     const blockingIssues = issues.filter((issue) => issue.severity === "blocking");
 
     if (blockingIssues.length > 0) {
@@ -510,7 +535,16 @@ export function sealSnapshotInDatabase(db: Database.Database, projectId: string)
       });
     }
 
-    const snapshot = insertVersionCopy(db, projectId, draft, "snapshot", draft.id, "valid", nowIso());
+    const snapshot = insertVersionCopy(
+      db,
+      projectId,
+      draft,
+      "snapshot",
+      draft.id,
+      "valid",
+      nowIso(),
+      JSON.stringify(validationLimits),
+    );
     copyGraphRows(db, draft.id, snapshot.id);
 
     return toStoryVersion(snapshot);
@@ -592,7 +626,7 @@ export async function readPreview(projectId: string, versionId: string): Promise
   const db = initializeAuthoringDatabase();
 
   try {
-    const project = requireProject(db, projectId);
+    requireProject(db, projectId);
     const version = toStoryVersion(requireVersionRow(db, projectId, versionId));
     if (version.kind !== "snapshot" || version.sealedAt === null || version.status !== "valid") {
       throw new AuthoringError("VALIDATION", "Preview requires a valid sealed snapshot", {
@@ -601,11 +635,9 @@ export async function readPreview(projectId: string, versionId: string): Promise
       });
     }
 
+    const versionRow = requireVersionRow(db, projectId, versionId);
     const graph = readGraphByVersionId(db, version.id);
-    const issues = validateStoryGraph(graph, {
-      maxNodes: project.targetNodeCount,
-      maxEndings: project.targetEndingCount,
-    });
+    const issues = validateStoryGraph(graph, parseStoredGraphLimits(versionRow.validation_limits_json));
     const blockingIssues = issues.filter((issue) => issue.severity === "blocking");
     if (blockingIssues.length > 0) {
       throw new AuthoringError("BLOCKING_ISSUES", "Snapshot graph has blocking issues", {

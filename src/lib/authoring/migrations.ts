@@ -230,4 +230,13 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
       CREATE INDEX idx_story_edges_target ON story_edges(version_id, target_node_id);
     `,
   },
+  {
+    version: 3,
+    name: "freeze_snapshot_validation_limits",
+    up: `
+      ALTER TABLE story_versions
+      ADD COLUMN validation_limits_json TEXT NOT NULL
+      DEFAULT '{"minNodes":8,"minEndings":2,"maxNodes":80,"maxEndings":10}';
+    `,
+  },
 ];

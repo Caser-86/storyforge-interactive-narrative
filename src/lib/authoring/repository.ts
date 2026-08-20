@@ -93,6 +93,7 @@ type StoryVersionRow = {
   draft_revision: number;
   created_at: string;
   sealed_at: string | null;
+  validation_limits_json: string;
 };
 
 type ChapterRow = {
@@ -788,9 +789,9 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
           INSERT INTO story_versions (
             id, project_id, version_number, kind, source_version_id, status,
             brief_json, story_bible_json, outline_json, canon_json, draft_revision,
-            created_at, sealed_at
+            created_at, sealed_at, validation_limits_json
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
         `,
       )
       .run(
@@ -806,6 +807,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         sourceVersion.canon_json,
         createdAt,
         sealedAt,
+        sourceVersion.validation_limits_json,
       );
 
     return toStoryVersion(this.requireVersion(projectId, id));

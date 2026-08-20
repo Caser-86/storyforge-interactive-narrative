@@ -8,6 +8,7 @@ import { runAuthoringMigrations } from "@/lib/authoring/database";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository, CreateProjectInput } from "@/lib/authoring/repository";
 import type { Chapter, StoryEdge, StoryGraph, StoryNode } from "@/lib/authoring/schemas";
+import { validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
 
 let tempDir: string;
 let dbPath: string;
@@ -97,24 +98,27 @@ function edge(
 }
 
 function populatedGraph(versionId: string): StoryGraph {
-  const firstChapter = chapter(`${versionId}-chapter-source`, versionId);
-  const startNode = node(`${versionId}-node-source-start`, versionId, firstChapter.id, {
-    nodeKey: "start",
-    kind: "start",
-    title: "Start",
-  });
-  const endingNode = node(`${versionId}-node-source-ending`, versionId, firstChapter.id, {
-    nodeKey: "ending",
-    kind: "ending",
-    title: "Ending",
-    topologicalRank: 1,
-  });
+  const source = validReleaseGraph();
+  const chapterId = `${versionId}-chapter-source`;
+  const chapterIds = new Map(source.chapters.map((item) => [item.id, chapterId]));
+  const nodeIds = new Map(source.nodes.map((item) => [item.id, `${versionId}-node-${item.nodeKey}`]));
 
   return {
     versionId,
-    chapters: [firstChapter],
-    nodes: [startNode, endingNode],
-    edges: [edge(`${versionId}-edge-source`, versionId, startNode.id, endingNode.id)],
+    chapters: source.chapters.map((item) => ({ ...item, id: chapterId, versionId })),
+    nodes: source.nodes.map((item) => ({
+      ...item,
+      id: nodeIds.get(item.id)!,
+      versionId,
+      chapterId: chapterIds.get(item.chapterId)!,
+    })),
+    edges: source.edges.map((item) => ({
+      ...item,
+      id: `${versionId}-${item.id}`,
+      versionId,
+      sourceNodeId: nodeIds.get(item.sourceNodeId)!,
+      targetNodeId: nodeIds.get(item.targetNodeId)!,
+    })),
   };
 }
 
@@ -257,7 +261,7 @@ describe("authoring repository", () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('projects', 'story_versions')")
         .all();
 
-      expect(migrations).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(migrations).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
       expect(projectTables).toEqual([{ name: "projects" }, { name: "story_versions" }]);
     } finally {
       db.close();

@@ -71,6 +71,12 @@ describe("authoring graph validation", () => {
     expect(
       validateStoryGraph(graphOverEndingLimit(), testLimits({ maxEndings: 1 })).map((issue) => issue.code),
     ).toContain("ENDING_LIMIT");
+    expect(validateStoryGraph(validConvergingGraph(), testLimits({ minNodes: 6 })).map((issue) => issue.code)).toContain(
+      "NODE_MIN_LIMIT",
+    );
+    expect(validateStoryGraph(validConvergingGraph(), testLimits({ minEndings: 2 })).map((issue) => issue.code)).toContain(
+      "ENDING_MIN_LIMIT",
+    );
   });
 
   it("returns a deterministic topological order", () => {

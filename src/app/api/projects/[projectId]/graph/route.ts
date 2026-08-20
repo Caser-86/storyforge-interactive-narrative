@@ -8,7 +8,7 @@ import {
   readJsonBody,
 } from "@/lib/authoring/api-contracts";
 import type { GraphWriteInputPayload } from "@/lib/authoring/api-contracts";
-import { validateStoryGraph } from "@/lib/authoring/graph";
+import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "@/lib/authoring/graph";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 
 type ProjectRouteContext = {
@@ -47,6 +47,7 @@ export async function PUT(request: Request, { params }: ProjectRouteContext): Pr
   try {
     const project = await repo.getProject(projectId);
     const issues = validateStoryGraph(input.graph, {
+      ...RELEASE_GRAPH_LIMITS,
       maxNodes: project.targetNodeCount,
       maxEndings: project.targetEndingCount,
     });

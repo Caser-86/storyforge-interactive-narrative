@@ -222,11 +222,29 @@ function renderShell(storyJson: string): string {
       edgesBySourceId.set(edge.sourceNodeId, edges);
     }
 
+    let memoryStorage = null;
     let state = loadState();
+
+    function readStoredState() {
+      try {
+        return localStorage.getItem(story.storageKey) || memoryStorage;
+      } catch {
+        return memoryStorage;
+      }
+    }
+
+    function clearStoredState() {
+      memoryStorage = null;
+      try {
+        localStorage.removeItem(story.storageKey);
+      } catch {
+        // Continue with an in-memory session when file:// storage is unavailable.
+      }
+    }
 
     function loadState() {
       try {
-        const stored = localStorage.getItem(story.storageKey);
+        const stored = readStoredState();
         if (stored) {
           const parsed = JSON.parse(stored);
           const restored = replayEdgePath(parsed.edgePath);
@@ -235,10 +253,10 @@ function renderShell(storyJson: string): string {
           }
         }
       } catch {
-        localStorage.removeItem(story.storageKey);
+        clearStoredState();
       }
 
-      localStorage.removeItem(story.storageKey);
+      clearStoredState();
       return story.initialState;
     }
 
@@ -280,7 +298,13 @@ function renderShell(storyJson: string): string {
     }
 
     function saveState() {
-      localStorage.setItem(story.storageKey, JSON.stringify(state));
+      const serialized = JSON.stringify(state);
+      memoryStorage = serialized;
+      try {
+        localStorage.setItem(story.storageKey, serialized);
+      } catch {
+        // Keep the current session usable when persistence is blocked.
+      }
     }
 
     function currentNode() {

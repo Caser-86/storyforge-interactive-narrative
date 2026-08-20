@@ -13,7 +13,7 @@ import {
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository, CreateProjectInput } from "@/lib/authoring/repository";
 import type { StoryGraph } from "@/lib/authoring/schemas";
-import { graphWithoutEnding, validConvergingGraph } from "@/__tests__/fixtures/authoring-graphs";
+import { graphWithoutEnding, validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
 
 type ProjectContext = { params: Promise<{ projectId: string }> };
 
@@ -55,7 +55,7 @@ function request(url: string, method: string, body?: unknown): Request {
   });
 }
 
-function graphForVersion(versionId: string, graph: StoryGraph = validConvergingGraph()): StoryGraph {
+function graphForVersion(versionId: string, graph: StoryGraph = validReleaseGraph()): StoryGraph {
   const chapterIdBySource = new Map<string, string>();
   const nodeIdBySource = new Map<string, string>();
   const chapters = graph.chapters.map((chapter, index) => {
