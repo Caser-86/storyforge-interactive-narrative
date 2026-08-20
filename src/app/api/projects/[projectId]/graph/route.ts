@@ -1,6 +1,8 @@
 import {
   GraphWriteInputSchema,
   GraphWriteResponseSchema,
+  NodePatchInputSchema,
+  NodePatchResponseSchema,
   StoryGraphResponseSchema,
   errorResponse,
   json,
@@ -8,6 +10,7 @@ import {
   readJsonBody,
 } from "@/lib/authoring/api-contracts";
 import type { GraphWriteInputPayload } from "@/lib/authoring/api-contracts";
+import type { NodePatchInputPayload } from "@/lib/authoring/api-contracts";
 import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "@/lib/authoring/graph";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 
@@ -54,6 +57,28 @@ export async function PUT(request: Request, { params }: ProjectRouteContext): Pr
     const graph = await repo.replaceDraftGraph(projectId, input.graph, input.expectedRevision);
 
     return json(GraphWriteResponseSchema, { graph, issues });
+  } catch (error) {
+    return errorResponse(error);
+  } finally {
+    repo.close();
+  }
+}
+
+export async function PATCH(request: Request, { params }: ProjectRouteContext): Promise<Response> {
+  let projectId: string;
+  let input: NodePatchInputPayload;
+
+  try {
+    ({ projectId } = await params);
+    input = await readJsonBody(request, NodePatchInputSchema);
+  } catch (error) {
+    return errorResponse(error);
+  }
+
+  const repo = createAuthoringRepository();
+  try {
+    const result = await repo.patchDraftNode(projectId, input.nodeId, input.patch, input.expectedRevision);
+    return json(NodePatchResponseSchema, result);
   } catch (error) {
     return errorResponse(error);
   } finally {

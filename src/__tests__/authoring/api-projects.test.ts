@@ -7,6 +7,7 @@ import {
   ErrorResponseSchema,
   GraphWriteResponseSchema,
   ListProjectsResponseSchema,
+  NodePatchResponseSchema,
   ProjectResponseSchema,
   StoryGraphResponseSchema,
 } from "@/lib/authoring/api-contracts";
@@ -193,6 +194,60 @@ describe("authoring project API routes", () => {
 
     expect(response.status).toBe(409);
     expect(ErrorResponseSchema.parse(await response.json()).error.code).toBe("CONFLICT");
+  });
+
+  it("patches one draft node atomically and rejects a stale node revision", async () => {
+    const routes = await importRoutes();
+    const project = await createProject();
+    const graph = graphForVersion(project.activeDraftVersionId!);
+    const put = await putGraph(project.id, graph, 0);
+    expect(put.status).toBe(200);
+
+    const target = graph.nodes[0]!;
+    const patched = await routes.graph.PATCH(
+      request(`http://local/api/projects/${project.id}/graph`, "PATCH", {
+        nodeId: target.id,
+        patch: { body: "An author-edited body." },
+        expectedRevision: target.contentRevision,
+      }),
+      projectContext(project.id),
+    );
+    expect(patched.status).toBe(200);
+    expect(NodePatchResponseSchema.parse(await patched.json()).node).toMatchObject({
+      id: target.id,
+      body: "An author-edited body.",
+      authorModified: true,
+      contentStatus: "author_edited",
+      contentRevision: 1,
+    });
+
+    const summaryPatch = await routes.graph.PATCH(
+      request(`http://local/api/projects/${project.id}/graph`, "PATCH", {
+        nodeId: target.id,
+        patch: { summary: "The author changes the story direction." },
+        expectedRevision: 1,
+      }),
+      projectContext(project.id),
+    );
+    expect(summaryPatch.status).toBe(200);
+
+    const graphAfterImpact = await routes.graph.GET(
+      request(`http://local/api/projects/${project.id}/graph`, "GET"),
+      projectContext(project.id),
+    );
+    const parsedGraph = StoryGraphResponseSchema.parse(await graphAfterImpact.json()).graph;
+    expect(parsedGraph.nodes.find((node) => node.nodeKey === "left")?.contentStatus).toBe("review_required");
+
+    const stale = await routes.graph.PATCH(
+      request(`http://local/api/projects/${project.id}/graph`, "PATCH", {
+        nodeId: target.id,
+        patch: { body: "Stale body." },
+        expectedRevision: target.contentRevision,
+      }),
+      projectContext(project.id),
+    );
+    expect(stale.status).toBe(409);
+    expect(ErrorResponseSchema.parse(await stale.json()).error.code).toBe("CONFLICT");
   });
 
   it("rejects malformed and unknown create input", async () => {

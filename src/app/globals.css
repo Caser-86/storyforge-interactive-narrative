@@ -223,6 +223,21 @@ body {
 .node-canvas-objective { margin: 0; color: var(--authoring-coral-dark); font-size: 15px; line-height: 1.7; }
 .node-canvas-copy { margin-top: 40px; padding: 28px 0; border-top: 1px solid var(--authoring-line); border-bottom: 1px solid var(--authoring-line); }
 .node-canvas-copy p { margin: 0; color: #3e3c38; font-size: 18px; line-height: 1.9; }
+.node-editor-form { margin-top: 28px; }
+.node-editor-save-state { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; color: var(--authoring-muted); font-family: var(--font-geist-mono), monospace; font-size: 10px; }
+.save-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--authoring-muted); }
+.save-dot-idle { background: #8a4e2d; }
+.save-dot-saving { background: var(--authoring-coral); animation: save-pulse 900ms ease-in-out infinite; }
+.save-dot-saved { background: var(--authoring-olive); }
+.save-dot-error { background: var(--authoring-coral-dark); }
+.node-revision { margin-left: auto; }
+.node-editor-error { margin: 0 0 18px; padding: 11px 12px; border-left: 3px solid var(--authoring-coral-dark); background: rgba(216, 92, 69, 0.09); color: var(--authoring-coral-dark); font-size: 12px; }
+.node-editor-field { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; color: var(--authoring-muted); font-size: 11px; font-weight: 700; }
+.node-editor-field input, .node-editor-field textarea { width: 100%; border: 0; border-bottom: 1px solid var(--authoring-line); outline: 0; background: transparent; color: var(--authoring-ink); font: inherit; font-size: 16px; font-weight: 400; line-height: 1.7; }
+.node-editor-field input { height: 42px; }
+.node-editor-field textarea { padding: 10px 0; resize: vertical; }
+.node-editor-field input:focus, .node-editor-field textarea:focus { border-color: var(--authoring-coral); box-shadow: 0 2px 0 var(--authoring-coral); }
+.node-editor-protection { margin: 22px 0 0; padding: 11px 12px; border-left: 3px solid var(--authoring-olive); background: rgba(101, 112, 92, 0.1); color: #486043; font-size: 11px; line-height: 1.7; }
 .node-choices { margin-top: 34px; }
 .node-choice { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--authoring-line); font-size: 13px; }
 .node-choice span { color: var(--authoring-muted); font-size: 11px; text-align: right; }
@@ -289,8 +304,20 @@ body {
 .brief-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 0 0 60px; border-top: 1px solid var(--authoring-line); }
 .brief-form-actions p { margin: 0; color: var(--authoring-muted); font-size: 12px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.node-inspector { display: grid; gap: 14px; }
+.inspector-node-heading h3 { margin: 5px 0 0; font-size: 17px; line-height: 1.25; }
+.inspector-regenerate { width: 100%; justify-content: center; }
+.candidate-diff { display: grid; gap: 10px; padding-top: 6px; border-top: 1px solid var(--authoring-line); }
+.candidate-diff-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.candidate-diff-heading span { overflow: hidden; color: var(--authoring-muted); font-family: var(--font-geist-mono), monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.candidate-column { min-width: 0; padding: 11px; border: 1px solid var(--authoring-line); background: rgba(255, 252, 247, 0.42); }
+.candidate-column span { color: var(--authoring-muted); font-family: var(--font-geist-mono), monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.candidate-column p { max-height: 160px; margin: 8px 0 0; overflow: auto; color: var(--authoring-ink); font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
+.candidate-new { border-color: rgba(216, 92, 69, 0.5); background: rgba(216, 92, 69, 0.06); }
+.candidate-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 @keyframes authoring-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes save-pulse { 50% { opacity: 0.35; } }
 
 @media (max-width: 720px) {
   .authoring-container { width: min(100% - 28px, 560px); padding-top: 18px; }

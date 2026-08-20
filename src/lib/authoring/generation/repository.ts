@@ -5,17 +5,21 @@ import type { AuthoringDatabaseOptions } from "../database";
 import { AuthoringError } from "../errors";
 import type { JsonValue } from "../schemas";
 import {
+  GenerationCandidateSchema,
   GenerationRunSchema,
   GenerationStepDescriptorSchema,
   GenerationStepSchema,
 } from "./schemas";
 import type {
+  GenerationCandidate,
   GenerationErrorCode,
   GenerationRun,
   GenerationStage,
   GenerationStep,
   GenerationStepDescriptor,
 } from "./schemas";
+import { StoryNodeSchema } from "../schemas";
+import type { StoryNode } from "../schemas";
 
 const LEASE_MINUTES = 5;
 
@@ -74,6 +78,10 @@ export interface GenerationRepository {
   listRuns(projectId: string): Promise<GenerationRun[]>;
   listActiveRuns(): Promise<GenerationRun[]>;
   listSteps(runId: string): Promise<GenerationStep[]>;
+  listCandidates(projectId: string, nodeId?: string): Promise<GenerationCandidate[]>;
+  createCandidate(input: CreateGenerationCandidateInput): Promise<GenerationCandidate>;
+  applyCandidate(projectId: string, candidateId: string, expectedRevision: number): Promise<{ candidate: GenerationCandidate; node: StoryNode }>;
+  rejectCandidate(projectId: string, candidateId: string): Promise<GenerationCandidate>;
   getStep(stepId: string): Promise<GenerationStep>;
   leaseNextSteps(runId: string, now: Date, limit: number): Promise<GenerationStep[]>;
   recoverExpiredSteps(runId: string, now: Date): Promise<number>;
@@ -84,6 +92,18 @@ export interface GenerationRepository {
   resumeRun(runId: string, now: Date): Promise<GenerationRun>;
   cancelRun(runId: string, now: Date): Promise<GenerationRun>;
   close(): void;
+}
+
+export interface CreateGenerationCandidateInput {
+  projectId: string;
+  versionId: string;
+  nodeId: string;
+  baseContentRevision: number;
+  candidateBody: string;
+  model?: string | null;
+  rawResponse?: string | null;
+  runId?: string | null;
+  stepId?: string | null;
 }
 
 type GenerationRunRow = {
@@ -129,6 +149,41 @@ type GenerationStepRow = {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+};
+
+type GenerationCandidateRow = {
+  id: string;
+  project_id: string;
+  version_id: string;
+  run_id: string | null;
+  step_id: string | null;
+  node_id: string;
+  base_content_revision: number;
+  status: GenerationCandidate["status"];
+  candidate_body: string;
+  model: string | null;
+  raw_response: string | null;
+  created_at: string;
+  applied_at: string | null;
+  rejected_at: string | null;
+};
+
+type GenerationNodeRow = {
+  id: string;
+  version_id: string;
+  chapter_id: string;
+  node_key: string;
+  kind: StoryNode["kind"];
+  title: string;
+  body: string;
+  summary: string;
+  objective: string;
+  topological_rank: number;
+  content_status: StoryNode["contentStatus"];
+  author_modified: number;
+  content_revision: number;
+  created_at: string;
+  updated_at: string;
 };
 
 function nowIso(now: Date = new Date()): string {
@@ -197,6 +252,45 @@ function toStep(row: GenerationStepRow): GenerationStep {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
+  });
+}
+
+function toCandidate(row: GenerationCandidateRow): GenerationCandidate {
+  return GenerationCandidateSchema.parse({
+    id: row.id,
+    projectId: row.project_id,
+    versionId: row.version_id,
+    runId: row.run_id,
+    stepId: row.step_id,
+    nodeId: row.node_id,
+    baseContentRevision: row.base_content_revision,
+    status: row.status,
+    candidateBody: row.candidate_body,
+    model: row.model,
+    rawResponse: row.raw_response,
+    createdAt: row.created_at,
+    appliedAt: row.applied_at,
+    rejectedAt: row.rejected_at,
+  });
+}
+
+function toCandidateNode(row: GenerationNodeRow): StoryNode {
+  return StoryNodeSchema.parse({
+    id: row.id,
+    versionId: row.version_id,
+    chapterId: row.chapter_id,
+    nodeKey: row.node_key,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    summary: row.summary,
+    objective: row.objective,
+    topologicalRank: row.topological_rank,
+    contentStatus: row.content_status,
+    authorModified: row.author_modified === 1,
+    contentRevision: row.content_revision,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   });
 }
 
@@ -397,6 +491,129 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
       return rows.map(toStep);
     } catch (error) {
       throw storageError(error, "Failed to list generation steps");
+    }
+  }
+
+  public async listCandidates(projectId: string, nodeId?: string): Promise<GenerationCandidate[]> {
+    try {
+      const rows = (nodeId === undefined
+        ? this.db.prepare("SELECT * FROM generation_candidates WHERE project_id = ? ORDER BY created_at DESC, id DESC").all(projectId)
+        : this.db.prepare("SELECT * FROM generation_candidates WHERE project_id = ? AND node_id = ? ORDER BY created_at DESC, id DESC").all(projectId, nodeId)) as GenerationCandidateRow[];
+      return rows.map(toCandidate);
+    } catch (error) {
+      throw storageError(error, "Failed to list generation candidates");
+    }
+  }
+
+  public async createCandidate(input: CreateGenerationCandidateInput): Promise<GenerationCandidate> {
+    try {
+      const create = this.db.transaction(() => {
+        this.requireProjectVersion(input.projectId, input.versionId);
+        const node = this.db
+          .prepare("SELECT content_revision FROM story_nodes WHERE version_id = ? AND id = ?")
+          .get(input.versionId, input.nodeId) as { content_revision: number } | undefined;
+        if (!node) throw new AuthoringError("NOT_FOUND", "Candidate node not found", { nodeId: input.nodeId });
+        if (input.runId) {
+          const run = this.requireRunRow(input.runId);
+          if (run.project_id !== input.projectId || run.version_id !== input.versionId) {
+            throw new AuthoringError("NOT_FOUND", "Generation run not found", { runId: input.runId });
+          }
+        }
+
+        const id = randomUUID();
+        const timestamp = nowIso();
+        this.db
+          .prepare(
+            `
+              INSERT INTO generation_candidates (
+                id, project_id, version_id, run_id, step_id, node_id, base_content_revision,
+                status, candidate_body, model, raw_response, created_at, applied_at, rejected_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, NULL, NULL)
+            `,
+          )
+          .run(
+            id,
+            input.projectId,
+            input.versionId,
+            input.runId ?? null,
+            input.stepId ?? null,
+            input.nodeId,
+            input.baseContentRevision,
+            input.candidateBody,
+            input.model ?? null,
+            input.rawResponse ?? null,
+            timestamp,
+          );
+        return this.requireCandidate(input.projectId, id);
+      });
+      return create();
+    } catch (error) {
+      throw storageError(error, "Failed to create generation candidate");
+    }
+  }
+
+  public async applyCandidate(projectId: string, candidateId: string, expectedRevision: number): Promise<{ candidate: GenerationCandidate; node: StoryNode }> {
+    try {
+      const apply = this.db.transaction(() => {
+        const candidate = this.requireCandidate(projectId, candidateId);
+        if (candidate.status !== "pending") {
+          throw new AuthoringError("VALIDATION", "Only pending candidates can be applied", { candidateId, status: candidate.status });
+        }
+        const node = this.db
+          .prepare("SELECT * FROM story_nodes WHERE version_id = ? AND id = ?")
+          .get(candidate.versionId, candidate.nodeId) as GenerationNodeRow | undefined;
+        if (!node) throw new AuthoringError("NOT_FOUND", "Candidate node not found", { nodeId: candidate.nodeId });
+        if (node.content_revision !== expectedRevision || candidate.baseContentRevision !== expectedRevision) {
+          throw new AuthoringError("CONFLICT", "Candidate base revision is stale", {
+            candidateId,
+            expectedRevision,
+            actualRevision: node.content_revision,
+            baseContentRevision: candidate.baseContentRevision,
+          });
+        }
+
+        const timestamp = nowIso();
+        this.db
+          .prepare(
+            `
+              UPDATE story_nodes
+              SET body = ?, content_status = 'author_edited', author_modified = 1,
+                  content_revision = content_revision + 1, updated_at = ?
+              WHERE version_id = ? AND id = ? AND content_revision = ?
+            `,
+          )
+          .run(candidate.candidateBody, timestamp, candidate.versionId, candidate.nodeId, expectedRevision);
+        this.db
+          .prepare("UPDATE generation_candidates SET status = 'applied', applied_at = ? WHERE id = ? AND status = 'pending'")
+          .run(timestamp, candidateId);
+        this.db.prepare("UPDATE story_versions SET draft_revision = draft_revision + 1 WHERE id = ?").run(candidate.versionId);
+        this.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run(timestamp, projectId);
+
+        const updatedNode = this.db
+          .prepare("SELECT * FROM story_nodes WHERE version_id = ? AND id = ?")
+          .get(candidate.versionId, candidate.nodeId) as GenerationNodeRow;
+        return { candidate: this.requireCandidate(projectId, candidateId), node: toCandidateNode(updatedNode) };
+      });
+      return apply();
+    } catch (error) {
+      throw storageError(error, "Failed to apply generation candidate");
+    }
+  }
+
+  public async rejectCandidate(projectId: string, candidateId: string): Promise<GenerationCandidate> {
+    try {
+      const reject = this.db.transaction(() => {
+        const candidate = this.requireCandidate(projectId, candidateId);
+        if (candidate.status === "pending") {
+          this.db
+            .prepare("UPDATE generation_candidates SET status = 'rejected', rejected_at = ? WHERE id = ? AND status = 'pending'")
+            .run(nowIso(), candidateId);
+        }
+        return this.requireCandidate(projectId, candidateId);
+      });
+      return reject();
+    } catch (error) {
+      throw storageError(error, "Failed to reject generation candidate");
     }
   }
 
@@ -966,6 +1183,14 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
 
   private requireRun(runId: string): GenerationRun {
     return toRun(this.requireRunRow(runId));
+  }
+
+  private requireCandidate(projectId: string, candidateId: string): GenerationCandidate {
+    const row = this.db
+      .prepare("SELECT * FROM generation_candidates WHERE project_id = ? AND id = ?")
+      .get(projectId, candidateId) as GenerationCandidateRow | undefined;
+    if (!row) throw new AuthoringError("NOT_FOUND", "Generation candidate not found", { projectId, candidateId });
+    return toCandidate(row);
   }
 
   private requireRunRow(runId: string): GenerationRunRow {

@@ -5,6 +5,8 @@ import {
   ProjectSchema,
   ProjectSizeSchema,
   StoryGraphSchema,
+  StoryNodePatchSchema,
+  StoryNodeSchema,
   ValidationIssueSchema,
 } from "./schemas";
 
@@ -42,6 +44,21 @@ export const GraphWriteInputSchema = z
   .object({
     graph: StoryGraphSchema,
     expectedRevision: z.number().int().min(0),
+  })
+  .strict();
+
+export const NodePatchInputSchema = z
+  .object({
+    nodeId: z.string().min(1),
+    patch: StoryNodePatchSchema,
+    expectedRevision: z.number().int().min(0),
+  })
+  .strict();
+
+export const NodePatchResponseSchema = z
+  .object({
+    node: StoryNodeSchema,
+    draftRevision: z.number().int().min(0),
   })
   .strict();
 
@@ -197,3 +214,4 @@ function statusForAuthoringCode(code: AuthoringError["code"]): number {
 export type CreateProjectInputPayload = z.infer<typeof CreateProjectInputSchema>;
 export type PatchProjectInputPayload = z.infer<typeof PatchProjectInputSchema>;
 export type GraphWriteInputPayload = z.infer<typeof GraphWriteInputSchema>;
+export type NodePatchInputPayload = z.infer<typeof NodePatchInputSchema>;

@@ -5,6 +5,7 @@ import { initializeAuthoringDatabase } from "./database";
 import type { AuthoringDatabaseOptions } from "./database";
 import { sealSnapshotInDatabase } from "./snapshots";
 import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "./graph";
+import { findAffectedNodes } from "./impact";
 import type {
   Chapter,
   JsonValue,
@@ -13,6 +14,7 @@ import type {
   StoryEdge,
   StoryGraph,
   StoryNode,
+  StoryNodePatch,
   StoryVersion,
 } from "./schemas";
 
@@ -55,6 +57,7 @@ export interface AuthoringRepository {
   updateProject(projectId: string, input: UpdateProjectInput): Promise<Project>;
   getProjectGraph(projectId: string, versionId?: string): Promise<StoryGraph>;
   replaceDraftGraph(projectId: string, graph: StoryGraph, expectedRevision: number): Promise<StoryGraph>;
+  patchDraftNode(projectId: string, nodeId: string, patch: StoryNodePatch, expectedRevision: number): Promise<{ node: StoryNode; draftRevision: number }>;
   createSnapshot(projectId: string): Promise<StoryVersion>;
   restoreSnapshot(projectId: string, snapshotId: string): Promise<StoryVersion>;
   duplicateProject(projectId: string): Promise<Project>;
@@ -464,6 +467,93 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
       return replace();
     } catch (error) {
       throw storageError(error, "Failed to replace authoring draft graph");
+    }
+  }
+
+  public async patchDraftNode(
+    projectId: string,
+    nodeId: string,
+    patch: StoryNodePatch,
+    expectedRevision: number,
+  ): Promise<{ node: StoryNode; draftRevision: number }> {
+    try {
+      const update = this.db.transaction(() => {
+        const project = this.requireProject(projectId);
+        if (!project.activeDraftVersionId) {
+          throw new AuthoringError("NOT_FOUND", "Project has no active draft version", { projectId });
+        }
+
+        const draft = this.requireVersion(projectId, project.activeDraftVersionId);
+        const current = this.db
+          .prepare("SELECT * FROM story_nodes WHERE id = ? AND version_id = ?")
+          .get(nodeId, draft.id) as StoryNodeRow | undefined;
+        if (!current) {
+          throw new AuthoringError("NOT_FOUND", "Draft node not found", { projectId, nodeId });
+        }
+        if (current.content_revision !== expectedRevision) {
+          throw new AuthoringError("CONFLICT", "Node revision is stale", {
+            expectedRevision,
+            actualRevision: current.content_revision,
+            nodeId,
+          });
+        }
+
+        const updatedAt = nowIso();
+        const currentGraph = patch.summary !== undefined || patch.objective !== undefined
+          ? this.readProjectGraph(projectId, draft.id)
+          : null;
+        this.db
+          .prepare(
+            `
+              UPDATE story_nodes
+              SET title = ?, body = ?, summary = ?, objective = ?,
+                  content_status = 'author_edited', author_modified = 1,
+                  content_revision = content_revision + 1, updated_at = ?
+              WHERE id = ? AND version_id = ? AND content_revision = ?
+            `,
+          )
+          .run(
+            patch.title ?? current.title,
+            patch.body ?? current.body,
+            patch.summary ?? current.summary,
+            patch.objective ?? current.objective,
+            updatedAt,
+            nodeId,
+            draft.id,
+            expectedRevision,
+          );
+
+        if (currentGraph) {
+          const affectedNodeIds = findAffectedNodes(currentGraph, nodeId);
+          if (affectedNodeIds.length > 0) {
+            const placeholders = affectedNodeIds.map(() => "?").join(", ");
+            this.db
+              .prepare(
+                `UPDATE story_nodes
+                 SET content_status = 'review_required', updated_at = ?
+                 WHERE version_id = ? AND id IN (${placeholders}) AND content_status <> 'author_edited'`,
+              )
+              .run(updatedAt, draft.id, ...affectedNodeIds);
+          }
+        }
+
+        this.db
+          .prepare("UPDATE story_versions SET draft_revision = draft_revision + 1 WHERE id = ?")
+          .run(draft.id);
+        this.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run(updatedAt, projectId);
+
+        const updated = this.db
+          .prepare("SELECT * FROM story_nodes WHERE id = ? AND version_id = ?")
+          .get(nodeId, draft.id) as StoryNodeRow;
+        return {
+          node: toStoryNode(updated),
+          draftRevision: draft.draft_revision + 1,
+        };
+      });
+
+      return update();
+    } catch (error) {
+      throw storageError(error, "Failed to patch authoring node");
     }
   }
 

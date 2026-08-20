@@ -80,6 +80,16 @@ export const StoryNodeSchema = z
   })
   .strict();
 
+export const StoryNodePatchSchema = z
+  .object({
+    title: z.string().trim().min(1).optional(),
+    body: z.string().trim().min(1).optional(),
+    summary: z.string().trim().min(1).optional(),
+    objective: z.string().trim().min(1).optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one node field is required." });
+
 export const StoryEdgeSchema = z
   .object({
     id: z.string().min(1),
@@ -145,6 +155,7 @@ export type ProjectSize = z.infer<typeof ProjectSizeSchema>;
 export type StoryVersion = z.infer<typeof StoryVersionSchema>;
 export type Chapter = z.infer<typeof ChapterSchema>;
 export type StoryNode = z.infer<typeof StoryNodeSchema>;
+export type StoryNodePatch = z.infer<typeof StoryNodePatchSchema>;
 export type StoryEdge = z.infer<typeof StoryEdgeSchema>;
 export type StoryGraph = z.infer<typeof StoryGraphSchema>;
 export type Project = z.infer<typeof ProjectSchema>;

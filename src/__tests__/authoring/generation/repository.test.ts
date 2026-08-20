@@ -393,4 +393,47 @@ describe("authoring generation repository", () => {
       db.close();
     }
   });
+
+  it("keeps candidate application behind the node revision guard", async () => {
+    const project = await createProject();
+    const runs = createRunsRepo();
+    const db = new Database(dbPath);
+    const chapterId = "candidate-apply-chapter";
+    const nodeId = "candidate-apply-node";
+
+    try {
+      db.prepare(
+        `INSERT INTO chapters (id, version_id, ordinal, title, goal, summary, created_at, updated_at)
+         VALUES (?, ?, 0, 'Chapter', 'Goal', 'Summary', ?, ?)`,
+      ).run(chapterId, project.activeDraftVersionId, date(0).toISOString(), date(0).toISOString());
+      db.prepare(
+        `INSERT INTO story_nodes (
+          id, version_id, chapter_id, node_key, kind, title, body, summary, objective,
+          topological_rank, content_status, author_modified, content_revision, created_at, updated_at
+        ) VALUES (?, ?, ?, 'candidate-apply', 'scene', 'Title', 'Original', 'Summary', 'Objective', 0, 'generated', 0, 0, ?, ?)`,
+      ).run(nodeId, project.activeDraftVersionId, chapterId, date(0).toISOString(), date(0).toISOString());
+
+      const candidate = await runs.createCandidate({
+        projectId: project.id,
+        versionId: project.activeDraftVersionId!,
+        nodeId,
+        baseContentRevision: 0,
+        candidateBody: "Candidate body",
+        model: "fake",
+      });
+      const applied = await runs.applyCandidate(project.id, candidate.id, 0);
+      expect(applied.node).toMatchObject({ body: "Candidate body", contentRevision: 1, authorModified: true });
+
+      const stale = await runs.createCandidate({
+        projectId: project.id,
+        versionId: project.activeDraftVersionId!,
+        nodeId,
+        baseContentRevision: 0,
+        candidateBody: "Stale candidate",
+      });
+      await expect(runs.applyCandidate(project.id, stale.id, 0)).rejects.toMatchObject({ code: "CONFLICT" });
+    } finally {
+      db.close();
+    }
+  });
 });

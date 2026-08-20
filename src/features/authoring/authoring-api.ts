@@ -1,11 +1,13 @@
-import { CreateProjectResponseSchema } from "@/lib/authoring/api-contracts";
+import { CreateProjectResponseSchema, NodePatchResponseSchema } from "@/lib/authoring/api-contracts";
 import type { CreateProjectInputPayload } from "@/lib/authoring/api-contracts";
-import type { Project } from "@/lib/authoring/schemas";
+import type { Project, StoryNodePatch } from "@/lib/authoring/schemas";
 import {
   GenerationListResponseSchema,
   GenerationNextResponseSchema,
   GenerationResponseSchema,
   GenerationStatusResponseSchema,
+  CandidateApplyResponseSchema,
+  CandidateResponseSchema,
 } from "@/lib/authoring/generation/api-contracts";
 import type { GenerationStatusResponse } from "@/lib/authoring/generation/api-contracts";
 import type { GenerationRun } from "@/lib/authoring/generation/schemas";
@@ -71,4 +73,36 @@ export async function generationAction(
     body: JSON.stringify({ action }),
   });
   return parseJson(response, (value) => GenerationResponseSchema.parse(value).run);
+}
+
+export async function patchNode(projectId: string, nodeId: string, patch: StoryNodePatch, expectedRevision: number) {
+  const response = await fetch(`/api/projects/${projectId}/graph`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ nodeId, patch, expectedRevision }),
+  });
+  return parseJson(response, (value) => NodePatchResponseSchema.parse(value));
+}
+
+export async function regenerateNode(projectId: string, nodeId: string, expectedRevision: number) {
+  const response = await fetch(`/api/projects/${projectId}/nodes/${nodeId}/regenerate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ expectedRevision }),
+  });
+  return parseJson(response, (value) => CandidateResponseSchema.parse(value).candidate);
+}
+
+export async function applyCandidate(projectId: string, candidateId: string, expectedRevision: number) {
+  const response = await fetch(`/api/projects/${projectId}/candidates/${candidateId}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ expectedRevision }),
+  });
+  return parseJson(response, (value) => CandidateApplyResponseSchema.parse(value));
+}
+
+export async function rejectCandidate(projectId: string, candidateId: string) {
+  const response = await fetch(`/api/projects/${projectId}/candidates/${candidateId}`, { method: "DELETE" });
+  return parseJson(response, (value) => CandidateResponseSchema.parse(value).candidate);
 }
