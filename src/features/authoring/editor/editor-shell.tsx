@@ -8,6 +8,8 @@ import { NodeEditor } from "./node-editor";
 import { NodeInspector } from "./node-inspector";
 import { OutlineTree } from "./outline-tree";
 import { ChoiceEditor } from "./choice-editor";
+import { IssuePanel } from "./issue-panel";
+import { ReleaseChecklist } from "./release-checklist";
 
 type EditorShellProps = {
   project: Project;
@@ -20,6 +22,7 @@ export function EditorShell({ project, graph, issues, draftRevision: initialDraf
   const initial = initialEditorState(graph);
   const [draftGraph, setDraftGraph] = useState(graph);
   const [draftRevision, setDraftRevision] = useState(initialDraftRevision);
+  const [qualityRefreshToken, setQualityRefreshToken] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState(initial.selectedNodeId);
   const [collapsedChapterIds, setCollapsedChapterIds] = useState(initial.collapsedChapterIds);
   const selectedNode = draftGraph.nodes.find((node) => node.id === selectedNodeId) ?? null;
@@ -49,7 +52,7 @@ export function EditorShell({ project, graph, issues, draftRevision: initialDraf
         </aside>
         <section className="editor-main-panel" aria-label="节点编辑区域">
           {selectedNode ? (
-            <NodeCanvas projectId={project.id} node={selectedNode} graph={draftGraph} draftRevision={draftRevision} onSaved={(updatedNode, nextRevision) => { setDraftRevision(nextRevision); setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); }} onEdgeSaved={(updatedEdge, nextRevision) => { setDraftRevision(nextRevision); setDraftGraph((current) => ({ ...current, edges: current.edges.map((edge) => edge.id === updatedEdge.id ? updatedEdge : edge) })); }} />
+            <NodeCanvas projectId={project.id} node={selectedNode} graph={draftGraph} draftRevision={draftRevision} onSaved={(updatedNode, nextRevision) => { setDraftRevision(nextRevision); setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); setQualityRefreshToken((current) => current + 1); }} onEdgeSaved={(updatedEdge, nextRevision) => { setDraftRevision(nextRevision); setDraftGraph((current) => ({ ...current, edges: current.edges.map((edge) => edge.id === updatedEdge.id ? updatedEdge : edge) })); setQualityRefreshToken((current) => current + 1); }} />
           ) : (
             <div className="editor-empty-node">从左侧大纲选择一个节点开始。</div>
           )}
@@ -61,7 +64,9 @@ export function EditorShell({ project, graph, issues, draftRevision: initialDraf
           <div className="inspector-stat"><span>结局数量</span><strong>{draftGraph.nodes.filter((node) => node.kind === "ending").length} / {project.targetEndingCount}</strong></div>
           <div className={`inspector-issue ${blockingIssues.length > 0 ? "inspector-issue-warning" : ""}`}><strong>{blockingIssues.length}</strong><span>个阻断问题</span></div>
           <div className="inspector-divider" />
-          {selectedNode ? <NodeInspector key={selectedNode.id} projectId={project.id} node={selectedNode} onApplied={(updatedNode) => setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) }))} /> : <p className="inspector-muted">尚未选择节点。</p>}
+          <ReleaseChecklist projectId={project.id} refreshToken={qualityRefreshToken} />
+          <IssuePanel projectId={project.id} onSelectNode={setSelectedNodeId} refreshToken={qualityRefreshToken} />
+          {selectedNode ? <NodeInspector key={selectedNode.id} projectId={project.id} node={selectedNode} onApplied={(updatedNode) => { setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); setQualityRefreshToken((current) => current + 1); }} /> : <p className="inspector-muted">尚未选择节点。</p>}
         </aside>
       </div>
     </main>
