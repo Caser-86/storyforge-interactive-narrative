@@ -229,7 +229,7 @@ function renderShell(storyJson: string): string {
         const stored = localStorage.getItem(story.storageKey);
         if (stored) {
           const parsed = JSON.parse(stored);
-          const restored = replayEdgePath(parsed);
+          const restored = replayEdgePath(parsed.edgePath);
           if (restored && statesMatch(restored, parsed)) {
             return restored;
           }

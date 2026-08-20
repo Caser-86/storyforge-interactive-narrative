@@ -154,8 +154,29 @@ test.describe("authoring manual closed loop", () => {
       await offlinePage.reload();
       await expect(offlinePage.getByRole("heading", { name: "Courtyard Gate" })).toBeVisible();
 
-      await offlinePage.getByRole("button", { name: "Enter the archive" }).click();
+      await offlinePage.evaluate(
+        ({ projectId, versionNumber, sceneEdgeId, sceneNodeId }) => {
+          localStorage.setItem(
+            `storyforge:${projectId}:${versionNumber}`,
+            JSON.stringify({
+              currentNodeId: sceneNodeId,
+              nodePath: [sceneNodeId],
+              edgePath: [sceneEdgeId],
+              isEnding: false,
+            }),
+          );
+        },
+        {
+          projectId: project.id,
+          versionNumber: snapshot.versionNumber,
+          sceneEdgeId: previewSceneEdge.id,
+          sceneNodeId: previewScene.id,
+        },
+      );
+      await offlinePage.reload();
       await expect(offlinePage.getByRole("heading", { name: "Lantern Archive" })).toBeVisible();
+      await expect(offlinePage.getByRole("button", { name: "Back" })).toBeEnabled();
+
       await expect(offlinePage.getByText(editedBody)).toBeVisible();
 
       await offlinePage.getByRole("button", { name: "Back" }).click();
