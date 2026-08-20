@@ -2,6 +2,8 @@ import { errorResponse } from "@/lib/authoring/api-contracts";
 import { AuthoringError } from "@/lib/authoring/errors";
 import { renderStandaloneHtml } from "@/lib/authoring/export-html";
 import { readPreview } from "@/lib/authoring/snapshots";
+import { createAuthoringRepository } from "@/lib/authoring/repository";
+import { assertReleaseReady } from "@/lib/authoring/release-gate";
 
 type ProjectRouteContext = {
   params: Promise<{ projectId: string }>;
@@ -29,6 +31,14 @@ export async function GET(request: Request, { params }: ProjectRouteContext): Pr
   try {
     const { projectId } = await params;
     const snapshotId = parseSnapshotId(request);
+    const authoringRepository = createAuthoringRepository();
+    let expectedRevision: number;
+    try {
+      expectedRevision = await authoringRepository.getDraftRevision(projectId);
+    } finally {
+      authoringRepository.close();
+    }
+    await assertReleaseReady(projectId, expectedRevision);
     const preview = await readPreview(projectId, snapshotId);
     const html = renderStandaloneHtml({
       snapshot: preview.snapshot,

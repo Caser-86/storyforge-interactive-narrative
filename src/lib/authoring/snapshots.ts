@@ -174,6 +174,10 @@ function storageError(error: unknown, message: string): AuthoringError {
     return error;
   }
 
+  if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
+    return error as AuthoringError;
+  }
+
   return new AuthoringError("STORAGE", message, {
     cause: error instanceof Error ? error.message : String(error),
   });
@@ -557,6 +561,14 @@ export async function sealSnapshot(projectId: string): Promise<StoryVersion> {
   const db = initializeAuthoringDatabase();
 
   try {
+    const draft = db
+      .prepare("SELECT draft_revision FROM story_versions WHERE id = (SELECT active_draft_version_id FROM projects WHERE id = ?)")
+      .get(projectId) as { draft_revision: number } | undefined;
+    if (!draft) {
+      throw new AuthoringError("NOT_FOUND", "Active draft version not found", { projectId });
+    }
+    const { assertReleaseReady } = await import("./release-gate");
+    await assertReleaseReady(projectId, draft.draft_revision);
     return sealSnapshotInDatabase(db, projectId);
   } catch (error) {
     throw storageError(error, "Failed to seal authoring snapshot");

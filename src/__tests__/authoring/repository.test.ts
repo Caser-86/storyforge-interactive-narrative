@@ -261,7 +261,7 @@ describe("authoring repository", () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('projects', 'story_versions')")
         .all();
 
-    expect(migrations).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+      expect(migrations).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }]);
       expect(projectTables).toEqual([{ name: "projects" }, { name: "story_versions" }]);
     } finally {
       db.close();

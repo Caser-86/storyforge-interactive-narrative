@@ -255,8 +255,10 @@ function toStoryEdge(row: StoryEdgeRow): StoryEdge {
 
 export class BetterSqliteAuthoringRepository implements AuthoringRepository {
   private readonly db: Database.Database;
+  private readonly databaseOptions: AuthoringDatabaseOptions;
 
   constructor(options: AuthoringDatabaseOptions = {}) {
+    this.databaseOptions = options;
     this.db = initializeAuthoringDatabase(options);
   }
 
@@ -622,6 +624,9 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
 
   public async createSnapshot(projectId: string): Promise<StoryVersion> {
     try {
+      const expectedRevision = await this.getDraftRevision(projectId);
+      const { assertReleaseReady } = await import("./release-gate");
+      await assertReleaseReady(projectId, expectedRevision, { databaseOptions: this.databaseOptions });
       return sealSnapshotInDatabase(this.db, projectId);
     } catch (error) {
       throw storageError(error, "Failed to create authoring snapshot");

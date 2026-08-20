@@ -184,7 +184,7 @@ describe("authoring snapshots", () => {
     const invalidGraph = graphForVersion(project.activeDraftVersionId!, graphWithoutEnding());
     await createRepo().replaceDraftGraph(project.id, invalidGraph, 1);
 
-    await expect(sealSnapshot(project.id)).rejects.toMatchObject({ code: "BLOCKING_ISSUES" });
+    await expect(sealSnapshot(project.id)).rejects.toMatchObject({ code: "CONFLICT" });
 
     const routes = await importRoutes();
     const list = await routes.snapshots.GET(
