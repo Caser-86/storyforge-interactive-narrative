@@ -306,6 +306,10 @@ describe("authoring project API routes", () => {
 
   it("rejects graph writes to snapshot versions", async () => {
     const project = await createProject();
+    const graph = graphForVersion(project.activeDraftVersionId!);
+    const writeDraft = await putGraph(project.id, graph, 0);
+    expect(writeDraft.status).toBe(200);
+
     const snapshot = await createSnapshot(project.id);
     const response = await putGraph(project.id, { versionId: snapshot.id, chapters: [], nodes: [], edges: [] }, 0);
 

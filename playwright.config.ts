@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import path from "path";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -8,6 +9,7 @@ export default defineConfig({
   retries: 0,
   use: {
     baseURL: "http://localhost:3105",
+    channel: "chrome",
     headless: true,
   },
   webServer: {
@@ -19,6 +21,7 @@ export default defineConfig({
       DISABLE_REDIS: "true",
       IMAGE_PROVIDER: "mock",
       OPENAI_API_KEY: "sk-test-mock",
+      SQLITE_DB_PATH: path.join(process.cwd(), "output", "playwright", "authoring-e2e.sqlite"),
       USE_MEMORY_DB: "true",
     },
   },

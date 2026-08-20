@@ -84,3 +84,58 @@ The final gate then ran with Redis, image generation, and LLM calls disabled or 
 - The default npm registry remains slow for the large Next/SWC/sharp tarballs on this host; use the mirror command above when reproducing the clean install locally.
 - The one remaining lint warning is the existing `window.location.href` warning in `src/components/error-boundary.tsx`; it is non-fatal and does not block the gate.
 - Remote GitHub Actions remain unexecuted.
+
+# StoryForge Phase 1 Task 6 Verification Record
+
+- Date: 2026-08-21
+- Scope: sealed reader-safe snapshot export to standalone HTML plus manual closed-loop E2E.
+- Legacy flow status: untouched by Task 6; no legacy UI routes or game endpoints were modified.
+- Offline file status: passed; the exported HTML was saved to a temporary file and opened through `file://` in a separate browser context with non-file requests blocked.
+- Browser note: the bundled Playwright Chromium executable was missing on this host. The initial E2E attempt exited `1` before the test body; `playwright.config.ts` now uses the installed Chrome channel.
+
+## Task 6 Commands And Evidence
+
+Initial TDD red run:
+
+```powershell
+npm test -- src/__tests__/authoring/export-html.test.ts
+```
+
+Observed before implementation: exit code `1`; Vitest could not import `@/lib/authoring/export-html`, the expected missing-module failure.
+
+Focused exporter and route tests:
+
+```powershell
+npm test -- src/__tests__/authoring/export-html.test.ts
+```
+
+Observed final result: exit code `0`; `1` test file and `10` tests passed.
+
+Phase 1 authoring suite:
+
+```powershell
+npm test -- src/__tests__/authoring
+```
+
+Observed final result: exit code `0`; `7` test files and `73` tests passed.
+
+Named manual closed-loop E2E:
+
+```powershell
+npm run test:e2e -- e2e/authoring-manual-flow.spec.ts
+```
+
+Observed final result: exit code `0`; `1` test passed. The E2E created a project, replaced and edited the draft graph, sealed a snapshot, previewed it, downloaded the HTML, loaded it offline from `file://`, exercised back/restart/choice transitions, and reached an ending without network requests.
+
+Typecheck:
+
+```powershell
+npm run typecheck
+```
+
+Observed final result: exit code `0`; `tsc --noEmit` completed successfully.
+
+## Task 6 Residual Concerns
+
+- The earlier failed Playwright run generated `test-results/.last-run.json`; it was removed and is not part of the commit.
+- The local Playwright browser download from `npx playwright install chromium` was slow/stalled on this host, so E2E now depends on an installed Chrome channel.
