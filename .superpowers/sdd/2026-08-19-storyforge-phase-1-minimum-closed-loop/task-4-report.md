@@ -2,7 +2,7 @@
 
 Status: Implemented project and graph authoring API routes with validated request/response contracts.
 
-Commit hash: Pending commit.
+Commit hash: `a6d235f`.
 
 Focused test/typecheck results:
 
