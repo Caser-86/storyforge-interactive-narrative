@@ -75,6 +75,7 @@ export interface GenerationRepository {
   getRun(runId: string): Promise<GenerationRun>;
   listRuns(projectId: string): Promise<GenerationRun[]>;
   listActiveRuns(): Promise<GenerationRun[]>;
+  listSteps(runId: string): Promise<GenerationStep[]>;
   getStep(stepId: string): Promise<GenerationStep>;
   leaseNextSteps(runId: string, now: Date, limit: number): Promise<GenerationStep[]>;
   recoverExpiredSteps(runId: string, now: Date): Promise<number>;
@@ -384,6 +385,19 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
       return rows.map(toRun);
     } catch (error) {
       throw storageError(error, "Failed to list active generation runs");
+    }
+  }
+
+  public async listSteps(runId: string): Promise<GenerationStep[]> {
+    try {
+      this.requireRun(runId);
+      const rows = this.db
+        .prepare("SELECT * FROM generation_steps WHERE run_id = ? ORDER BY sort_order ASC, created_at ASC, id ASC")
+        .all(runId) as GenerationStepRow[];
+
+      return rows.map(toStep);
+    } catch (error) {
+      throw storageError(error, "Failed to list generation steps");
     }
   }
 

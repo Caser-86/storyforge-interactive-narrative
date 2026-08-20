@@ -20,14 +20,22 @@
 - Task 3: complete. Brief, bible, outline, and graph stages now use structured prompts, stable IDs, project budgets, and bounded next-step descriptors.
 - Task 4: complete. Structural precheck, bounded node context/batching, node output validation, and warning-only continuity review are implemented.
 - Task 5: complete. The bounded executor now leases at most two steps, persists completions/failures, applies capped transient backoff, pauses auth failures, and recovers expired leases.
-- Task 6: in progress.
-- Task 7: pending.
+- Task 6: complete. Private local generation controls, safe run/step summaries, pause/resume/cancel, bounded lease endpoint, and persisted run metrics are implemented.
+- Task 7: in progress.
 
 ## Task 1 verification
 
 - `npm test -- src/__tests__/authoring/generation/repository.test.ts`: 12 tests passed.
 - `npm test -- src/__tests__/authoring`: 8 files, 87 tests passed.
 - `npm run typecheck`: passed.
+
+## Task 6 verification
+
+- `npm test -- src/__tests__/authoring/generation/api.test.ts`: 4 tests passed.
+- `npm test -- src/__tests__/authoring`: 13 files, 115 tests passed.
+- `npm run typecheck`: passed.
+- API payloads omit `requestJson`, `rawResponse`, and `parsedResponseJson` from step summaries.
+- The `/next` control endpoint leases at most two steps; provider execution wiring is the remaining Task 7 integration boundary.
 - `npm run db:authoring:smoke`: passed.
 
 ## Task 5 verification
