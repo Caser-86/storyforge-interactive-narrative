@@ -239,4 +239,107 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
       DEFAULT '{"minNodes":8,"minEndings":2,"maxNodes":80,"maxEndings":10}';
     `,
   },
+  {
+    version: 4,
+    name: "generation_runs_persistence",
+    up: `
+      CREATE TABLE IF NOT EXISTS generation_runs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        version_id TEXT NOT NULL,
+        stage TEXT NOT NULL CHECK (stage IN ('brief', 'bible', 'outline', 'graph', 'structural_check', 'nodes', 'continuity_review', 'ready')),
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'paused', 'failed', 'completed', 'canceled')),
+        progress_current INTEGER NOT NULL DEFAULT 0,
+        progress_total INTEGER NOT NULL DEFAULT 0,
+        model TEXT,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        last_error_code TEXT CHECK (
+          last_error_code IS NULL OR last_error_code IN (
+            'AUTH', 'RATE_LIMIT', 'TIMEOUT', 'NETWORK', 'EMPTY', 'SCHEMA',
+            'VALIDATION', 'STORAGE', 'LEASE_EXPIRED', 'CANCELED', 'UNKNOWN'
+          )
+        ),
+        last_error_message TEXT,
+        lease_expires_at TEXT,
+        started_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id, version_id) REFERENCES story_versions(project_id, id) ON DELETE CASCADE,
+        UNIQUE (project_id, version_id, id)
+      );
+
+      CREATE TABLE IF NOT EXISTS generation_steps (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        step_key TEXT NOT NULL,
+        stage TEXT NOT NULL CHECK (stage IN ('brief', 'bible', 'outline', 'graph', 'structural_check', 'nodes', 'continuity_review')),
+        subject_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed', 'canceled')),
+        attempt INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL,
+        lease_expires_at TEXT,
+        next_attempt_at TEXT,
+        model TEXT,
+        request_json TEXT NOT NULL DEFAULT '{}',
+        raw_response TEXT,
+        parsed_response_json TEXT,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        error_code TEXT CHECK (
+          error_code IS NULL OR error_code IN (
+            'AUTH', 'RATE_LIMIT', 'TIMEOUT', 'NETWORK', 'EMPTY', 'SCHEMA',
+            'VALIDATION', 'STORAGE', 'LEASE_EXPIRED', 'CANCELED', 'UNKNOWN'
+          )
+        ),
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        FOREIGN KEY (run_id) REFERENCES generation_runs(id) ON DELETE CASCADE,
+        UNIQUE (run_id, step_key),
+        UNIQUE (run_id, id)
+      );
+
+      CREATE TABLE IF NOT EXISTS generation_candidates (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        version_id TEXT NOT NULL,
+        run_id TEXT,
+        step_id TEXT,
+        node_id TEXT NOT NULL,
+        base_content_revision INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'applied', 'rejected')),
+        candidate_body TEXT NOT NULL,
+        model TEXT,
+        raw_response TEXT,
+        created_at TEXT NOT NULL,
+        applied_at TEXT,
+        rejected_at TEXT,
+        CHECK (step_id IS NULL OR run_id IS NOT NULL),
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id, version_id) REFERENCES story_versions(project_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (run_id) REFERENCES generation_runs(id) ON DELETE SET NULL,
+        FOREIGN KEY (step_id) REFERENCES generation_steps(id) ON DELETE SET NULL,
+        FOREIGN KEY (project_id, version_id, run_id) REFERENCES generation_runs(project_id, version_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (run_id, step_id) REFERENCES generation_steps(run_id, id) ON DELETE SET NULL,
+        FOREIGN KEY (version_id, node_id) REFERENCES story_nodes(version_id, id) ON DELETE CASCADE
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_generation_runs_one_active_project
+        ON generation_runs(project_id)
+        WHERE status IN ('queued', 'running', 'paused');
+
+      CREATE INDEX IF NOT EXISTS idx_generation_runs_project ON generation_runs(project_id);
+      CREATE INDEX IF NOT EXISTS idx_generation_runs_version ON generation_runs(version_id);
+      CREATE INDEX IF NOT EXISTS idx_generation_steps_run_status
+        ON generation_steps(run_id, status, next_attempt_at, lease_expires_at, sort_order);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_generation_steps_run_step_key
+        ON generation_steps(run_id, step_key);
+      CREATE INDEX IF NOT EXISTS idx_generation_candidates_node ON generation_candidates(version_id, node_id);
+    `,
+  },
 ];
