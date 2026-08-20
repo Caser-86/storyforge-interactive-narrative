@@ -467,7 +467,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
   public async restoreSnapshot(projectId: string, snapshotId: string): Promise<StoryVersion> {
     try {
       const restore = this.db.transaction(() => {
-        const project = this.requireProject(projectId);
+        this.requireProject(projectId);
         const snapshot = this.requireVersion(projectId, snapshotId);
         if (snapshot.kind !== "snapshot") {
           throw new AuthoringError("IMMUTABLE_VERSION", "Only snapshot versions can be restored", {
