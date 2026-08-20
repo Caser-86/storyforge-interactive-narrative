@@ -212,3 +212,27 @@ Commands and observed results:
 - `npm run test:e2e -- e2e/authoring-editor-flow.spec.ts`: exit code `0`; `1` test passed in `20.6s`. The main worktree already had a user-owned `next dev` process, so the same commit was checked out into a temporary isolated worktree with a junction to the existing `node_modules`; the test created a project, edited a choice, verified stale candidate rejection, sealed a snapshot, and reached an ending in the browser. The user-owned process was not stopped.
 
 Phase 3 implementation evidence includes component tests for project library, brief form, generation progress, outline tree, autosave, node editing, impact analysis, candidate persistence, and preview choice-to-ending behavior. The Phase 3 gate is green; the existing `error-boundary.tsx` navigation warning and unexecuted remote CI remain known non-blocking residual risks.
+
+## Phase 4 Quality Loop Verification
+
+- Date: 2026-08-21
+- Scope: persisted validation runs/issues, deterministic quality rules, non-destructive AI continuity review, revision-bound release gate, issue UI, release checklist, and node/edge path coverage.
+- Commits: `96162e2`, `dc65549`, `01a9cc0`, `162bc86`, `d0245d1`, `faa0939`.
+- AI evidence: tests use the deterministic fake provider; no real DeepSeek request was made during automated verification. AI findings are constrained to warning severity and provider edit fields are rejected by schema.
+
+Commands and observed results:
+
+- `npm test`: exit code `0`; `60` test files and `401` tests passed.
+- `npm run typecheck`: exit code `0`; `tsc --noEmit` completed successfully.
+- `npm run lint`: exit code `0`; no errors, with the one pre-existing `src/components/error-boundary.tsx` navigation warning.
+- `npm run build`: exit code `0`; Next `16.3.1` production build completed and includes `/api/projects/[projectId]/validate`, `/api/projects/[projectId]/validation/[issueId]`, snapshot/export routes, and authoring pages.
+- `npm run test:e2e -- e2e/authoring-quality-flow.spec.ts`: exit code `0`; `1` test passed in `29.1s`. The browser flow creates cycle/dead-end blocking issues, dismisses a selected warning with confirmation, detects stale draft revision, revalidates, seals a snapshot, and reaches an ending.
+- `npx playwright install chromium`: exit code `0`; managed Chromium and headless shell installed under the local Playwright cache. E2E uses `NEXT_DIST_DIR=.next-playwright` so the isolated server does not contend with the user-owned port 3000 dev server.
+
+The release gate is now the sole authorization path for snapshot/export actions. If no validation exists, it bootstraps structural/rule validation; after a validation exists, any changed draft revision returns `CONFLICT` until revalidated. Blocking issues cannot be dismissed, warning evidence is preserved, and path coverage reports uncovered node/edge IDs after capped enumeration.
+
+## Phase 4 Residual Risks
+
+- Remote GitHub Actions were not executed from this environment.
+- The real DeepSeek network path was not exercised in automated tests; provider wiring remains configured through the existing environment variables.
+- The existing `window.location.href` lint warning in `src/components/error-boundary.tsx` remains outside this Phase 4 change set.

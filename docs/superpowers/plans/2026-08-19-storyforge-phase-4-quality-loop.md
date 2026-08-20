@@ -48,13 +48,13 @@ export async function assertReleaseReady(projectId: string, expectedRevision: nu
 **Interfaces:**
 - Produces: `replaceIssues(versionId, revision, source, issues)`, `resolveIssue`, `dismissWarning`, `listIssues`; unique issue fingerprint by source/code/node/edge/details.
 
-- [ ] **Step 1: Test replacement, stable fingerprints, resolution, and blocking-dismiss rejection**
+- [x] **Step 1: Test replacement, stable fingerprints, resolution, and blocking-dismiss rejection**
 
-- [ ] **Step 2: Add `validation_runs` and `validation_issues` migrations and repository**
+- [x] **Step 2: Add `validation_runs` and `validation_issues` migrations and repository**
 
 Persist `source`, `severity`, `code`, message, node/edge IDs, details, status, draft revision, timestamps. Re-running one source replaces only that source's open issues for the same revision.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/validation/repository.test.ts`
 
@@ -73,13 +73,13 @@ git commit -m "feat: persist authoring validation issues"
 - Consumes: `StoryGraph`, bible, outline.
 - Produces: warning codes `SIMILAR_CHOICES`, `REPEATED_PROSE`, `DEPTH_IMBALANCE`, `SIMILAR_ENDINGS`, `MERGE_FACT_CONFLICT`, `MISSING_THREAD_RESOLUTION`.
 
-- [ ] **Step 1: Add positive and negative fixture tests for every rule**
+- [x] **Step 1: Add positive and negative fixture tests for every rule**
 
-- [ ] **Step 2: Implement deterministic thresholds as named constants**
+- [x] **Step 2: Implement deterministic thresholds as named constants**
 
 Use normalized token/Jaccard similarity for choices and endings, repeated n-gram detection for prose, min/max path depth ratio for imbalance, and explicit canon/thread references for merge and resolution checks. Include measured values in issue details.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/validation/rules.test.ts`
 
@@ -99,13 +99,13 @@ git commit -m "feat: add deterministic story quality rules"
 - Consumes: `GenerationProvider`, chapter summaries, canon, character cards, ending summaries.
 - Produces: warning codes `CHARACTER_CONTRADICTION`, `TIMELINE_CONTRADICTION`, `SETTING_CONTRADICTION`, `ARC_UNRESOLVED`, `PACING`, `ENDING_QUALITY`.
 
-- [ ] **Step 1: Test schema rejection, warning-only coercion, and no-prose mutation**
+- [x] **Step 1: Test schema rejection, warning-only coercion, and no-prose mutation**
 
-- [ ] **Step 2: Implement chapter batches followed by one global review**
+- [x] **Step 2: Implement chapter batches followed by one global review**
 
 Reject any provider output requesting automatic edits. Store evidence snippets and node IDs; never store a blocking AI issue.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/validation/ai-review.test.ts`
 
@@ -125,13 +125,13 @@ git commit -m "feat: add non-destructive continuity review"
 **Interfaces:**
 - Produces: `validateDraft(projectId, sources)`, `getReleaseDecision(projectId): { allowed; revision; blocking; warnings }`; POST validate, GET issues, PATCH resolve/dismiss.
 
-- [ ] **Step 1: Test stale validation, source selection, warning dismissal, and blocking denial**
+- [x] **Step 1: Test stale validation, source selection, warning dismissal, and blocking denial**
 
-- [ ] **Step 2: Implement ordered execution**
+- [x] **Step 2: Implement ordered execution**
 
 Run structural validation, then deterministic rules, then optional AI review. Mark prior results stale when draft revision changes. Return 409 when a caller tries to seal using an older validation revision.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/validation/api.test.ts`
 
@@ -151,15 +151,15 @@ git commit -m "feat: expose authoring validation workflow"
 **Interfaces:**
 - Produces: `assertReleaseReady(projectId, expectedRevision): ReleaseDecision`.
 
-- [ ] **Step 1: Test that every bypass attempt fails**
+- [x] **Step 1: Test that every bypass attempt fails**
 
 Cover direct snapshot, direct export, stale revision, incomplete generation, open blocking issue, and changed graph after validation.
 
-- [ ] **Step 2: Route snapshot and export through `assertReleaseReady`**
+- [x] **Step 2: Route snapshot and export through `assertReleaseReady`**
 
 Create the immutable snapshot and revalidate that snapshot inside one release transaction boundary before rendering export.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/validation/release-gate.test.ts`
 
@@ -180,15 +180,15 @@ git commit -m "feat: enforce a single story release gate"
 - Consumes: validation APIs and outline selection.
 - Produces: issue filters, jump-to-node, resolve/dismiss actions, release checklist, path coverage report.
 
-- [ ] **Step 1: Write E2E that creates a cycle, dead end, warning, and stale validation**
+- [x] **Step 1: Write E2E that creates a cycle, dead end, warning, and stale validation**
 
 Verify cycle/dead end block release, warning can be dismissed with confirmation, editing invalidates release readiness, and fixing/revalidating enables snapshot/export.
 
-- [ ] **Step 2: Add node/edge coverage to the preview test harness**
+- [x] **Step 2: Add node/edge coverage to the preview test harness**
 
 Enumerate all paths up to a fixed cap; above the cap, generate a deterministic set covering every node and edge and report uncovered IDs as blocking test failures.
 
-- [ ] **Step 3: Run Phase 4 gate and commit**
+- [x] **Step 3: Run Phase 4 gate and commit**
 
 Run: `npm test -- src/__tests__/authoring/validation`
 
@@ -201,8 +201,8 @@ git commit -m "feat: complete story quality release loop"
 
 ## Phase 4 Completion Gate
 
-- [ ] Every blocking invariant prevents snapshot and export through all routes.
-- [ ] AI findings are warnings only and never alter prose.
-- [ ] Validation is invalidated by any relevant draft revision change.
-- [ ] Issues jump to exact nodes/edges and preserve evidence.
-- [ ] Automated preview coverage reaches every node and edge.
+- [x] Every blocking invariant prevents snapshot and export through all routes.
+- [x] AI findings are warnings only and never alter prose.
+- [x] Validation is invalidated by any relevant draft revision change.
+- [x] Issues jump to exact nodes/edges and preserve evidence.
+- [x] Automated preview coverage reaches every node and edge.
