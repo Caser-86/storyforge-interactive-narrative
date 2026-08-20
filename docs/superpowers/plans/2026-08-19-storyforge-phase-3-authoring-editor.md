@@ -242,7 +242,7 @@ git commit -m "feat: add safe graph and regeneration editing"
 
 - [x] **Step 2: Implement preview with no model or editor mutation calls**
 
-- [ ] **Step 3: Run Phase 3 gate**
+- [x] **Step 3: Run Phase 3 gate**
 
 Run: `npm test -- src/__tests__/authoring/editor`
 
@@ -271,4 +271,4 @@ git commit -m "feat: complete authoring edit and preview flow"
 
 - Tasks 1-6 are implemented and committed. Task 6 includes choice label/consequence editing with draft-revision protection.
 - Task 7 preview UI and the browser-flow spec are implemented and committed.
-- The Phase 3 Playwright gate remains open: the run was blocked because an existing `next dev` process owns the repository lock on port 3000, so the configured 3105 web server exited before the first request. Re-run `npm run test:e2e -- e2e/authoring-editor-flow.spec.ts` after releasing that process.
+- The Phase 3 Playwright gate passed in a temporary isolated worktree because the user-owned `next dev` process remained active in the main worktree.
