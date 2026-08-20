@@ -11,6 +11,8 @@ import {
 } from "@/lib/authoring/generation/api-contracts";
 import type { GenerationStatusResponse } from "@/lib/authoring/generation/api-contracts";
 import type { GenerationRun } from "@/lib/authoring/generation/schemas";
+import { PreviewResponseSchema, SnapshotResponseSchema } from "@/lib/authoring/preview-contracts";
+import type { PreviewResponse } from "@/lib/authoring/preview-contracts";
 
 async function responseError(response: Response): Promise<Error> {
   try {
@@ -105,4 +107,18 @@ export async function applyCandidate(projectId: string, candidateId: string, exp
 export async function rejectCandidate(projectId: string, candidateId: string) {
   const response = await fetch(`/api/projects/${projectId}/candidates/${candidateId}`, { method: "DELETE" });
   return parseJson(response, (value) => CandidateResponseSchema.parse(value).candidate);
+}
+
+export async function createPreviewSnapshot(projectId: string) {
+  const response = await fetch(`/api/projects/${projectId}/snapshots`, { method: "POST" });
+  return parseJson(response, (value) => SnapshotResponseSchema.parse(value).snapshot);
+}
+
+export async function loadPreview(projectId: string, snapshotId: string): Promise<PreviewResponse> {
+  const response = await fetch(`/api/projects/${projectId}/preview`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ snapshotId }),
+  });
+  return parseJson(response, (value) => PreviewResponseSchema.parse(value));
 }
