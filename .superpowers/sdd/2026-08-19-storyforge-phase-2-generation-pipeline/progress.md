@@ -18,8 +18,8 @@
 - Task 1: complete. Generation run/step/candidate schemas, migration v4, bounded leases, retry scheduling, terminal-safe transitions, and repository tests are implemented.
 - Task 2: complete. Provider contracts, OpenAI-compatible DeepSeek adapter, error taxonomy, and deterministic fake provider are implemented and tested.
 - Task 3: complete. Brief, bible, outline, and graph stages now use structured prompts, stable IDs, project budgets, and bounded next-step descriptors.
-- Task 4: in progress.
-- Task 5: pending.
+- Task 4: complete. Structural precheck, bounded node context/batching, node output validation, and warning-only continuity review are implemented.
+- Task 5: in progress.
 - Task 6: pending.
 - Task 7: pending.
 
@@ -44,3 +44,10 @@
 - `npm test -- src/__tests__/authoring`: 10 files, 102 tests passed.
 - `npm run typecheck`: passed.
 - Graph generation does not emit final node bodies; structural validation and node-context generation remain Task 4 work.
+
+## Task 4 verification
+
+- `npm test -- src/__tests__/authoring/generation/node-context.test.ts`: 4 tests passed.
+- `npm test -- src/__tests__/authoring`: 11 files, 106 tests passed.
+- `npm run typecheck`: passed.
+- `npm run db:authoring:smoke`: passed.
