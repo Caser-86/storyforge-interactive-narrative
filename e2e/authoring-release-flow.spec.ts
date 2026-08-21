@@ -36,7 +36,7 @@ test.describe("authoring release gate", () => {
       const next = await request.post(`/api/projects/${project.id}/generation/${run.id}/next`);
       expect(next.ok()).toBe(true);
       finalRun = (await next.json()).run;
-      if (finalRun.status === "completed") break;
+      if (finalRun?.status === "completed") break;
     }
     expect(finalRun?.status).toBe("completed");
 

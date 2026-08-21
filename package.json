@@ -29,6 +29,8 @@
     "test": "vitest run",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "test:e2e": "playwright test",
+    "build:e2e:authoring": "tsx src/scripts/authoring-e2e-build.ts",
+    "test:e2e:authoring": "npm run build:e2e:authoring && playwright test \"e2e/authoring-.*\\.spec\\.ts\"",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

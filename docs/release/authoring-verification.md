@@ -236,3 +236,24 @@ The release gate is now the sole authorization path for snapshot/export actions.
 - Remote GitHub Actions were not executed from this environment.
 - The real DeepSeek network path was not exercised in automated tests; provider wiring remains configured through the existing environment variables.
 - The existing `window.location.href` lint warning in `src/components/error-boundary.tsx` remains outside this Phase 4 change set.
+
+## Phase 5 Local Release Gate
+
+- Date: 2026-08-21
+- Scope: private local authoring product, persisted recovery, quality gate, offline export, legacy read-only export, and clean-install release verification.
+- Secrets: no real API key is recorded in this document. Automated checks use `OPENAI_API_KEY=sk-test-mock` and `GENERATION_PROVIDER=fake`.
+- Remote CI: workflow changes are committed but GitHub Actions were not executed from this environment.
+
+### Coverage Matrix
+
+| Coverage row | Evidence | Status |
+| --- | --- | --- |
+| Project backup and new-ID restore | `src/__tests__/authoring/backup.test.ts`, `src/__tests__/authoring/backup-api.test.ts`, `e2e/authoring-release-flow.spec.ts` | pending final clean gate |
+| Migration backup integrity and retention | `src/__tests__/authoring/database-backup.test.ts`, `npm run db:authoring:backup` | pending final clean gate |
+| Metrics survive restart and cost stays null without prices | `src/__tests__/authoring/metrics.test.ts` | pending final clean gate |
+| Offline HTML with private fields excluded | `src/__tests__/authoring/export-private-fields.test.ts`, `e2e/authoring-offline-export.spec.ts` | pending final clean gate |
+| Local-only health and loopback startup | `src/__tests__/authoring/local-security.test.ts`, `src/__tests__/api-health.test.ts` | pending final clean gate |
+| Legacy sessions remain exportable | `src/__tests__/legacy-export.test.ts`, `npm run legacy:export -- --dry-run` | pending final clean gate |
+| Full authoring browser loop | `e2e/authoring-release-flow.spec.ts` | passed locally |
+
+The rows will be updated with exact clean-directory counts, durations, Node/npm versions, and the migration version after the clean release gate completes. A row is not marked complete merely because a focused test passed in the existing worktree.

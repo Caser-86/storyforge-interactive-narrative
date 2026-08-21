@@ -124,3 +124,23 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npx playwright test e2e/text-flow.spec.ts
+
+  e2e-authoring:
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      DISABLE_REDIS: "true"
+      ENABLE_IMAGE_GENERATION: "false"
+      IMAGE_PROVIDER: "mock"
+      GENERATION_PROVIDER: "fake"
+      OPENAI_API_KEY: sk-test-mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e:authoring

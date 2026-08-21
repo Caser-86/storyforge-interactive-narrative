@@ -13,7 +13,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: "npm run dev -- --port 3105",
+    command: "node .next-playwright/standalone/server.js",
     port: 3105,
     reuseExistingServer: false,
     timeout: 30_000,
@@ -23,8 +23,9 @@ export default defineConfig({
       OPENAI_API_KEY: "sk-test-mock",
       GENERATION_PROVIDER: "fake",
       SQLITE_DB_PATH: path.join(process.cwd(), "output", "playwright", "authoring-e2e.sqlite"),
-      USE_MEMORY_DB: "true",
       NEXT_DIST_DIR: ".next-playwright",
+      PORT: "3105",
+      HOSTNAME: "127.0.0.1",
     },
   },
 });
