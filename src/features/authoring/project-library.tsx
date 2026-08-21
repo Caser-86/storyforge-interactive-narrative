@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import type { ProjectSummary } from "@/lib/authoring/repository";
 
 type ProjectLibraryProps = {
@@ -45,6 +46,7 @@ async function readError(response: Response): Promise<string> {
 export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) {
   const [actionState, setActionState] = useState<ActionState>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   async function runAction(project: ProjectSummary, action: "duplicate" | "archive" | "delete") {
     if (action === "delete" && !window.confirm(`确定删除“${project.title}”吗？此操作无法撤销。`)) {
@@ -77,6 +79,46 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
     }
   }
 
+  async function downloadBackup(project: ProjectSummary) {
+    setActionState({ projectId: project.id, label: "备份中" });
+    setActionError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/backup`);
+      if (!response.ok) throw new Error(await readError(response));
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `storyforge-project-${project.id}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "备份失败，请稍后重试");
+    } finally {
+      setActionState(null);
+    }
+  }
+
+  async function importBackup(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setActionError(null);
+
+    try {
+      const backup = JSON.parse(await file.text()) as unknown;
+      const response = await fetch("/api/projects/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ backup, mode: "new-id" }),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      window.location.reload();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "导入失败，请检查备份文件");
+    }
+  }
+
   return (
     <main className="authoring-shell">
       <div className="authoring-grain" aria-hidden="true" />
@@ -101,6 +143,17 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
           <Link className="button button-primary" href="/projects/new">
             新建项目 <span aria-hidden="true">↗</span>
           </Link>
+          <label className="button button-quiet">
+            导入备份
+            <input
+              ref={importInputRef}
+              aria-label="导入 StoryForge 项目备份"
+              accept="application/json,.json"
+              className="backup-file-input"
+              type="file"
+              onChange={(event) => void importBackup(event)}
+            />
+          </label>
         </section>
 
         {initialError ? (
@@ -156,6 +209,15 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
                       <Link className="button button-small button-primary" href={`/projects/${project.id}/edit`}>
                         打开项目 <span aria-hidden="true">→</span>
                       </Link>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-label={`备份${project.title}`}
+                        disabled={isBusy}
+                        onClick={() => void downloadBackup(project)}
+                      >
+                        {isBusy && actionState?.label === "备份中" ? "…" : "备份"}
+                      </button>
                       <button
                         className="icon-button"
                         type="button"

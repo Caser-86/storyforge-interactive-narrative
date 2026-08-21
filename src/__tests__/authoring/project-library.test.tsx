@@ -50,6 +50,8 @@ describe("ProjectLibrary", () => {
     expect(screen.getByRole("link", { name: "打开项目" })).toHaveAttribute("href", "/projects/project-1/edit");
     expect(screen.getByRole("button", { name: "复制潮汐档案" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "归档潮汐档案" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "备份潮汐档案" })).toBeInTheDocument();
+    expect(screen.getByLabelText("导入 StoryForge 项目备份")).toBeInTheDocument();
   });
 
   it("keeps the library usable when the initial server load fails", () => {

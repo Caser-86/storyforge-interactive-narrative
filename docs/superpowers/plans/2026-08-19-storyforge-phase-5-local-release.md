@@ -45,13 +45,13 @@ Backup schema marker is exactly `storyforge-project@1`. Missing token-price conf
 **Interfaces:**
 - Produces: `exportProjectBackup(projectId): ProjectBackupV1`; `importProjectBackup(input, mode: "new-id" | "replace"): Project`; schema marker `storyforge-project@1`.
 
-- [ ] **Step 1: Test full round-trip, invalid schema, duplicate ID modes, secret exclusion, and transaction rollback**
+- [x] **Step 1: Test full round-trip, invalid schema, duplicate ID modes, secret exclusion, and transaction rollback**
 
-- [ ] **Step 2: Implement canonical JSON backup and library controls**
+- [x] **Step 2: Implement canonical JSON backup and library controls**
 
 Include project, versions, chapters, nodes, edges, generation metadata, and validation status; exclude environment values, raw authorization headers, API keys, and transient leases. Validate the complete document before beginning a transaction. Add project-library actions to download one backup and select a local JSON file for import; show schema and transaction errors without discarding the selected file.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/backup.test.ts`
 
