@@ -1,7 +1,9 @@
 import { spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { resetAuthoringE2EDistDir } from "../lib/authoring/e2e-build";
 
+resetAuthoringE2EDistDir(path.resolve(".next-playwright"));
 const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
 const args = process.platform === "win32" ? ["/d", "/s", "/c", "npm run build"] : ["run", "build"];
 const result = spawnSync(command, args, {
