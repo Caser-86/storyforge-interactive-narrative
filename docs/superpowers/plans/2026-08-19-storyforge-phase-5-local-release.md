@@ -160,13 +160,13 @@ git commit -m "test: prove offline private story export"
 **Interfaces:**
 - Produces: `assertSafeBindHost(host, allowUnsafe): void`; default scripts bind `127.0.0.1`; explicit `STORYFORGE_ALLOW_LAN=true` warning path.
 
-- [ ] **Step 1: Test loopback allow, LAN deny, and explicit warning override**
+- [x] **Step 1: Test loopback allow, LAN deny, and explicit warning override**
 
-- [ ] **Step 2: Change start scripts to explicit loopback binding**
+- [x] **Step 2: Change start scripts to explicit loopback binding**
 
 Document installation, environment configuration, generation recovery, project backup, database backup, HTML export, and what data is never included. Do not advertise public sharing or multi-user safety.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/local-security.test.ts`
 

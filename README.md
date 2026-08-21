@@ -4,6 +4,8 @@
 
 当前主产品路径是“对话剧情推进”。场景图功能作为附属模块默认关闭，只有在开局勾选或显式配置 `ENABLE_IMAGE_GENERATION=true` 时才会创建图片任务。
 
+> 正式本地创作路径已收敛到“项目库 -> 有限生成 -> 编辑 -> 质量校验 -> 快照 -> 离线导出”。私人创作工作台不需要登录，默认只监听 `127.0.0.1`。安装、备份和恢复请先阅读 [authoring-user-guide.md](docs/authoring-user-guide.md) 与 [authoring-recovery.md](docs/authoring-recovery.md)。
+
 当前故事执行不是无限续写模式。每局会按短篇 / 中篇 / 长篇目标步数推进，并通过 `setup`、`development`、`crisis`、`resolution`、`ending` 阶段逐步收束；旧版固定 `turn >= 12` 的硬截断已被动态 `targetTurns` 和 `endingReadiness` 机制替代。
 
 GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`

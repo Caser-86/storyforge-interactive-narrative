@@ -11,9 +11,9 @@
     "url": "https://github.com/Caser-86/storyforge-interactive-narrative.git"
   },
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev --webpack --hostname 127.0.0.1",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "next start --hostname 127.0.0.1",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "db:init": "tsx src/scripts/init-db.ts",

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { renderStandaloneHtml } from "@/lib/authoring/export-html";
 import type { ExportStory } from "@/lib/authoring/export-html";
 
