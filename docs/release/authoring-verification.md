@@ -1,7 +1,7 @@
 # StoryForge Authoring Release Verification
 
 - Date: 2026-08-21
-- Final code commit: `f140d7c` (`fix: align brief prompt with strict schema`)
+- Final code commit: `0e9fbc2` (`fix: restore resumable branch generation loop`)
 - Runtime: Node `v24.18.0`, npm `11.16.0`
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, backup/restore, and legacy read-only export.
 - Remote CI: workflow committed but GitHub Actions were not executed from this environment.
@@ -28,8 +28,8 @@
 
 ## Command Results
 
-- `npm run verify`: exit code `0`; `44` test files and `185` tests passed, typecheck, lint, and production build all passed.
-- `npm run test:e2e:authoring`: exit code `0`; `6` tests passed in `10.0s` using the fake provider and a standalone production server. The E2E build also clears stale `.next-playwright` output before compiling.
+- `npm run verify`: exit code `0`; `44` test files and `189` tests passed, typecheck, lint, and production build all passed.
+- `npm run test:e2e:authoring`: exit code `0`; `6` tests passed in `22.9s` using the fake provider and a standalone production server. The E2E build also clears stale `.next-playwright` output before compiling.
 - `npm run db:authoring:smoke`: exit code `0`; temporary SQLite project lifecycle passed.
 - `npm run db:authoring:backup`: exit code `0`; `Integrity: ok`; SHA-256 `714d6196d4f897cb8398ee53350d50cc803a345ff1e150a927982382e6fe2236`.
 - `npm run legacy:export -- --dry-run`: exit code `0`; inspected `0` sessions and wrote `0` files without changing source data.
@@ -38,6 +38,13 @@
 
 - Manual provider smoke: exit code `0`; `deepseek-v4-flash` returned a structured brief through `OpenAICompatibleGenerationProvider`, passed `BriefOutputSchema`, and used `287` input tokens plus `196` output tokens in `3037ms`.
 - The manual check did not record the API key, raw prompt, or raw response.
+
+## Post-release Generation Hardening
+
+- Fixed the browser progress loop so a successful step that remains `queued` schedules the next step instead of stopping after the first response.
+- Added strict JSON contracts for every provider stage, including bible, outline, graph, node content, and continuity review, plus bounded per-stage token budgets.
+- Added explicit `branchType: main | side` to generated and authored edges, with a database migration that backfills existing graphs by local choice order. Branch validation requires exactly one main edge at every branching node.
+- Node generation steps in the same batch now run concurrently; the real DeepSeek verification run completed all `14 / 14` steps after resuming from the earlier bible schema failure.
 
 ## Build Boundary
 
