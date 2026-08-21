@@ -196,11 +196,11 @@ Assert default authoring modules do not import BullMQ, ioredis, AWS SDK, asset m
 
 Provide a script that lists existing legacy sessions and exports each as the existing JSON/Markdown format. Never migrate them silently into authoring projects because the graph semantics differ.
 
-- [ ] **Step 3: Remove packages only after import graph and legacy export tests pass**
+- [x] **Step 3: Remove packages only after import graph and legacy export tests pass**
 
 Remove `@aws-sdk/client-s3`, `bullmq`, `ioredis`, and unused image dependencies from `package.json`; regenerate npm lock; simplify Docker/compose to the local text app.
 
-- [ ] **Step 4: Run full regression and commit**
+- [x] **Step 4: Run full regression and commit**
 
 Run: `npm run verify`
 
@@ -255,11 +255,11 @@ git commit -m "release: verify local authoring product"
 
 ## Phase 5 Completion Gate
 
-- [ ] Project backup restores atomically into an empty database.
-- [ ] Migration backup passes integrity check and retention tests.
-- [ ] Metrics survive process restart and never invent cost without price data.
-- [ ] Offline HTML completes a path with networking denied and server stopped.
-- [ ] Default startup binds loopback and warns on explicit LAN override.
-- [ ] Legacy sessions remain exportable before retirement and are never auto-deleted.
-- [ ] Default UI, health, build, dependencies, and documentation contain no image/Redis/public-sharing path.
-- [ ] Clean secondary-directory install passes the complete release gate.
+- [x] Project backup restores atomically into an empty database.
+- [x] Migration backup passes integrity check and retention tests.
+- [x] Metrics survive process restart and never invent cost without price data.
+- [x] Offline HTML completes a path with networking denied and server stopped.
+- [x] Default startup binds loopback and warns on explicit LAN override.
+- [x] Legacy sessions remain exportable before retirement and are never auto-deleted.
+- [x] Default UI, health, build, dependencies, and documentation contain no image/Redis/public-sharing path.
+- [x] Clean secondary-directory install passes the complete release gate.
