@@ -16,16 +16,10 @@
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "db:init": "tsx src/scripts/init-db.ts",
-    "db:smoke": "tsx src/scripts/db-smoke-test.ts",
-    "db:sqlite:smoke": "tsx src/scripts/sqlite-smoke-test.ts",
-    "db:sqlite:backup": "tsx src/scripts/sqlite-backup.ts",
     "db:authoring:smoke": "tsx src/scripts/authoring-db-smoke.ts",
     "db:authoring:backup": "tsx src/scripts/authoring-db-backup.ts",
     "legacy:export": "tsx src/scripts/legacy-export.ts",
     "authoring:llm:smoke": "tsx src/scripts/authoring-llm-smoke.ts",
-    "llm:smoke": "tsx src/scripts/llm-smoke-test.ts",
-    "worker": "tsx src/scripts/asset-worker.ts",
     "test": "vitest run",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "test:e2e": "playwright test",
@@ -34,20 +28,13 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1048.0",
-    "@next/env": "16.3.1",
     "better-sqlite3": "^12.10.0",
-    "bullmq": "^5",
     "geist": "^1.7.0",
-    "ioredis": "5.10.1",
     "next": "16.3.1",
     "openai": "^4",
-    "pg": "^8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "uuid": "^11",
-    "zod": "^3",
-    "zustand": "^5"
+    "zod": "^3"
   },
   "overrides": {
     "next": {

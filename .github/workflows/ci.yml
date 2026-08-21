@@ -6,15 +6,15 @@ on:
   pull_request:
     branches: [main, master]
 
+env:
+  OPENAI_API_KEY: sk-test-mock
+  OPENAI_BASE_URL: https://api.deepseek.com
+  OPENAI_MODEL: deepseek-chat
+  GENERATION_PROVIDER: fake
+
 jobs:
-  typecheck:
+  verify:
     runs-on: ubuntu-latest
-    env:
-      DISABLE_REDIS: "true"
-      ENABLE_IMAGE_GENERATION: "false"
-      IMAGE_PROVIDER: "mock"
-      MOCK_LLM: "true"
-      OPENAI_API_KEY: sk-test-mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,118 +22,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-
-  lint:
-    runs-on: ubuntu-latest
-    env:
-      DISABLE_REDIS: "true"
-      ENABLE_IMAGE_GENERATION: "false"
-      IMAGE_PROVIDER: "mock"
-      MOCK_LLM: "true"
-      OPENAI_API_KEY: sk-test-mock
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-
-  test:
-    runs-on: ubuntu-latest
-    env:
-      DISABLE_REDIS: "true"
-      ENABLE_IMAGE_GENERATION: "false"
-      IMAGE_PROVIDER: "mock"
-      MOCK_LLM: "true"
-      OPENAI_API_KEY: sk-test-mock
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm test
-
-  build:
-    runs-on: ubuntu-latest
-    needs: [typecheck, lint, test]
-    env:
-      DISABLE_REDIS: "true"
-      ENABLE_IMAGE_GENERATION: "false"
-      IMAGE_PROVIDER: "mock"
-      MOCK_LLM: "true"
-      OPENAI_API_KEY: sk-test-mock
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-
-  db-smoke:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: storyforge_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx tsx src/scripts/db-smoke-test.ts
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/storyforge_test
-          TOKEN_SALT: ci-test-salt-not-for-production
-          DISABLE_REDIS: "true"
-
-  e2e-text:
-    runs-on: ubuntu-latest
-    needs: [build]
-    env:
-      DISABLE_REDIS: "true"
-      ENABLE_IMAGE_GENERATION: "false"
-      IMAGE_PROVIDER: "mock"
-      MOCK_LLM: "true"
-      OPENAI_API_KEY: sk-test-mock
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - run: npx playwright test e2e/text-flow.spec.ts
+      - run: npm run verify
+      - run: npm run db:authoring:smoke
+      - run: npm run legacy:export -- --dry-run
 
   e2e-authoring:
     runs-on: ubuntu-latest
-    needs: [build]
-    env:
-      DISABLE_REDIS: "true"
-      ENABLE_IMAGE_GENERATION: "false"
-      IMAGE_PROVIDER: "mock"
-      GENERATION_PROVIDER: "fake"
-      OPENAI_API_KEY: sk-test-mock
+    needs: [verify]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -142,5 +37,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
       - run: npm run test:e2e:authoring
