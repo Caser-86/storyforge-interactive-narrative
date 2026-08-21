@@ -64,6 +64,7 @@ export const graphFixture: GraphOutput = {
     { id: "edge-start-left", sourceNodeId: "node-start", targetNodeId: "node-left", label: "Open the vault", intent: "seek truth", consequenceSummary: "The vault wakes.", branchType: "main", sortOrder: 0 },
     { id: "edge-start-right", sourceNodeId: "node-start", targetNodeId: "node-right", label: "Take the tunnel", intent: "avoid danger", consequenceSummary: "The tunnel floods.", branchType: "side", sortOrder: 1 },
     { id: "edge-left-ending", sourceNodeId: "node-left", targetNodeId: "node-left-end", label: "Keep the seed", intent: "protect life", consequenceSummary: "The orchard survives.", branchType: "main", sortOrder: 0 },
+    { id: "edge-left-right-ending", sourceNodeId: "node-left", targetNodeId: "node-right-end", label: "Tell the city", intent: "share truth", consequenceSummary: "The orchard becomes public.", branchType: "side", sortOrder: 1 },
     { id: "edge-right-ending", sourceNodeId: "node-right", targetNodeId: "node-right-end", label: "Tell the city", intent: "share truth", consequenceSummary: "The orchard becomes public.", branchType: "main", sortOrder: 0 },
   ],
 };

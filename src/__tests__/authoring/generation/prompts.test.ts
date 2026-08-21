@@ -4,6 +4,7 @@ import {
   buildBriefPrompt,
   buildGraphPrompt,
   buildOutlinePrompt,
+  minimumBranchingNodes,
   STAGE_SYSTEM_PROMPT,
 } from "@/lib/authoring/generation/prompts";
 
@@ -55,6 +56,11 @@ describe("generation prompts", () => {
   it("instructs the provider to write natural-language values in the project language", () => {
     expect(buildBriefPrompt({ ...context, language: "Chinese" })).toContain('"language":"Chinese"');
     expect(STAGE_SYSTEM_PROMPT).toContain("language specified by the project context");
+  });
+
+  it("requires multiple bounded decision points in the generated graph", () => {
+    expect(minimumBranchingNodes({ ...context, size: { preset: "micro", targetNodes: 8, targetEndings: 2 } })).toBe(2);
+    expect(buildGraphPrompt(context, brief, bible, outline)).toContain("at least 2 distinct branching decision nodes");
   });
 
   it("spells out strict contracts for the planning stages", () => {

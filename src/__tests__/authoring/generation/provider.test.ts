@@ -93,6 +93,24 @@ describe("OpenAI-compatible generation provider", () => {
     }));
   });
 
+  it("accepts JSON wrapped in a markdown fence or short provider preamble", async () => {
+    const provider = new OpenAICompatibleGenerationProvider({
+      client: {
+        chat: {
+          completions: {
+            create: vi.fn().mockResolvedValue({
+              choices: [{ message: { content: "Here is the JSON:\n```json\n{\"title\":\"The Orchard\",\"summary\":\"A hidden route.\"}\n```" } }],
+            }),
+          },
+        },
+      },
+    });
+
+    await expect(provider.generate(request)).resolves.toMatchObject({
+      data: { title: "The Orchard", summary: "A hidden route." },
+    });
+  });
+
   it("maps empty and invalid structured responses", async () => {
     const empty = new OpenAICompatibleGenerationProvider({
       client: { chat: { completions: { create: vi.fn().mockResolvedValue({ choices: [] }) } } },

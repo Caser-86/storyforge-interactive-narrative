@@ -104,5 +104,18 @@ describe("generation stage handlers", () => {
       issues: [expect.objectContaining({ code: "CONTINUITY_REVIEW_FALLBACK", severity: "warning" })],
     });
     expect(result.providerResult.model).toBe("local-continuity-fallback");
+    });
   });
-});
+
+  it("rejects a graph that has only one decision point", async () => {
+    const provider = providerWithFixtures();
+    provider.reply("graph", "graph:main", {
+      ...graphFixture,
+      edges: graphFixture.edges.filter((edge) => edge.sourceNodeId !== "node-left"),
+    });
+
+    await expect(executeGraphStage(generationContext, provider, briefFixture, bibleFixture, outlineFixture)).rejects.toMatchObject({
+      code: "SCHEMA",
+      retryable: false,
+    } satisfies Partial<ProviderError>);
+  });

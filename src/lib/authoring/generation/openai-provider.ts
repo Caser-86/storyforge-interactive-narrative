@@ -31,6 +31,23 @@ type ChatCompletionResponse = {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 };
 
+function parseStructuredContent(content: string): unknown {
+  try {
+    return JSON.parse(content);
+  } catch {
+    const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1]?.trim();
+    if (fenced) return JSON.parse(fenced);
+
+    const objectStart = content.indexOf("{");
+    const objectEnd = content.lastIndexOf("}");
+    if (objectStart >= 0 && objectEnd > objectStart) {
+      return JSON.parse(content.slice(objectStart, objectEnd + 1));
+    }
+
+    throw new Error("No JSON object found in provider response");
+  }
+}
+
 export class OpenAICompatibleGenerationProvider implements GenerationProvider {
   private readonly options: OpenAICompatibleProviderOptions;
   private client: ChatCompletionClient | null;
@@ -64,7 +81,7 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
 
       let parsed: unknown;
       try {
-        parsed = JSON.parse(content);
+        parsed = parseStructuredContent(content);
       } catch (error) {
         throw new ProviderError("SCHEMA", "Provider returned invalid JSON", false, { cause: error });
       }

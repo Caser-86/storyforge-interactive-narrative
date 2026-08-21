@@ -1,6 +1,6 @@
 import type { GenerationProvider } from "../provider";
 import type { GenerationProjectContext } from "../prompts";
-import { buildGraphPrompt, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
+import { buildGraphPrompt, minimumBranchingNodes, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
 import type { BriefOutput, BibleOutput, GraphOutput, OutlineOutput, StageExecutionResult } from "./types";
 import { GraphOutputSchema } from "./types";
 import { assertUnique, schemaFailure } from "./common";
@@ -53,6 +53,14 @@ function validateGraphOutput(context: GenerationProjectContext, outline: Outline
     const edges = outgoing.get(edge.sourceNodeId) ?? [];
     edges.push(edge);
     outgoing.set(edge.sourceNodeId, edges);
+  }
+  const branchingNodeCount = [...outgoing.values()].filter((edges) => edges.length >= 2).length;
+  const requiredBranchingNodes = minimumBranchingNodes(context);
+  if (branchingNodeCount < requiredBranchingNodes) {
+    throw schemaFailure("Graph does not contain enough branching decision nodes", {
+      requiredBranchingNodes,
+      branchingNodeCount,
+    });
   }
   for (const [sourceNodeId, edges] of outgoing) {
     if (edges.length < 2) continue;

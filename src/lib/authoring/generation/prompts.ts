@@ -26,6 +26,10 @@ export const STAGE_MAX_TOKENS = {
   continuity_review: 7000,
 } as const;
 
+export function minimumBranchingNodes(context: GenerationProjectContext): number {
+  return Math.min(4, Math.max(2, Math.floor((context.size.targetNodes - context.size.targetEndings) / 4)));
+}
+
 function projectFrame(context: GenerationProjectContext): string {
   return JSON.stringify({
     title: context.title,
@@ -57,7 +61,8 @@ export function buildGraphPrompt(
   bible: BibleOutput,
   outline: OutlineOutput,
 ): string {
-  return `Create the directed story graph skeleton. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. Outline: ${JSON.stringify(outline)}. Reuse every outline chapter and node ID exactly, add only valid edge references, and stay within ${context.size.targetNodes} nodes. Return exactly this JSON shape: { "chapters": [{ "id": "string", "title": "string", "goal": "string", "summary": "string" }], "nodes": [{ "id": "string", "chapterId": "string", "kind": "start | scene | ending", "title": "string", "objective": "string", "summary": "string", "topologicalRank": 0 }], "edges": [{ "id": "string", "sourceNodeId": "string", "targetNodeId": "string", "label": "string", "intent": "string", "consequenceSummary": "string", "branchType": "main | side", "sortOrder": 0 }] }. Keep the graph acyclic. At every branching node, exactly one edge must have branchType main and every other edge must have branchType side; every side branch must merge back into the mainline or reach an ending. Do not include extra keys, final node bodies, markdown, or scene prose.`;
+  const requiredBranchingNodes = minimumBranchingNodes(context);
+  return `Create the directed story graph skeleton. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. Outline: ${JSON.stringify(outline)}. Reuse every outline chapter and node ID exactly, add only valid edge references, and stay within ${context.size.targetNodes} nodes. Return exactly this JSON shape: { "chapters": [{ "id": "string", "title": "string", "goal": "string", "summary": "string" }], "nodes": [{ "id": "string", "chapterId": "string", "kind": "start | scene | ending", "title": "string", "objective": "string", "summary": "string", "topologicalRank": 0 }], "edges": [{ "id": "string", "sourceNodeId": "string", "targetNodeId": "string", "label": "string", "intent": "string", "consequenceSummary": "string", "branchType": "main | side", "sortOrder": 0 }] }. Keep the graph acyclic and create at least ${requiredBranchingNodes} distinct branching decision nodes, each with at least two outgoing choices. Do not make the whole story a single chain with only one split near the ending. At every branching node, exactly one edge must have branchType main and every other edge must have branchType side; every side branch must merge back into the mainline or reach an ending. Do not include extra keys, final node bodies, markdown, or scene prose.`;
 }
 
 export function buildStageRequestContext(context: GenerationProjectContext): { model?: string } {
