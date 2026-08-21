@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { FakeGenerationProvider } from "@/lib/authoring/generation/fake-provider";
+import type { GenerationProvider } from "@/lib/authoring/generation/provider";
 import { ProviderError } from "@/lib/authoring/generation/provider-errors";
-import { executeBibleStage, executeBriefStage, executeGraphStage, executeOutlineStage } from "@/lib/authoring/generation/stages";
+import { executeBibleStage, executeBriefStage, executeContinuityReview, executeGraphStage, executeOutlineStage } from "@/lib/authoring/generation/stages";
 import { generationContext, bibleFixture, briefFixture, graphFixture, outlineFixture } from "@/__tests__/fixtures/authoring-generation";
 
 function providerWithFixtures(): FakeGenerationProvider {
@@ -75,5 +76,33 @@ describe("generation stage handlers", () => {
       code: "SCHEMA",
       retryable: false,
     } satisfies Partial<ProviderError>);
+  });
+
+  it("keeps continuity review non-blocking when the provider returns invalid JSON", async () => {
+    const provider: GenerationProvider = {
+      generate: async () => {
+        throw new ProviderError("SCHEMA", "Provider returned invalid JSON", false);
+      },
+    };
+
+    const result = await executeContinuityReview({
+      provider,
+      context: generationContext,
+      graph: graphFixture,
+      bible: bibleFixture,
+      outline: outlineFixture,
+      nodeContents: graphFixture.nodes.map((node) => ({
+        nodeId: node.id,
+        body: `${node.title} body.`,
+        summary: node.summary,
+        objective: node.objective,
+      })),
+    });
+
+    expect(result.output).toEqual({
+      passed: true,
+      issues: [expect.objectContaining({ code: "CONTINUITY_REVIEW_FALLBACK", severity: "warning" })],
+    });
+    expect(result.providerResult.model).toBe("local-continuity-fallback");
   });
 });

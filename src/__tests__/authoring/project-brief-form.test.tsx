@@ -27,7 +27,7 @@ function okCreateResponse() {
         targetEndingCount: 4,
         status: "draft",
         activeDraftVersionId: "version-1",
-        settingsJson: {},
+        settingsJson: { language: "Chinese" },
         createdAt: "2026-08-21T00:00:00.000Z",
         updatedAt: "2026-08-21T00:00:00.000Z",
       },
@@ -93,5 +93,8 @@ describe("ProjectBriefForm", () => {
 
     expect(await screen.findByText("项目已建立，正在进入生成流程…")).toBeInTheDocument();
     expect(push).toHaveBeenCalledWith("/projects/project-created/generate");
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/projects", expect.objectContaining({
+      body: expect.stringContaining('"language":"Chinese"'),
+    }));
   });
 });

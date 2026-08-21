@@ -128,6 +128,7 @@ export function ProjectBriefForm() {
           targetNodes: Number(form.targetNodes),
           targetEndings: Number(form.targetEndings),
         },
+        settingsJson: { language: "Chinese" },
       });
       setCreatedMessage(true);
       router.push(`/projects/${project.id}/generate`);

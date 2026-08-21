@@ -24,7 +24,7 @@ function contextFor(project: Awaited<ReturnType<AuthoringRepository["getProject"
     rating: project.rating,
     language: typeof project.settingsJson === "object" && project.settingsJson !== null && !Array.isArray(project.settingsJson) && typeof project.settingsJson.language === "string"
       ? project.settingsJson.language
-      : "English",
+      : "Chinese",
     size: {
       preset: project.sizePreset,
       targetNodes: project.targetNodeCount,

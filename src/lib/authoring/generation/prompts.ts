@@ -15,7 +15,7 @@ export interface GenerationProjectContext {
   model?: string;
 }
 
-export const STAGE_SYSTEM_PROMPT = "You are a structured interactive-fiction planner. Return only valid JSON matching the requested schema. Do not reveal analysis or markdown. Keep strings concise, identifiers stable, and never invent prose for a later stage.";
+export const STAGE_SYSTEM_PROMPT = "You are a structured interactive-fiction planner. Return only valid JSON matching the requested schema. Write every natural-language value in the language specified by the project context. Do not reveal analysis or markdown. Keep strings concise, identifiers stable, and never invent prose for a later stage.";
 
 export const STAGE_MAX_TOKENS = {
   brief: 1600,

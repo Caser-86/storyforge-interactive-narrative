@@ -4,6 +4,7 @@ import {
   buildBriefPrompt,
   buildGraphPrompt,
   buildOutlinePrompt,
+  STAGE_SYSTEM_PROMPT,
 } from "@/lib/authoring/generation/prompts";
 
 const context = {
@@ -49,6 +50,11 @@ describe("generation prompts", () => {
     expect(prompt).toContain('"promise": "string"');
     expect(prompt).toContain('"audience": "string"');
     expect(prompt).toContain("Do not include extra keys");
+  });
+
+  it("instructs the provider to write natural-language values in the project language", () => {
+    expect(buildBriefPrompt({ ...context, language: "Chinese" })).toContain('"language":"Chinese"');
+    expect(STAGE_SYSTEM_PROMPT).toContain("language specified by the project context");
   });
 
   it("spells out strict contracts for the planning stages", () => {
