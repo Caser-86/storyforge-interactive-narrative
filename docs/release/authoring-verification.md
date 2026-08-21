@@ -1,7 +1,7 @@
 # StoryForge Authoring Release Verification
 
 - Date: 2026-08-21
-- Final code commit: `6a4d488` (`test: isolate authoring e2e build output`)
+- Final code commit: `f140d7c` (`fix: align brief prompt with strict schema`)
 - Runtime: Node `v24.18.0`, npm `11.16.0`
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, backup/restore, and legacy read-only export.
 - Remote CI: workflow committed but GitHub Actions were not executed from this environment.
@@ -28,11 +28,16 @@
 
 ## Command Results
 
-- `npm run verify`: exit code `0`; `43` test files and `184` tests passed, typecheck, lint, and production build all passed.
+- `npm run verify`: exit code `0`; `44` test files and `185` tests passed, typecheck, lint, and production build all passed.
 - `npm run test:e2e:authoring`: exit code `0`; `6` tests passed in `10.0s` using the fake provider and a standalone production server. The E2E build also clears stale `.next-playwright` output before compiling.
 - `npm run db:authoring:smoke`: exit code `0`; temporary SQLite project lifecycle passed.
 - `npm run db:authoring:backup`: exit code `0`; `Integrity: ok`; SHA-256 `714d6196d4f897cb8398ee53350d50cc803a345ff1e150a927982382e6fe2236`.
 - `npm run legacy:export -- --dry-run`: exit code `0`; inspected `0` sessions and wrote `0` files without changing source data.
+
+## Real Provider Check
+
+- Manual provider smoke: exit code `0`; `deepseek-v4-flash` returned a structured brief through `OpenAICompatibleGenerationProvider`, passed `BriefOutputSchema`, and used `287` input tokens plus `196` output tokens in `3037ms`.
+- The manual check did not record the API key, raw prompt, or raw response.
 
 ## Build Boundary
 
@@ -40,6 +45,5 @@ The clean production route table contains only `/api/health`, `/api/projects/**`
 
 ## Residual Risks
 
-- The real DeepSeek network path was not called during automated verification; fake-provider coverage proves the resumable state machine and schema boundaries.
 - Remote GitHub Actions were not executed locally.
 - This is a private local application without login or multi-user isolation; do not expose it publicly.
