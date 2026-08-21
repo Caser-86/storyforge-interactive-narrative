@@ -1,7 +1,7 @@
 # StoryForge Authoring Release Verification
 
 - Date: 2026-08-21
-- Final code commit: `0e9fbc2` (`fix: restore resumable branch generation loop`)
+- Final code commit: `34a783e` (`fix: persist generated story content`)
 - Runtime: Node `v24.18.0`, npm `11.16.0`
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, backup/restore, and legacy read-only export.
 - Remote CI: workflow committed but GitHub Actions were not executed from this environment.
@@ -45,6 +45,7 @@
 - Added strict JSON contracts for every provider stage, including bible, outline, graph, node content, and continuity review, plus bounded per-stage token budgets.
 - Added explicit `branchType: main | side` to generated and authored edges, with a database migration that backfills existing graphs by local choice order. Branch validation requires exactly one main edge at every branching node.
 - Node generation steps in the same batch now run concurrently; the real DeepSeek verification run completed all `14 / 14` steps after resuming from the earlier bible schema failure.
+- Completed generation outputs are now materialized into the active draft graph. The verified project contains `3` chapters, `8` generated nodes, `7` edges, and non-empty node bodies instead of an empty editor graph.
 
 ## Build Boundary
 
