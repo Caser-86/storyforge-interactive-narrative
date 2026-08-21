@@ -222,7 +222,7 @@ git commit -m "refactor: retire legacy game and asset defaults"
 **Interfaces:**
 - Produces: `npm run test:e2e:authoring`; final evidence for every master coverage row.
 
-- [ ] **Step 1: Add one release E2E covering the whole product**
+- [x] **Step 1: Add one release E2E covering the whole product**
 
 Create a project, generate with fixtures, resume one failure, edit, validate, resolve issues, preview, snapshot, export offline, backup, delete, import, and compare restored graph/version counts.
 
