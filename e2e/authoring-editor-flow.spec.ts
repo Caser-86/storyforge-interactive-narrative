@@ -22,10 +22,13 @@ test.describe("authoring editor closed loop", () => {
     const written = await request.put(`/api/projects/${project.id}/graph`, { data: { graph, expectedRevision: 0 } });
     expect(written.ok()).toBe(true);
 
+    const validationResponse = page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/validate`) && response.request().method() === "GET");
     await page.goto(`/projects/${project.id}/edit`);
+    expect((await validationResponse).ok()).toBe(true);
     await expect(page.getByText("Manual Lantern Loop")).toBeVisible();
     const choiceLabel = page.getByLabel("选择文案").first();
     await expect(choiceLabel).toHaveValue("Enter the archive");
+    await expect(choiceLabel).toBeEditable();
     const choicePatch = page.waitForResponse((response) => response.url().includes("/api/projects/") && response.request().method() === "PATCH");
     await choiceLabel.fill("Enter the author-approved archive");
     await choiceLabel.blur();

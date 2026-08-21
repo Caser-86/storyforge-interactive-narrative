@@ -62,7 +62,9 @@ test.describe("authoring quality loop", () => {
     expect(warningPayload.warnings.map((issue: { code: string }) => issue.code)).toContain("SIMILAR_CHOICES");
 
     page.once("dialog", async (dialog) => { await dialog.accept(); });
+    const issueResponse = page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/validate`) && response.request().method() === "GET");
     await page.goto(`/projects/${project.id}/edit`);
+    expect((await issueResponse).ok()).toBe(true);
     await expect(page.getByText("SIMILAR_CHOICES")).toBeVisible();
     const dismissResponse = page.waitForResponse((response) => response.url().includes(`/validation/`) && response.request().method() === "PATCH");
     await page.locator(".quality-issue").filter({ hasText: "SIMILAR_CHOICES" }).getByRole("button", { name: "忽略 warning" }).click();
@@ -74,7 +76,9 @@ test.describe("authoring quality loop", () => {
       nodes: warningGraph.nodes.map((node) => node.nodeKey === "archive" ? { ...node, body: "A revised archive passage." } : node),
     } satisfies StoryGraph;
     expect((await request.put(`/api/projects/${project.id}/graph`, { data: { graph: staleGraph, expectedRevision: 3 } })).ok()).toBe(true);
+    const staleValidationResponse = page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/validate`) && response.request().method() === "GET");
     await page.reload();
+    expect((await staleValidationResponse).ok()).toBe(true);
     await expect(page.getByText("暂不可发布")).toBeVisible();
     await expect(page.getByText("修订 未验证")).toBeVisible();
 
