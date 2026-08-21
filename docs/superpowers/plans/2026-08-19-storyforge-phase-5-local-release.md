@@ -188,11 +188,11 @@ git commit -m "docs: formalize local-only operation"
 **Interfaces:**
 - Produces: authoring-only default UI/build/health; read-only `npm run legacy:export` during the migration window.
 
-- [ ] **Step 1: Add a regression test for forbidden default dependencies**
+- [x] **Step 1: Add a regression test for forbidden default dependencies**
 
 Assert default authoring modules do not import BullMQ, ioredis, AWS SDK, asset modules, game store, or legacy routes; health JSON has no Redis/image requirement.
 
-- [ ] **Step 2: Add and verify legacy data export before route retirement**
+- [x] **Step 2: Add and verify legacy data export before route retirement**
 
 Provide a script that lists existing legacy sessions and exports each as the existing JSON/Markdown format. Never migrate them silently into authoring projects because the graph semantics differ.
 

@@ -22,6 +22,7 @@
     "db:sqlite:backup": "tsx src/scripts/sqlite-backup.ts",
     "db:authoring:smoke": "tsx src/scripts/authoring-db-smoke.ts",
     "db:authoring:backup": "tsx src/scripts/authoring-db-backup.ts",
+    "legacy:export": "tsx src/scripts/legacy-export.ts",
     "authoring:llm:smoke": "tsx src/scripts/authoring-llm-smoke.ts",
     "llm:smoke": "tsx src/scripts/llm-smoke-test.ts",
     "worker": "tsx src/scripts/asset-worker.ts",

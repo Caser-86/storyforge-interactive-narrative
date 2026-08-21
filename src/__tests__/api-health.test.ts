@@ -61,37 +61,14 @@ describe("health status", () => {
     expect(status).toBe("degraded");
   });
 
-  it("does not probe Redis when image generation is disabled", async () => {
-    process.env.ENABLE_IMAGE_GENERATION = "false";
-    process.env.IMAGE_PROVIDER = "mock";
-    delete process.env.REDIS_URL;
-
+  it("reports only local authoring dependencies", async () => {
     const { GET } = await import("@/app/api/health/route");
     const response = await GET();
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.checks.redis.status).toBe("disabled");
-  });
-
-  it("reports redisRequired in production when REDIS_URL is whitespace only", async () => {
-    restoreEnv("NODE_ENV", "production");
-    process.env.ENABLE_IMAGE_GENERATION = "true";
-    process.env.REDIS_URL = "   ";
-    process.env.IMAGE_PROVIDER = "replicate";
-    process.env.ADMIN_TOKEN = "admin-token";
-    process.env.TOKEN_SALT = "production-secret";
-    process.env.OPENAI_API_KEY = "test-key";
-
-    const { GET } = await import("@/app/api/health/route");
-    const response = await GET();
-    const body = await response.json();
-
-    expect(response.status).toBe(503);
-    expect(body.checks.redis.status).toBe("disabled");
-    expect(body.checks.redisRequired).toEqual({
-      status: "error",
-      error: "REDIS_URL required when ENABLE_IMAGE_GENERATION=true",
-    });
+    expect(body.checks.authoring.status).toBe("ok");
+    expect(body.checks).not.toHaveProperty("redis");
+    expect(body.checks).not.toHaveProperty("imageProvider");
   });
 });
