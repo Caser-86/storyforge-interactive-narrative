@@ -48,6 +48,12 @@ describe("generation runtime", () => {
       expect(steps.filter((step) => step.status === "completed").length).toBe(steps.length);
       expect(steps.filter((step) => step.stage === "nodes")).toHaveLength(8);
       expect(completed.progressCurrent).toBe(completed.progressTotal);
+
+      const graph = await authoring.getProjectGraph(project.id);
+      expect(graph.chapters).toHaveLength(1);
+      expect(graph.nodes).toHaveLength(8);
+      expect(graph.edges).toHaveLength(8);
+      expect(graph.nodes.every((node) => node.contentStatus === "generated" && !node.body.includes("pending"))).toBe(true);
     } finally {
       generation.close();
       authoring.close();

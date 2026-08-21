@@ -10,6 +10,7 @@ import type { GenerationProjectContext } from "./prompts";
 import { executeBibleStage, executeBriefStage, executeContinuityReview, executeGraphStage, executeNodeBatch, executeOutlineStage, executeStructuralCheck } from "./stages";
 import { BibleOutputSchema, BriefOutputSchema, GraphOutputSchema, OutlineOutputSchema } from "./stages/types";
 import { NodeContentOutputSchema } from "./stages/nodes";
+import type { StoryGraph } from "../schemas";
 
 function contextFor(project: Awaited<ReturnType<AuthoringRepository["getProject"]>>, versionId: string): GenerationProjectContext {
   return {
@@ -50,6 +51,56 @@ function readCompleted<T>(steps: GenerationStep[], stepKey: string, schema: { pa
     throw new ProviderError("SCHEMA", `Required generation output is missing: ${stepKey}`, false);
   }
   return schema.parse(step.parsedResponseJson);
+}
+
+async function persistDraftGraph(authoringRepository: AuthoringRepository, projectId: string, graph: StoryGraph): Promise<void> {
+  const expectedRevision = await authoringRepository.getDraftRevision(projectId);
+  await authoringRepository.replaceDraftGraph(projectId, graph, expectedRevision);
+}
+
+export async function materializeGenerationRunOutputs(
+  projectId: string,
+  runId: string,
+  repository: GenerationRepository,
+  authoringRepository: AuthoringRepository,
+): Promise<StoryGraph> {
+  const project = await authoringRepository.getProject(projectId);
+  const run = await repository.getRun(runId);
+  const steps = await repository.listSteps(runId);
+  const context = contextFor(project, run.versionId);
+  const graphOutput = readCompleted(steps, "graph:main", GraphOutputSchema);
+  const structural = executeStructuralCheck(context, graphOutput);
+  if (!structural.passed) {
+    throw new ProviderError("SCHEMA", "Generated graph failed structural validation", false, { details: structural.blockingIssues });
+  }
+
+  const nodeContents = steps
+    .filter((candidate) => candidate.stage === "nodes" && candidate.status === "completed" && candidate.parsedResponseJson !== null)
+    .map((candidate) => NodeContentOutputSchema.parse(candidate.parsedResponseJson));
+  const contentByNodeId = new Map(nodeContents.map((node) => [node.nodeId, node]));
+  if (contentByNodeId.size !== structural.graph.nodes.length) {
+    throw new ProviderError("SCHEMA", "Generated node content is incomplete", false, {
+      details: { expected: structural.graph.nodes.length, actual: contentByNodeId.size },
+    });
+  }
+
+  const completedGraph: StoryGraph = {
+    ...structural.graph,
+    nodes: structural.graph.nodes.map((node) => {
+      const content = contentByNodeId.get(node.id);
+      if (!content) throw new ProviderError("SCHEMA", `Generated content is missing for ${node.id}`, false);
+      return {
+        ...node,
+        body: content.body,
+        summary: content.summary,
+        objective: content.objective,
+        contentStatus: "generated",
+      };
+    }),
+  };
+
+  await persistDraftGraph(authoringRepository, projectId, completedGraph);
+  return completedGraph;
 }
 
 function fixedProvider(project: Awaited<ReturnType<AuthoringRepository["getProject"]>>): GenerationProvider {
@@ -163,6 +214,7 @@ export async function createProjectGenerationExecutor(
       if (!result.passed) {
         throw new ProviderError("SCHEMA", "Generated graph failed structural validation", false, { details: result.blockingIssues });
       }
+      await persistDraftGraph(authoringRepository, projectId, result.graph);
       return { parsedResponse: { passed: true, warnings: result.warnings }, rawResponse: null, model: "local-structural-check" };
     },
     nodes: async (step: GenerationStep, run: GenerationRun) => {
@@ -184,6 +236,7 @@ export async function createProjectGenerationExecutor(
         outline: readCompleted(steps, "outline:main", OutlineOutputSchema),
         nodeContents,
       });
+      await materializeGenerationRunOutputs(projectId, run.id, repository, authoringRepository);
       return { parsedResponse: result.output, rawResponse: result.providerResult.rawResponse, inputTokens: result.providerResult.inputTokens, outputTokens: result.providerResult.outputTokens, model: result.providerResult.model };
     },
   };
