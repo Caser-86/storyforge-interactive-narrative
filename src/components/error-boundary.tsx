@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ReactNode } from "react";
+import Link from "next/link";
 
 interface Props {
   children: ReactNode;
@@ -36,15 +37,12 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-gray-400 text-sm mb-4">
               {this.state.error?.message || "发生了未知错误"}
             </p>
-            <button
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.href = "/";
-              }}
+            <Link
+              href="/"
               className="px-6 py-2 rounded-lg bg-gradient-to-r from-[#e94560] to-[#ff6b6b] text-white font-semibold hover:opacity-90 transition-opacity"
             >
               返回首页
-            </button>
+            </Link>
           </div>
         </div>
       );

@@ -218,13 +218,13 @@ Expected: all gates pass from a clean install; backup round-trip succeeds; expor
 
 ## Master Completion Checklist
 
-- [ ] Phase 0 gate passes and is recorded.
-- [ ] Phase 1 gate passes and is recorded.
-- [ ] Phase 2 gate passes and is recorded.
-- [ ] Phase 3 gate passes and is recorded.
-- [ ] Phase 4 gate passes and is recorded.
-- [ ] Phase 5 gate passes and is recorded.
-- [ ] Every row in the specification coverage matrix has a passing automated or documented manual acceptance check.
-- [ ] Clean-install instructions reproduce the final app on a second local directory.
-- [ ] The final exported HTML is verified offline with the application stopped.
-- [ ] The legacy instant-play and image paths are absent from the default UI, build, health check, and documentation.
+- [x] Phase 0 gate passes and is recorded.
+- [x] Phase 1 gate passes and is recorded.
+- [x] Phase 2 gate passes and is recorded.
+- [x] Phase 3 gate passes and is recorded.
+- [x] Phase 4 gate passes and is recorded.
+- [x] Phase 5 gate passes and is recorded.
+- [x] Every row in the specification coverage matrix has a passing automated or documented manual acceptance check.
+- [x] Clean-install instructions reproduce the final app on a second local directory.
+- [x] The final exported HTML is verified offline with the application stopped.
+- [x] The legacy instant-play and image paths are absent from the default UI, build, health check, and documentation.
