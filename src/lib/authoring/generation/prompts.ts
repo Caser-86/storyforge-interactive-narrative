@@ -31,7 +31,7 @@ function projectFrame(context: GenerationProjectContext): string {
 }
 
 export function buildBriefPrompt(context: GenerationProjectContext): string {
-  return `Create the story brief for this project. Project: ${projectFrame(context)}. Define the reader promise without writing scene prose.`;
+  return `Create the story brief for this project. Project: ${projectFrame(context)}. Define the reader promise without writing scene prose. Return exactly this JSON shape: { "title": "string", "premise": "string", "promise": "string", "genre": "string", "tone": "string", "audience": "string" }. Do not include extra keys, project metadata, markdown, or scene prose.`;
 }
 
 export function buildBiblePrompt(context: GenerationProjectContext, brief: BriefOutput): string {
