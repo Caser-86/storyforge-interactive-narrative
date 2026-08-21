@@ -127,15 +127,15 @@ git commit -m "feat: persist local generation metrics"
 - Consumes: sealed reader-safe snapshot.
 - Produces: CSP-constrained standalone HTML with zero network requests and local progress.
 
-- [ ] **Step 1: Add a denylist test for every private field family**
+- [x] **Step 1: Add a denylist test for every private field family**
 
 Cover API key patterns, base URL credentials, raw prompts, raw responses, objectives, canon, author notes, leases, errors, and internal IDs not needed by runtime.
 
-- [ ] **Step 2: Add browser network interception that fails any request**
+- [x] **Step 2: Add browser network interception that fails any request**
 
 Download the HTML, stop/release the web server used for authoring, open the local file in a separate Playwright context, select through an ending, reload, verify progress, back, and restart.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/export-private-fields.test.ts`
 
