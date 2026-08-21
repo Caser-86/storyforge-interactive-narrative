@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { AuthoringError } from "./errors";
 import { AUTHORING_MIGRATIONS } from "./migrations";
+import { backupOpenDatabaseBeforeMigration } from "./database-backup";
 
 export interface AuthoringDatabaseOptions {
   dbPath?: string;
@@ -28,25 +29,6 @@ function ensureParentDirectory(dbPath: string): void {
   }
 
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-}
-
-function escapeSqlString(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
-function createMigrationBackup(db: Database.Database, dbPath: string, backupDir: string): string {
-  fs.mkdirSync(backupDir, { recursive: true });
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const backupPath = path.join(backupDir, `authoring-before-migration-${timestamp}.sqlite`);
-
-  db.exec(`VACUUM INTO '${escapeSqlString(backupPath)}'`);
-
-  if (!fs.existsSync(backupPath)) {
-    throw new Error(`SQLite backup was not created at: ${backupPath}`);
-  }
-
-  return backupPath;
 }
 
 function tableExists(db: Database.Database, tableName: string): boolean {
@@ -98,7 +80,7 @@ export function migrateAuthoringDatabase(
 
   if (hasPendingNonEmptyMigration && appliedVersions.size === 0 && options.backupBeforeMigration === true) {
     try {
-      createMigrationBackup(db, dbPath, getBackupDir(options));
+      backupOpenDatabaseBeforeMigration(db, getBackupDir(options), AUTHORING_MIGRATIONS[AUTHORING_MIGRATIONS.length - 1].version);
     } catch (error) {
       throw new AuthoringError("STORAGE", "Failed to create SQLite backup before authoring migration", {
         cause: error instanceof Error ? error.message : String(error),

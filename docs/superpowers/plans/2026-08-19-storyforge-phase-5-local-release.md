@@ -72,13 +72,13 @@ git commit -m "feat: add atomic project backup and restore"
 **Interfaces:**
 - Produces: `backupBeforeMigration(dbPath, targetVersion): BackupResult`; `npm run db:authoring:backup`.
 
-- [ ] **Step 1: Test backup success, disk failure, checksum, retention, and failed-migration preservation**
+- [x] **Step 1: Test backup success, disk failure, checksum, retention, and failed-migration preservation**
 
-- [ ] **Step 2: Implement backup-before-migrate**
+- [x] **Step 2: Implement backup-before-migrate**
 
 Use SQLite's backup API, reopen the copy read-only, run `PRAGMA integrity_check`, store SHA-256 and source migration version, and only then apply migrations. Keep the newest 10 automatic backups; never prune manual backups.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/database-backup.test.ts`
 
