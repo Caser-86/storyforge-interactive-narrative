@@ -1,5 +1,23 @@
-import { createGenerationRepository } from "./generation/repository";
-import type { GenerationRepository } from "./generation/repository";
+import { initializeAuthoringDatabase } from "./database";
+import { z } from "zod";
+
+type StageMetrics = { calls: number; p50: number; p95: number };
+
+export const ProjectGenerationMetricsSchema = z.object({
+  totalRuns: z.number().int().min(0),
+  activeRuns: z.number().int().min(0),
+  completedRuns: z.number().int().min(0),
+  failedRuns: z.number().int().min(0),
+  canceledRuns: z.number().int().min(0),
+  pausedRuns: z.number().int().min(0),
+  totalInputTokens: z.number().int().min(0),
+  totalOutputTokens: z.number().int().min(0),
+  totalRetries: z.number().int().min(0),
+  totalCalls: z.number().int().min(0),
+  failuresByCode: z.record(z.number().int().min(0)),
+  stageLatencyMs: z.record(z.object({ calls: z.number().int().min(0), p50: z.number().min(0), p95: z.number().min(0) }).strict()),
+  estimatedCost: z.number().min(0).nullable(),
+}).strict();
 
 export interface ProjectGenerationMetrics {
   totalRuns: number;
@@ -11,17 +29,54 @@ export interface ProjectGenerationMetrics {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalRetries: number;
+  totalCalls: number;
+  failuresByCode: Record<string, number>;
+  stageLatencyMs: Record<string, StageMetrics>;
+  estimatedCost: number | null;
 }
 
-export async function getProjectGenerationMetrics(
-  projectId: string,
-  repository?: GenerationRepository,
-): Promise<ProjectGenerationMetrics> {
-  const ownedRepository = repository === undefined;
-  const generation = repository ?? createGenerationRepository();
-
+export async function getProjectGenerationMetrics(projectId: string): Promise<ProjectGenerationMetrics> {
+  const db = initializeAuthoringDatabase();
   try {
-    const runs = await generation.listRuns(projectId);
+    const runs = db.prepare("SELECT status, input_tokens, output_tokens, retry_count, last_error_code FROM generation_runs WHERE project_id = ? ORDER BY created_at, id").all(projectId) as Array<{
+      status: string;
+      input_tokens: number;
+      output_tokens: number;
+      retry_count: number;
+      last_error_code: string | null;
+    }>;
+    const steps = db.prepare("SELECT s.stage, s.status, s.error_code, s.created_at, s.completed_at FROM generation_steps s JOIN generation_runs r ON r.id = s.run_id WHERE r.project_id = ? ORDER BY s.created_at, s.id").all(projectId) as Array<{
+      stage: string;
+      status: string;
+      error_code: string | null;
+      created_at: string;
+      completed_at: string | null;
+    }>;
+    const failuresByCode: Record<string, number> = {};
+    for (const run of runs) if (run.status === "failed" && run.last_error_code) failuresByCode[run.last_error_code] = (failuresByCode[run.last_error_code] ?? 0) + 1;
+    for (const step of steps) if (step.status === "failed" && step.error_code) failuresByCode[step.error_code] = (failuresByCode[step.error_code] ?? 0) + 1;
+    const stageLatencies = new Map<string, number[]>();
+    for (const step of steps) {
+      if (!step.completed_at) continue;
+      const duration = new Date(step.completed_at).getTime() - new Date(step.created_at).getTime();
+      if (!Number.isFinite(duration) || duration < 0) continue;
+      const durations = stageLatencies.get(step.stage) ?? [];
+      durations.push(duration);
+      stageLatencies.set(step.stage, durations);
+    }
+    const percentile = (durations: number[], fraction: number): number => {
+      const sorted = [...durations].sort((left, right) => left - right);
+      return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0;
+    };
+    const stageLatencyMs: Record<string, StageMetrics> = {};
+    for (const [stage, durations] of stageLatencies) stageLatencyMs[stage] = { calls: durations.length, p50: percentile(durations, 0.5), p95: percentile(durations, 0.95) };
+    const totalInputTokens = runs.reduce((sum, run) => sum + run.input_tokens, 0);
+    const totalOutputTokens = runs.reduce((sum, run) => sum + run.output_tokens, 0);
+    const inputPrice = Number(process.env.STORYFORGE_INPUT_PRICE_PER_MILLION);
+    const outputPrice = Number(process.env.STORYFORGE_OUTPUT_PRICE_PER_MILLION);
+    const estimatedCost = Number.isFinite(inputPrice) && Number.isFinite(outputPrice)
+      ? (totalInputTokens / 1_000_000) * inputPrice + (totalOutputTokens / 1_000_000) * outputPrice
+      : null;
     return {
       totalRuns: runs.length,
       activeRuns: runs.filter((run) => ["queued", "running"].includes(run.status)).length,
@@ -29,13 +84,15 @@ export async function getProjectGenerationMetrics(
       failedRuns: runs.filter((run) => run.status === "failed").length,
       canceledRuns: runs.filter((run) => run.status === "canceled").length,
       pausedRuns: runs.filter((run) => run.status === "paused").length,
-      totalInputTokens: runs.reduce((sum, run) => sum + run.inputTokens, 0),
-      totalOutputTokens: runs.reduce((sum, run) => sum + run.outputTokens, 0),
-      totalRetries: runs.reduce((sum, run) => sum + run.retryCount, 0),
+      totalInputTokens,
+      totalOutputTokens,
+      totalRetries: runs.reduce((sum, run) => sum + run.retry_count, 0),
+      totalCalls: steps.length,
+      failuresByCode,
+      stageLatencyMs,
+      estimatedCost,
     };
   } finally {
-    if (ownedRepository) {
-      generation.close();
-    }
+    db.close();
   }
 }

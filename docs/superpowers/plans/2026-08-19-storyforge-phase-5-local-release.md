@@ -101,13 +101,13 @@ git commit -m "feat: protect authoring migrations with backups"
 **Interfaces:**
 - Produces: calls, retries, failures by code, input/output tokens, stage latency, P50/P95, and optional estimate from configured per-million-token prices.
 
-- [ ] **Step 1: Test persisted aggregates, percentile ordering, missing price, and restart survival**
+- [x] **Step 1: Test persisted aggregates, percentile ordering, missing price, and restart survival**
 
-- [ ] **Step 2: Implement SQL-backed metrics**
+- [x] **Step 2: Implement SQL-backed metrics**
 
 When price configuration is absent, return `estimatedCost: null` and show tokens only. Never use the existing process-memory arrays as the authoring source of truth. Link the metrics panel from the project editor and label estimates separately from provider invoices.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 Run: `npm test -- src/__tests__/authoring/metrics.test.ts`
 

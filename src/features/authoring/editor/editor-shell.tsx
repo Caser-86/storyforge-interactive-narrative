@@ -10,6 +10,7 @@ import { OutlineTree } from "./outline-tree";
 import { ChoiceEditor } from "./choice-editor";
 import { IssuePanel } from "./issue-panel";
 import { ReleaseChecklist } from "./release-checklist";
+import { ProjectMetrics } from "../project-metrics";
 
 type EditorShellProps = {
   project: Project;
@@ -65,6 +66,7 @@ export function EditorShell({ project, graph, issues, draftRevision: initialDraf
           <div className={`inspector-issue ${blockingIssues.length > 0 ? "inspector-issue-warning" : ""}`}><strong>{blockingIssues.length}</strong><span>个阻断问题</span></div>
           <div className="inspector-divider" />
           <ReleaseChecklist projectId={project.id} refreshToken={qualityRefreshToken} />
+          <ProjectMetrics projectId={project.id} />
           <IssuePanel projectId={project.id} onSelectNode={setSelectedNodeId} refreshToken={qualityRefreshToken} />
           {selectedNode ? <NodeInspector key={selectedNode.id} projectId={project.id} node={selectedNode} onApplied={(updatedNode) => { setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); setQualityRefreshToken((current) => current + 1); }} /> : <p className="inspector-muted">尚未选择节点。</p>}
         </aside>

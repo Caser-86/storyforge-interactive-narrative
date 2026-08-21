@@ -72,7 +72,6 @@ export function migrateAuthoringDatabase(
   db: Database.Database,
   options: AuthoringDatabaseOptions = {},
 ): void {
-  const dbPath = getAuthoringDbPath(options);
   const appliedVersions = readAppliedVersions(db);
   const hasPendingNonEmptyMigration = AUTHORING_MIGRATIONS.some(
     (migration) => !appliedVersions.has(migration.version) && migration.up.trim().length > 0,
