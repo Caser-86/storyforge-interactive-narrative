@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ProjectGenerationMetricsSchema } from "@/lib/authoring/metrics";
+import { ProjectGenerationMetricsSchema } from "@/lib/authoring/metrics-contracts";
 
 type ProjectMetricsProps = { projectId: string };
 

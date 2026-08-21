@@ -1,5 +1,6 @@
 import { errorResponse, json } from "@/lib/authoring/api-contracts";
-import { getProjectGenerationMetrics, ProjectGenerationMetricsSchema } from "@/lib/authoring/metrics";
+import { ProjectGenerationMetricsSchema } from "@/lib/authoring/metrics-contracts";
+import { getProjectGenerationMetrics } from "@/lib/authoring/metrics";
 
 type MetricsRouteContext = { params: Promise<{ projectId: string }> };
 
