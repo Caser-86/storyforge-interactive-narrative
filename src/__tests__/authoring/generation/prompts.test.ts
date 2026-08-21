@@ -61,6 +61,7 @@ describe("generation prompts", () => {
   it("requires multiple bounded decision points in the generated graph", () => {
     expect(minimumBranchingNodes({ ...context, size: { preset: "micro", targetNodes: 8, targetEndings: 2 } })).toBe(2);
     expect(buildGraphPrompt(context, brief, bible, outline)).toContain("at least 2 distinct branching decision nodes");
+    expect(buildGraphPrompt(context, brief, bible, outline)).toContain("start node must immediately offer at least two outgoing choices");
   });
 
   it("spells out strict contracts for the planning stages", () => {

@@ -56,6 +56,11 @@ function validateGraphOutput(context: GenerationProjectContext, outline: Outline
   }
   const branchingNodeCount = [...outgoing.values()].filter((edges) => edges.length >= 2).length;
   const requiredBranchingNodes = minimumBranchingNodes(context);
+  const startNode = output.nodes.find((node) => node.kind === "start");
+  const startChoices = startNode ? outgoing.get(startNode.id)?.length ?? 0 : 0;
+  if (startChoices < 2) {
+    throw schemaFailure("The start node must offer at least two choices", { startChoices });
+  }
   if (branchingNodeCount < requiredBranchingNodes) {
     throw schemaFailure("Graph does not contain enough branching decision nodes", {
       requiredBranchingNodes,
