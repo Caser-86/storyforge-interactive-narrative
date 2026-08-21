@@ -248,12 +248,26 @@ The release gate is now the sole authorization path for snapshot/export actions.
 
 | Coverage row | Evidence | Status |
 | --- | --- | --- |
-| Project backup and new-ID restore | `src/__tests__/authoring/backup.test.ts`, `src/__tests__/authoring/backup-api.test.ts`, `e2e/authoring-release-flow.spec.ts` | pending final clean gate |
-| Migration backup integrity and retention | `src/__tests__/authoring/database-backup.test.ts`, `npm run db:authoring:backup` | pending final clean gate |
-| Metrics survive restart and cost stays null without prices | `src/__tests__/authoring/metrics.test.ts` | pending final clean gate |
-| Offline HTML with private fields excluded | `src/__tests__/authoring/export-private-fields.test.ts`, `e2e/authoring-offline-export.spec.ts` | pending final clean gate |
-| Local-only health and loopback startup | `src/__tests__/authoring/local-security.test.ts`, `src/__tests__/api-health.test.ts` | pending final clean gate |
-| Legacy sessions remain exportable | `src/__tests__/legacy-export.test.ts`, `npm run legacy:export -- --dry-run` | pending final clean gate |
+| Project backup and new-ID restore | `src/__tests__/authoring/backup.test.ts`, `src/__tests__/authoring/backup-api.test.ts`, `e2e/authoring-release-flow.spec.ts` | passed |
+| Migration backup integrity and retention | `src/__tests__/authoring/database-backup.test.ts`, `npm run db:authoring:backup` | passed |
+| Metrics survive restart and cost stays null without prices | `src/__tests__/authoring/metrics.test.ts` | passed |
+| Offline HTML with private fields excluded | `src/__tests__/authoring/export-private-fields.test.ts`, `e2e/authoring-offline-export.spec.ts` | passed |
+| Local-only health and loopback startup | `src/__tests__/authoring/local-security.test.ts`, `src/__tests__/api-health.test.ts` | passed |
+| Legacy sessions remain exportable | `src/__tests__/legacy-export.test.ts`, `npm run legacy:export -- --dry-run` | passed; retirement pending |
 | Full authoring browser loop | `e2e/authoring-release-flow.spec.ts` | passed locally |
 
-The rows will be updated with exact clean-directory counts, durations, Node/npm versions, and the migration version after the clean release gate completes. A row is not marked complete merely because a focused test passed in the existing worktree.
+The authoring rows are backed by both focused tests and the clean-directory gate below. Legacy export is verified, but route/package retirement remains a separate open task.
+
+### Final Clean-Directory Evidence
+
+- Commit: `52a6642` (`test: stabilize production authoring gate`).
+- Clean directory: `D:\Program Files\storyforge-clean-install-20260821-142321`.
+- Runtime: Node `v24.18.0`, npm `11.16.0`.
+- Install: `npm ci --cache "D:\Program Files\npm-cache" --no-audit --no-fund`; exit code `0`, `595` packages added in `18s`.
+- `npm run verify`: exit code `0`; `68` test files and `417` tests passed; typecheck and Next production build passed; lint has only the existing `error-boundary.tsx` navigation warning.
+- `npm run test:e2e:authoring`: exit code `0`; `6` tests passed in `11.7s` using fake generation and a standalone production server.
+- `npm run db:authoring:smoke`: exit code `0`; temporary SQLite project lifecycle passed.
+- `npm run db:authoring:backup`: exit code `0`; backup reported `Integrity: ok` and SHA-256 `05c35128050beae3e3c17f4f73aa3b2ba90f10895ddf8e7717f261aac43c5cfb`.
+- `npm run legacy:export -- --dry-run`: exit code `0`; inspected `0` sessions and wrote `0` files without changing source data.
+
+The clean authoring release gate is complete. Phase 5 remains open for Task 6 legacy route/package retirement: the build still lists legacy game, share, stats, user, asset routes and the old Redis/image dependencies remain installed for the migration window.

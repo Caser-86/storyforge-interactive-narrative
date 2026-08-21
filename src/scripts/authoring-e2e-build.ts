@@ -2,10 +2,10 @@ import { spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const result = spawnSync(npmCommand, ["run", "build"], {
+const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
+const args = process.platform === "win32" ? ["/d", "/s", "/c", "npm run build"] : ["run", "build"];
+const result = spawnSync(command, args, {
   env: { ...process.env, NEXT_DIST_DIR: ".next-playwright" },
-  shell: true,
   stdio: "inherit",
 });
 

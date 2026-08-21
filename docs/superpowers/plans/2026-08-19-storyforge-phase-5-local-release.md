@@ -226,11 +226,11 @@ git commit -m "refactor: retire legacy game and asset defaults"
 
 Create a project, generate with fixtures, resume one failure, edit, validate, resolve issues, preview, snapshot, export offline, backup, delete, import, and compare restored graph/version counts.
 
-- [ ] **Step 2: Run from a clean secondary directory**
+- [x] **Step 2: Run from a clean secondary directory**
 
 Clone or copy tracked files to a new directory, run `npm ci`, configure a temporary SQLite path and fake provider, then execute all final commands. Do not reuse the existing `node_modules`, `.next`, or database.
 
-- [ ] **Step 3: Run final commands**
+- [x] **Step 3: Run final commands**
 
 Run: `npm run verify`
 
@@ -242,11 +242,11 @@ Run: `npm run db:authoring:backup`
 
 Expected: all exit 0; exported HTML passes offline; no Redis/image/public-auth service starts.
 
-- [ ] **Step 4: Complete the coverage audit**
+- [x] **Step 4: Complete the coverage audit**
 
 For every row in the master coverage matrix, link the exact passing test or manual command in `docs/release/authoring-verification.md`. Record test counts, durations, Node/npm versions, database migration version, and residual risks.
 
-- [ ] **Step 5: Commit release evidence**
+- [x] **Step 5: Commit release evidence**
 
 ```powershell
 git add e2e/authoring-release-flow.spec.ts .github/workflows/ci.yml docs/release/authoring-verification.md docs/release/authoring-release-checklist.md package.json package-lock.json
