@@ -1,6 +1,5 @@
 import { initializeAuthoringDatabase } from "./database";
 export { ProjectGenerationMetricsSchema } from "./metrics-contracts";
-import { ProjectGenerationMetricsSchema } from "./metrics-contracts";
 
 type StageMetrics = { calls: number; p50: number; p95: number };
 
