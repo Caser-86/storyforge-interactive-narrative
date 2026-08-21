@@ -11,7 +11,7 @@ const story: ExportStory = {
       { id: "start", chapterId: "chapter", nodeKey: "start", kind: "start", title: "Start", body: "Begin", summary: "Begin" },
       { id: "end", chapterId: "chapter", nodeKey: "end", kind: "ending", title: "End", body: "Finish", summary: "Finish" },
     ],
-    edges: [{ id: "edge", sourceNodeId: "start", targetNodeId: "end", label: "Continue", sortOrder: 0 }],
+    edges: [{ id: "edge", sourceNodeId: "start", targetNodeId: "end", label: "Continue", branchType: "main", sortOrder: 0 }],
   },
 };
 

@@ -1,6 +1,6 @@
 import type { GenerationProvider } from "../provider";
 import type { GenerationProjectContext } from "../prompts";
-import { buildGraphPrompt, STAGE_SYSTEM_PROMPT } from "../prompts";
+import { buildGraphPrompt, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
 import type { BriefOutput, BibleOutput, GraphOutput, OutlineOutput, StageExecutionResult } from "./types";
 import { GraphOutputSchema } from "./types";
 import { assertUnique, schemaFailure } from "./common";
@@ -47,6 +47,23 @@ function validateGraphOutput(context: GenerationProjectContext, outline: Outline
       throw schemaFailure("Graph edge references an unknown node", { edgeId: edge.id });
     }
   }
+
+  const outgoing = new Map<string, typeof output.edges>();
+  for (const edge of output.edges) {
+    const edges = outgoing.get(edge.sourceNodeId) ?? [];
+    edges.push(edge);
+    outgoing.set(edge.sourceNodeId, edges);
+  }
+  for (const [sourceNodeId, edges] of outgoing) {
+    if (edges.length < 2) continue;
+    const mainEdges = edges.filter((edge) => edge.branchType === "main");
+    if (mainEdges.length !== 1) {
+      throw schemaFailure("Every branching node must have exactly one main edge", {
+        sourceNodeId,
+        mainEdgeCount: mainEdges.length,
+      });
+    }
+  }
 }
 
 export async function executeGraphStage(
@@ -63,6 +80,7 @@ export async function executeGraphStage(
     userPrompt: buildGraphPrompt(context, brief, bible, outline),
     outputSchema: GraphOutputSchema,
     model: context.model,
+    maxTokens: STAGE_MAX_TOKENS.graph,
   });
   const output = providerResult.data;
   validateGraphOutput(context, outline, output);

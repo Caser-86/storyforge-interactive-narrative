@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AuthoringError } from "./errors";
 import { StoryNodeKindSchema } from "./schemas";
+import { BranchTypeSchema } from "./schemas";
 
 export const ReaderChapterSchema = z
   .object({
@@ -29,6 +30,7 @@ export const ReaderStoryEdgeSchema = z
     sourceNodeId: z.string().min(1),
     targetNodeId: z.string().min(1),
     label: z.string().min(1),
+    branchType: BranchTypeSchema,
     sortOrder: z.number().int().min(0),
   })
   .strict();

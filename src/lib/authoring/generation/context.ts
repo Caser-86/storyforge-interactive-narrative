@@ -13,6 +13,7 @@ export interface SuccessorChoiceContext {
   label: string;
   intent: string;
   consequenceSummary: string;
+  branchType: "main" | "side";
   targetNodeId: string;
 }
 
@@ -70,6 +71,7 @@ export function buildNodeContext(graph: GraphOutput, nodeId: string): NodeGenera
       label: edge.label,
       intent: edge.intent,
       consequenceSummary: edge.consequenceSummary,
+      branchType: edge.branchType,
       targetNodeId: edge.targetNodeId,
     }));
 

@@ -2,7 +2,7 @@
 
 import type { KeyboardEvent } from "react";
 import { useMemo } from "react";
-import type { StoryGraph, StoryNode } from "@/lib/authoring/schemas";
+import type { StoryEdge, StoryGraph, StoryNode } from "@/lib/authoring/schemas";
 
 type OutlineTreeProps = {
   graph: StoryGraph;
@@ -13,8 +13,8 @@ type OutlineTreeProps = {
 };
 
 type OutlineEntry =
-  | { type: "node"; node: StoryNode; depth: number; edgeLabel?: string }
-  | { type: "reference"; node: StoryNode; depth: number; edgeLabel?: string };
+  | { type: "node"; node: StoryNode; depth: number; edgeLabel?: string; branchType?: StoryEdge["branchType"] }
+  | { type: "reference"; node: StoryNode; depth: number; edgeLabel?: string; branchType?: StoryEdge["branchType"] };
 
 const contentStatusLabels: Record<StoryNode["contentStatus"], string> = {
   planned: "待生成",
@@ -43,17 +43,17 @@ function buildChapterEntries(graph: StoryGraph, chapterId: string): OutlineEntry
   const entries: OutlineEntry[] = [];
   const visited = new Set<string>();
 
-  function visit(node: StoryNode, depth: number, edgeLabel?: string) {
+  function visit(node: StoryNode, depth: number, edgeLabel?: string, branchType?: StoryEdge["branchType"]) {
     if (visited.has(node.id)) {
-      entries.push({ type: "reference", node, depth, edgeLabel });
+      entries.push({ type: "reference", node, depth, edgeLabel, branchType });
       return;
     }
 
     visited.add(node.id);
-    entries.push({ type: "node", node, depth, edgeLabel });
+    entries.push({ type: "node", node, depth, edgeLabel, branchType });
     for (const edge of outgoing.get(node.id) ?? []) {
       const target = nodeById.get(edge.targetNodeId);
-      if (target) visit(target, depth + 1, edge.label);
+      if (target) visit(target, depth + 1, edge.label, edge.branchType);
     }
   }
 
@@ -101,7 +101,7 @@ export function OutlineTree({ graph, selectedNodeId, collapsedChapterIds, onSele
                     return (
                       <div className="outline-reference" data-depth={entry.depth} key={`reference-${entry.node.id}-${index}`}>
                         <span aria-hidden="true">↳</span>
-                        <span>{entry.edgeLabel ?? "分支"} · 汇合至 {entry.node.title}</span>
+                        <span>{entry.branchType === "main" ? "主线" : "支线"} · {entry.edgeLabel ?? "分支"} · 汇合至 {entry.node.title}</span>
                       </div>
                     );
                   }

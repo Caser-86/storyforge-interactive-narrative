@@ -37,6 +37,7 @@ describe("generation node context", () => {
           label: "Return",
           intent: "loop",
           consequenceSummary: "The route folds back.",
+          branchType: "side" as const,
           sortOrder: 1,
         },
       ],
@@ -64,6 +65,8 @@ describe("generation node context", () => {
 
     expect(result.outputs).toHaveLength(2);
     expect(provider.allCalls()).toHaveLength(2);
+    expect(provider.allCalls()[0].userPrompt).toContain('"nodeId": "string"');
+    expect(provider.allCalls()[0].userPrompt).toContain("Do not include extra keys");
   });
 
   it("returns warning-only continuity review output", async () => {
@@ -86,5 +89,7 @@ describe("generation node context", () => {
 
     expect(result.output.issues[0]).toMatchObject({ code: "THREAD_UNRESOLVED" });
     expect(result.output.issues[0].severity).toBe("warning");
+    expect(provider.callsFor("continuity_review:main")[0].userPrompt).toContain('"passed": true');
+    expect(provider.callsFor("continuity_review:main")[0].userPrompt).toContain("Do not include extra keys");
   });
 });

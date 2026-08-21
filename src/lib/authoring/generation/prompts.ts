@@ -15,7 +15,16 @@ export interface GenerationProjectContext {
   model?: string;
 }
 
-export const STAGE_SYSTEM_PROMPT = "You are a structured interactive-fiction planner. Return only valid JSON matching the requested schema. Keep identifiers stable and never invent prose for a later stage.";
+export const STAGE_SYSTEM_PROMPT = "You are a structured interactive-fiction planner. Return only valid JSON matching the requested schema. Do not reveal analysis or markdown. Keep strings concise, identifiers stable, and never invent prose for a later stage.";
+
+export const STAGE_MAX_TOKENS = {
+  brief: 1600,
+  bible: 2600,
+  outline: 9000,
+  graph: 7000,
+  nodes: 2200,
+  continuity_review: 7000,
+} as const;
 
 function projectFrame(context: GenerationProjectContext): string {
   return JSON.stringify({
@@ -35,11 +44,11 @@ export function buildBriefPrompt(context: GenerationProjectContext): string {
 }
 
 export function buildBiblePrompt(context: GenerationProjectContext, brief: BriefOutput): string {
-  return `Create the story bible. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Define immutable world rules, themes, characters, canon facts, and forbidden changes.`;
+  return `Create the story bible. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Define immutable world rules, themes, characters, canon facts, and forbidden changes. Return exactly this JSON shape: { "worldRules": ["string"], "themes": ["string"], "characters": [{ "id": "string", "name": "string", "role": "string", "traits": ["string"], "goal": "string", "secret": "string" }], "canonFacts": ["string"], "forbiddenChanges": ["string"] }. Use at least one item in every required array. Do not include extra keys, markdown, or scene prose.`;
 }
 
 export function buildOutlinePrompt(context: GenerationProjectContext, brief: BriefOutput, bible: BibleOutput): string {
-  return `Create a bounded chapter and node outline. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. Allocate stable chapter and node IDs, exactly one start node, and at least ${context.size.targetEndings} ending node plans. Do not write final node bodies.`;
+  return `Create a bounded chapter and node outline. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. Allocate stable chapter and node IDs, exactly one start node, and at least ${context.size.targetEndings} ending node plans. Return exactly this JSON shape: { "chapters": [{ "id": "string", "title": "string", "goal": "string", "summary": "string" }], "nodes": [{ "id": "string", "chapterId": "string", "kind": "start | scene | ending", "title": "string", "objective": "string" }] }. Use kind exactly as one of start, scene, or ending. Do not include extra keys, final node bodies, markdown, or scene prose.`;
 }
 
 export function buildGraphPrompt(
@@ -48,7 +57,7 @@ export function buildGraphPrompt(
   bible: BibleOutput,
   outline: OutlineOutput,
 ): string {
-  return `Create the directed story graph skeleton. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. Outline: ${JSON.stringify(outline)}. Reuse every outline chapter and node ID exactly, add only valid edge references, and stay within ${context.size.targetNodes} nodes. Do not write final node bodies.`;
+  return `Create the directed story graph skeleton. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. Outline: ${JSON.stringify(outline)}. Reuse every outline chapter and node ID exactly, add only valid edge references, and stay within ${context.size.targetNodes} nodes. Return exactly this JSON shape: { "chapters": [{ "id": "string", "title": "string", "goal": "string", "summary": "string" }], "nodes": [{ "id": "string", "chapterId": "string", "kind": "start | scene | ending", "title": "string", "objective": "string", "summary": "string", "topologicalRank": 0 }], "edges": [{ "id": "string", "sourceNodeId": "string", "targetNodeId": "string", "label": "string", "intent": "string", "consequenceSummary": "string", "branchType": "main | side", "sortOrder": 0 }] }. Keep the graph acyclic. At every branching node, exactly one edge must have branchType main and every other edge must have branchType side; every side branch must merge back into the mainline or reach an ending. Do not include extra keys, final node bodies, markdown, or scene prose.`;
 }
 
 export function buildStageRequestContext(context: GenerationProjectContext): { model?: string } {

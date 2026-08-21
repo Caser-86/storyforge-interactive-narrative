@@ -141,6 +141,7 @@ type StoryEdgeRow = {
   label: string;
   intent: string;
   consequence_summary: string;
+  branch_type: "main" | "side";
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -247,6 +248,7 @@ function toStoryEdge(row: StoryEdgeRow): StoryEdge {
     label: row.label,
     intent: row.intent,
     consequenceSummary: row.consequence_summary,
+    branchType: row.branch_type,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -594,10 +596,10 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         this.db
           .prepare(
             `UPDATE story_edges
-             SET label = ?, intent = ?, consequence_summary = ?, updated_at = ?
+             SET label = ?, intent = ?, consequence_summary = ?, branch_type = ?, updated_at = ?
              WHERE id = ? AND version_id = ?`,
           )
-          .run(patch.label ?? current.label, patch.intent ?? current.intent, patch.consequenceSummary ?? current.consequence_summary, updatedAt, edgeId, draft.id);
+          .run(patch.label ?? current.label, patch.intent ?? current.intent, patch.consequenceSummary ?? current.consequence_summary, patch.branchType ?? current.branch_type, updatedAt, edgeId, draft.id);
 
         const sourceNodeId = current.source_node_id;
         const affectedNodeIds = findAffectedNodes(graph, sourceNodeId);
@@ -821,9 +823,9 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
     const insertEdge = this.db.prepare(`
       INSERT INTO story_edges (
         id, version_id, source_node_id, target_node_id, label, intent,
-        consequence_summary, sort_order, created_at, updated_at
+        consequence_summary, branch_type, sort_order, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const chapter of graph.chapters) {
@@ -868,6 +870,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         edge.label,
         edge.intent,
         edge.consequenceSummary,
+        edge.branchType,
         edge.sortOrder,
         edge.createdAt,
         edge.updatedAt,

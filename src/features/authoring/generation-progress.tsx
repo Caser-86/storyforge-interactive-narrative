@@ -96,6 +96,7 @@ export function GenerationProgress({ projectId, projectTitle }: GenerationProgre
     if (!run || !isAdvancing(run.status) || isLoading) return;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let currentRun = run;
 
     const tick = async () => {
       if (disposed || advancing.current) return;
@@ -106,14 +107,18 @@ export function GenerationProgress({ projectId, projectTitle }: GenerationProgre
 
       advancing.current = true;
       try {
-        const result = await advanceGeneration(projectId, run.id);
+        const result = await advanceGeneration(projectId, currentRun.id);
         if (disposed) return;
+        currentRun = result.run;
         setRun(result.run);
-        await syncStatus(result.run);
+        currentRun = await syncStatus(result.run);
       } catch (advanceError) {
         if (!disposed) setError(advanceError instanceof Error ? advanceError.message : "生成推进失败");
       } finally {
         advancing.current = false;
+        if (!disposed && isAdvancing(currentRun.status)) {
+          timer = setTimeout(() => void tick(), 350);
+        }
       }
     };
 
@@ -122,7 +127,7 @@ export function GenerationProgress({ projectId, projectTitle }: GenerationProgre
       disposed = true;
       if (timer) clearTimeout(timer);
     };
-    // The run status is the persisted resume cursor for this loop.
+    // The response drives the next tick; a queued run can keep the same status across steps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, run?.id, run?.status, isLoading]);
 

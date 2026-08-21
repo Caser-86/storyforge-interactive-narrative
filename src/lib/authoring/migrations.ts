@@ -390,4 +390,22 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_validation_issues_version_revision ON validation_issues(version_id, draft_revision, source);
     `,
   },
+  {
+    version: 6,
+    name: "explicit_main_and_side_branches",
+    up: `
+      ALTER TABLE story_edges
+      ADD COLUMN branch_type TEXT NOT NULL DEFAULT 'side'
+      CHECK (branch_type IN ('main', 'side'));
+
+      UPDATE story_edges
+      SET branch_type = 'main'
+      WHERE sort_order = (
+        SELECT MIN(candidate.sort_order)
+        FROM story_edges AS candidate
+        WHERE candidate.version_id = story_edges.version_id
+          AND candidate.source_node_id = story_edges.source_node_id
+      );
+    `,
+  },
 ];

@@ -146,4 +146,40 @@ describe("generation executor", () => {
       setupState.close();
     }
   });
+
+  it("runs leased node content steps concurrently", async () => {
+    const setupState = await setup();
+    try {
+      const run = await setupState.repository.createRun(setupState.project.id, setupState.project.activeDraftVersionId!, {
+        now: NOW,
+        steps: [
+          { stepKey: "nodes:a", stage: "nodes", subjectId: "node-a", sortOrder: 0 },
+          { stepKey: "nodes:b", stage: "nodes", subjectId: "node-b", sortOrder: 1 },
+        ],
+      });
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      let resolveSecond!: () => void;
+      const secondStarted = new Promise<string>((resolve) => { resolveSecond = () => resolve("started"); });
+      const handler = vi.fn(async (step: GenerationStep) => {
+        if (step.stepKey === "nodes:b") resolveSecond();
+        await gate;
+        return handlerResult(step);
+      });
+      const executor = createGenerationExecutor(setupState.repository, { handlers: { nodes: handler } });
+
+      const execution = executor.executeNext(run.id, NOW);
+      const result = await Promise.race([
+        secondStarted,
+        new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 100)),
+      ]);
+      release();
+      await execution;
+
+      expect(result).toBe("started");
+      expect(handler).toHaveBeenCalledTimes(2);
+    } finally {
+      setupState.close();
+    }
+  });
 });

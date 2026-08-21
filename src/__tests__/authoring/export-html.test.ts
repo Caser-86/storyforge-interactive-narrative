@@ -75,6 +75,7 @@ const BASE_STORY: ExportStory = {
         sourceNodeId: "node-start",
         targetNodeId: "node-left",
         label: "Walk between the trees",
+        branchType: "main",
         sortOrder: 0,
       },
       {
@@ -82,6 +83,7 @@ const BASE_STORY: ExportStory = {
         sourceNodeId: "node-start",
         targetNodeId: "node-ending-b",
         label: "Return to the city",
+        branchType: "side",
         sortOrder: 1,
       },
       {
@@ -89,6 +91,7 @@ const BASE_STORY: ExportStory = {
         sourceNodeId: "node-left",
         targetNodeId: "node-ending-a",
         label: "Light the lantern",
+        branchType: "main",
         sortOrder: 0,
       },
     ],

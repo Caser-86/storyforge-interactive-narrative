@@ -3,7 +3,7 @@ import { buildNodeContext } from "../context";
 import type { GenerationProvider, ProviderResult } from "../provider";
 import { ProviderError } from "../provider-errors";
 import type { GenerationProjectContext } from "../prompts";
-import { STAGE_SYSTEM_PROMPT } from "../prompts";
+import { STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
 import type { GraphOutput } from "./types";
 
 export const NodeContentOutputSchema = z
@@ -35,26 +35,26 @@ export async function executeNodeBatch(input: NodeBatchInput, maxBatch = 2): Pro
     .filter((node) => input.nodeIds === undefined || input.nodeIds.includes(node.id))
     .sort((left, right) => left.topologicalRank - right.topologicalRank || left.id.localeCompare(right.id))
     .slice(0, boundedBatch);
-  const outputs: NodeContentOutput[] = [];
-  const providerResults: ProviderResult<NodeContentOutput>[] = [];
-
-  for (const node of nodes) {
+  const results = await Promise.all(nodes.map(async (node) => {
     const nodeContext = buildNodeContext(input.graph, node.id);
     const providerResult = await input.provider.generate({
       stage: "nodes",
       stepKey: `nodes:${node.id}`,
       systemPrompt: STAGE_SYSTEM_PROMPT,
-      userPrompt: `Write only the final content for this node. Keep all canon and branch facts consistent. Context: ${JSON.stringify(nodeContext)}`,
+      userPrompt: `Write only the final content for this node. Keep all canon and branch facts consistent. Context: ${JSON.stringify(nodeContext)}. Return exactly this JSON shape: { "nodeId": "string", "body": "string", "summary": "string", "objective": "string" }. Set nodeId to ${node.id}. Do not include extra keys, markdown, or commentary.`,
       outputSchema: NodeContentOutputSchema,
       model: input.context?.model,
+      maxTokens: STAGE_MAX_TOKENS.nodes,
     });
     if (providerResult.data.nodeId !== node.id) {
       throw new ProviderError("SCHEMA", `Node provider returned ${providerResult.data.nodeId} for ${node.id}`, false);
     }
 
-    outputs.push(providerResult.data);
-    providerResults.push(providerResult);
-  }
+    return providerResult;
+  }));
 
-  return { outputs, providerResults };
+  return {
+    outputs: results.map((result) => result.data),
+    providerResults: results,
+  };
 }

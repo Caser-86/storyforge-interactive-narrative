@@ -1,6 +1,6 @@
 import type { GenerationProvider } from "../provider";
 import type { GenerationProjectContext } from "../prompts";
-import { buildOutlinePrompt, STAGE_SYSTEM_PROMPT } from "../prompts";
+import { buildOutlinePrompt, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
 import type { BriefOutput, BibleOutput, OutlineOutput, StageExecutionResult } from "./types";
 import { OutlineOutputSchema } from "./types";
 import { assertUnique, schemaFailure } from "./common";
@@ -18,6 +18,7 @@ export async function executeOutlineStage(
     userPrompt: buildOutlinePrompt(context, brief, bible),
     outputSchema: OutlineOutputSchema,
     model: context.model,
+    maxTokens: STAGE_MAX_TOKENS.outline,
   });
   const output = providerResult.data;
 

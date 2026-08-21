@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
     const generationGraph = {
       chapters: graph.chapters.map(({ id, title, goal, summary }) => ({ id, title, goal, summary })),
       nodes: graph.nodes.map(({ id, chapterId, kind, title, summary, objective, topologicalRank }) => ({ id, chapterId, kind, title, summary, objective, topologicalRank })),
-      edges: graph.edges.map(({ id, sourceNodeId, targetNodeId, label, intent, consequenceSummary, sortOrder }) => ({ id, sourceNodeId, targetNodeId, label, intent, consequenceSummary, sortOrder })),
+      edges: graph.edges.map(({ id, sourceNodeId, targetNodeId, label, intent, consequenceSummary, branchType, sortOrder }) => ({ id, sourceNodeId, targetNodeId, label, intent, consequenceSummary, branchType, sortOrder })),
     };
     const provider = process.env.GENERATION_PROVIDER === "fake" ? new FakeGenerationProvider() : new OpenAICompatibleGenerationProvider();
     if (provider instanceof FakeGenerationProvider) {

@@ -58,6 +58,7 @@ function readerGraph(): ReaderStoryGraph {
         sourceNodeId: "start",
         targetNodeId: "left",
         label: "Take the left stair",
+        branchType: "main",
         sortOrder: 0,
       },
       {
@@ -65,6 +66,7 @@ function readerGraph(): ReaderStoryGraph {
         sourceNodeId: "start",
         targetNodeId: "right",
         label: "Take the right stair",
+        branchType: "side",
         sortOrder: 1,
       },
       {
@@ -72,6 +74,7 @@ function readerGraph(): ReaderStoryGraph {
         sourceNodeId: "left",
         targetNodeId: "ending",
         label: "Lift the lantern",
+        branchType: "main",
         sortOrder: 0,
       },
     ],

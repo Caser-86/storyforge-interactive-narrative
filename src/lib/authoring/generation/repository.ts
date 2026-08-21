@@ -650,11 +650,12 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
                   OR (status = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)
                 )
                 AND NOT EXISTS (
-                  SELECT 1 FROM generation_steps prior
+                SELECT 1 FROM generation_steps prior
                   WHERE prior.run_id = generation_steps.run_id
                     AND prior.status != 'completed'
                     AND prior.sort_order < generation_steps.sort_order
-                )
+                    AND NOT (prior.stage = 'nodes' AND generation_steps.stage = 'nodes')
+              )
               ORDER BY sort_order ASC, created_at ASC, id ASC
               LIMIT ?
             `,

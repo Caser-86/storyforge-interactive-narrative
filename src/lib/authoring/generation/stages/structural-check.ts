@@ -50,6 +50,7 @@ function materializeGraph(context: GenerationProjectContext, graph: GraphOutput)
       label: edge.label,
       intent: edge.intent,
       consequenceSummary: edge.consequenceSummary,
+      branchType: edge.branchType,
       sortOrder: edge.sortOrder,
       createdAt: STRUCTURAL_TIMESTAMP,
       updatedAt: STRUCTURAL_TIMESTAMP,

@@ -1,6 +1,6 @@
 import type { GenerationProvider } from "../provider";
 import type { GenerationProjectContext } from "../prompts";
-import { buildBiblePrompt, STAGE_SYSTEM_PROMPT } from "../prompts";
+import { buildBiblePrompt, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
 import type { BriefOutput, BibleOutput, StageExecutionResult } from "./types";
 import { BibleOutputSchema } from "./types";
 
@@ -16,6 +16,7 @@ export async function executeBibleStage(
     userPrompt: buildBiblePrompt(context, brief),
     outputSchema: BibleOutputSchema,
     model: context.model,
+    maxTokens: STAGE_MAX_TOKENS.bible,
   });
 
   return {

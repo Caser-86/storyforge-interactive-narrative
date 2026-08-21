@@ -63,4 +63,17 @@ describe("generation stage handlers", () => {
       retryable: false,
     } satisfies Partial<ProviderError>);
   });
+
+  it("requires exactly one main edge at each branching node", async () => {
+    const provider = providerWithFixtures();
+    provider.reply("graph", "graph:main", {
+      ...graphFixture,
+      edges: graphFixture.edges.map((edge) => edge.sourceNodeId === "node-start" ? { ...edge, branchType: "main" as const } : edge),
+    });
+
+    await expect(executeGraphStage(generationContext, provider, briefFixture, bibleFixture, outlineFixture)).rejects.toMatchObject({
+      code: "SCHEMA",
+      retryable: false,
+    } satisfies Partial<ProviderError>);
+  });
 });

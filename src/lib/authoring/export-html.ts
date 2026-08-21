@@ -73,6 +73,7 @@ function sanitizeStory(input: ExportStory): ExportStory {
       sourceNodeId: edge.sourceNodeId,
       targetNodeId: edge.targetNodeId,
       label: edge.label,
+      branchType: edge.branchType,
       sortOrder: edge.sortOrder,
     }),
   );

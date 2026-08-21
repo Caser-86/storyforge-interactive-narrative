@@ -249,6 +249,7 @@ function readProjectBackup(db: Database.Database, projectId: string): ProjectBac
       label: row.label,
       intent: row.intent,
       consequenceSummary: row.consequence_summary,
+      branchType: row.branch_type,
       sortOrder: row.sort_order,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -479,8 +480,8 @@ function insertBackup(db: Database.Database, backup: ProjectBackupV1, mode: "new
   for (const chapter of mapped.chapters) insertChapter.run(chapter.id, chapter.versionId, chapter.ordinal, chapter.title, chapter.goal, chapter.summary, chapter.createdAt, chapter.updatedAt);
   const insertNode = db.prepare("INSERT INTO story_nodes (id, version_id, chapter_id, node_key, kind, title, body, summary, objective, topological_rank, content_status, author_modified, content_revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const node of mapped.nodes) insertNode.run(node.id, node.versionId, node.chapterId, node.nodeKey, node.kind, node.title, node.body, node.summary, node.objective, node.topologicalRank, node.contentStatus, node.authorModified ? 1 : 0, node.contentRevision, node.createdAt, node.updatedAt);
-  const insertEdge = db.prepare("INSERT INTO story_edges (id, version_id, source_node_id, target_node_id, label, intent, consequence_summary, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  for (const edge of mapped.edges) insertEdge.run(edge.id, edge.versionId, edge.sourceNodeId, edge.targetNodeId, edge.label, edge.intent, edge.consequenceSummary, edge.sortOrder, edge.createdAt, edge.updatedAt);
+  const insertEdge = db.prepare("INSERT INTO story_edges (id, version_id, source_node_id, target_node_id, label, intent, consequence_summary, branch_type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  for (const edge of mapped.edges) insertEdge.run(edge.id, edge.versionId, edge.sourceNodeId, edge.targetNodeId, edge.label, edge.intent, edge.consequenceSummary, edge.branchType, edge.sortOrder, edge.createdAt, edge.updatedAt);
   const insertRun = db.prepare("INSERT INTO generation_runs (id, project_id, version_id, stage, status, progress_current, progress_total, model, input_tokens, output_tokens, retry_count, last_error_code, last_error_message, lease_expires_at, started_at, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)");
   for (const run of mapped.generation.runs) insertRun.run(run.id, run.projectId, run.versionId, run.stage, run.status, run.progressCurrent, run.progressTotal, run.model, run.inputTokens, run.outputTokens, run.retryCount, run.lastErrorCode, run.lastErrorMessage, run.startedAt, run.createdAt, run.updatedAt, run.completedAt);
   const insertStep = db.prepare("INSERT INTO generation_steps (id, run_id, step_key, stage, subject_id, status, attempt, sort_order, lease_expires_at, next_attempt_at, model, request_json, raw_response, parsed_response_json, input_tokens, output_tokens, error_code, error_message, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, '{}', NULL, NULL, ?, ?, ?, ?, ?, ?, ?)");

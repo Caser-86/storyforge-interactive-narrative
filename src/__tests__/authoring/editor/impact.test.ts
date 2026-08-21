@@ -24,9 +24,9 @@ const graph: StoryGraph = {
     updatedAt: timestamp,
   } as StoryGraph["nodes"][number])),
   edges: [
-    { id: "edge-1", versionId: "version-1", sourceNodeId: "start", targetNodeId: "left", label: "left", intent: "left", consequenceSummary: "left", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
-    { id: "edge-2", versionId: "version-1", sourceNodeId: "left", targetNodeId: "merge", label: "merge", intent: "merge", consequenceSummary: "merge", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
-    { id: "edge-3", versionId: "version-1", sourceNodeId: "merge", targetNodeId: "ending", label: "end", intent: "end", consequenceSummary: "end", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
+    { id: "edge-1", versionId: "version-1", sourceNodeId: "start", targetNodeId: "left", label: "left", intent: "left", consequenceSummary: "left", branchType: "main", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
+    { id: "edge-2", versionId: "version-1", sourceNodeId: "left", targetNodeId: "merge", label: "merge", intent: "merge", consequenceSummary: "merge", branchType: "main", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
+    { id: "edge-3", versionId: "version-1", sourceNodeId: "merge", targetNodeId: "ending", label: "end", intent: "end", consequenceSummary: "end", branchType: "main", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
   ],
 };
 

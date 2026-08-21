@@ -56,6 +56,7 @@ function edge(
     label,
     intent: `intent-${sortOrder}`,
     consequenceSummary: `consequence-${sortOrder}`,
+    branchType: sortOrder === 0 ? "main" : "side",
     sortOrder,
     createdAt: NOW,
     updatedAt: NOW,

@@ -46,8 +46,7 @@ export class GenerationExecutor {
       return { runStatus: run.status, processedSteps: 0 };
     }
 
-    let processedSteps = 0;
-    for (const step of steps) {
+    const processStep = async (step: GenerationStep): Promise<{ shouldStop: boolean }> => {
       const run = await this.repository.getRun(runId);
       const handler = this.options.handlers[step.stage];
 
@@ -70,15 +69,15 @@ export class GenerationExecutor {
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
         });
-        processedSteps += 1;
+        return { shouldStop: false };
       } catch (error) {
         const decision = retryDecision(error, step.attempt, now);
         if (decision.error.code === "AUTH") {
-          const paused = await this.repository.pauseRun(runId, now, {
+          await this.repository.pauseRun(runId, now, {
             code: decision.error.code,
             message: decision.error.message,
           });
-          return { runStatus: paused.status, processedSteps: processedSteps + 1 };
+          return { shouldStop: true };
         }
 
         await this.repository.failStep(step.id, {
@@ -90,11 +89,19 @@ export class GenerationExecutor {
           retryable: decision.retryable,
           nextAttemptAt: decision.nextAttemptAt,
         });
-        processedSteps += 1;
+        return { shouldStop: !decision.retryable };
+      }
+    };
 
-        if (!decision.retryable) {
-          break;
-        }
+    let processedSteps = 0;
+    if (steps.length > 1 && steps.every((step) => step.stage === "nodes")) {
+      await Promise.all(steps.map((step) => processStep(step)));
+      processedSteps = steps.length;
+    } else {
+      for (const step of steps) {
+        const outcome = await processStep(step);
+        processedSteps += 1;
+        if (outcome.shouldStop) break;
       }
     }
 

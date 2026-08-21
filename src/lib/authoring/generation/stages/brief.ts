@@ -1,6 +1,6 @@
 import type { GenerationProvider } from "../provider";
 import type { GenerationProjectContext } from "../prompts";
-import { buildBriefPrompt, STAGE_SYSTEM_PROMPT } from "../prompts";
+import { buildBriefPrompt, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
 import { BriefOutputSchema } from "./types";
 import type { BriefOutput, StageExecutionResult } from "./types";
 
@@ -15,6 +15,7 @@ export async function executeBriefStage(
     userPrompt: buildBriefPrompt(context),
     outputSchema: BriefOutputSchema,
     model: context.model,
+    maxTokens: STAGE_MAX_TOKENS.brief,
   });
 
   return {

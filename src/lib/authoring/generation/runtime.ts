@@ -73,6 +73,7 @@ function fixedProvider(project: Awaited<ReturnType<AuthoringRepository["getProje
     summary: `${title} summary`,
     topologicalRank: index,
   }));
+  const edgeSortOrders = new Map<string, number>();
   const edges = [
     ["edge-start-left", "node-start", "node-left", "Open the vault"],
     ["edge-start-right", "node-start", "node-right", "Take the tunnel"],
@@ -82,15 +83,20 @@ function fixedProvider(project: Awaited<ReturnType<AuthoringRepository["getProje
     ["edge-right-merge", "node-right-detail", "node-merge", "Reach the heart"],
     ["edge-merge-left", "node-merge", "node-left-end", "Keep the seed"],
     ["edge-merge-right", "node-merge", "node-right-end", "Tell the city"],
-  ].map(([id, sourceNodeId, targetNodeId, label], sortOrder) => ({
-    id,
-    sourceNodeId,
-    targetNodeId,
-    label,
-    intent: `intent-${sortOrder}`,
-    consequenceSummary: `consequence-${sortOrder}`,
-    sortOrder,
-  }));
+  ].map(([id, sourceNodeId, targetNodeId, label], index) => {
+    const sortOrder = edgeSortOrders.get(sourceNodeId) ?? 0;
+    edgeSortOrders.set(sourceNodeId, sortOrder + 1);
+    return {
+      id,
+      sourceNodeId,
+      targetNodeId,
+      label,
+      intent: `intent-${index}`,
+      consequenceSummary: `consequence-${index}`,
+      branchType: sortOrder === 0 ? "main" as const : "side" as const,
+      sortOrder,
+    };
+  });
 
   provider.reply("brief", "brief:main", {
     title: project.title,

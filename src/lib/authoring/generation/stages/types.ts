@@ -73,6 +73,7 @@ export const GraphEdgeSchema = z
     label: z.string().min(1),
     intent: z.string().min(1),
     consequenceSummary: z.string().min(1),
+    branchType: z.enum(["main", "side"]),
     sortOrder: z.number().int().min(0),
   })
   .strict();

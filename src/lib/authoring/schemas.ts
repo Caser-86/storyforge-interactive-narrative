@@ -16,6 +16,7 @@ export type JsonArray = JsonValue[];
 
 export const ProjectSizePresetSchema = z.enum(projectSizePresets);
 export const StoryNodeKindSchema = z.enum(storyNodeKinds);
+export const BranchTypeSchema = z.enum(["main", "side"]);
 export const VersionKindSchema = z.enum(versionKinds);
 
 export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
@@ -95,6 +96,7 @@ export const StoryEdgePatchSchema = z
     label: z.string().trim().min(1).optional(),
     intent: z.string().trim().min(1).optional(),
     consequenceSummary: z.string().trim().min(1).optional(),
+    branchType: BranchTypeSchema.optional(),
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, { message: "At least one edge field is required." });
@@ -108,6 +110,7 @@ export const StoryEdgeSchema = z
     label: z.string().min(1),
     intent: z.string().min(1),
     consequenceSummary: z.string().min(1),
+    branchType: BranchTypeSchema,
     sortOrder: z.number().int().min(0),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),

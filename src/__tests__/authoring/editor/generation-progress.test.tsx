@@ -97,4 +97,21 @@ describe("GenerationProgress", () => {
 
     await waitFor(() => expect(api.generationAction).toHaveBeenCalledWith("project-1", "run-1", "resume"));
   });
+
+  it("keeps advancing when a completed step leaves the run queued", async () => {
+    let current = run({ status: "queued", progressCurrent: 0 });
+    api.listGenerationRuns.mockResolvedValue([current]);
+    api.getGenerationStatus.mockImplementation(async () => statusResponse(current));
+    api.advanceGeneration.mockImplementation(async () => {
+      current = api.advanceGeneration.mock.calls.length === 1
+        ? run({ status: "queued", progressCurrent: 1 })
+        : run({ status: "completed", progressCurrent: 2, progressTotal: 2, stage: "ready", completedAt: "2026-08-21T00:01:00.000Z" });
+      return statusResponse(current);
+    });
+
+    render(<GenerationProgress projectId="project-1" projectTitle="夜航船" />);
+
+    await waitFor(() => expect(api.advanceGeneration).toHaveBeenCalledTimes(2), { timeout: 2500 });
+    expect(await screen.findByText("生成完成")).toBeInTheDocument();
+  });
 });

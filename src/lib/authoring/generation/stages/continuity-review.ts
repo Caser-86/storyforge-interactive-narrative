@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { GenerationProvider, ProviderResult } from "../provider";
 import type { GenerationProjectContext } from "../prompts";
-import { STAGE_SYSTEM_PROMPT } from "../prompts";
+import { STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../prompts";
 import type { BibleOutput, GraphOutput, OutlineOutput } from "./types";
 import { NodeContentOutputSchema, type NodeContentOutput } from "./nodes";
 
@@ -46,9 +46,10 @@ export async function executeContinuityReview(input: ContinuityReviewInput): Pro
     stage: "continuity_review",
     stepKey: "continuity_review:main",
     systemPrompt: STAGE_SYSTEM_PROMPT,
-    userPrompt: `Review continuity only. Return warnings with node evidence; do not invent blocking validation issues. Bible: ${JSON.stringify(input.bible)}. Outline: ${JSON.stringify(input.outline)}. Graph: ${JSON.stringify(input.graph)}. Node contents: ${JSON.stringify(input.nodeContents.map((node) => NodeContentOutputSchema.parse(node)))}`,
+    userPrompt: `Review continuity only. Return warnings with node evidence; do not invent blocking validation issues. Bible: ${JSON.stringify(input.bible)}. Outline: ${JSON.stringify(input.outline)}. Graph: ${JSON.stringify(input.graph)}. Node contents: ${JSON.stringify(input.nodeContents.map((node) => NodeContentOutputSchema.parse(node)))}. Return exactly this JSON shape: { "passed": true, "issues": [{ "code": "string", "message": "string", "nodeIds": ["string"], "severity": "warning" }] }. Use an empty issues array when no continuity warning exists. Do not include extra keys, markdown, or blocking validation claims.`,
     outputSchema: ContinuityReviewOutputSchema,
     model: input.context.model,
+    maxTokens: STAGE_MAX_TOKENS.continuity_review,
   });
 
   return {

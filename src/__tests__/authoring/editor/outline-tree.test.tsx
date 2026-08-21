@@ -45,11 +45,11 @@ function graph(): StoryGraph {
       node("chapter-2-node", chapter2, "n-after", "余波", "scene", 5, "planned"),
     ],
     edges: [
-      { id: "edge-1", versionId: "version-1", sourceNodeId: "start", targetNodeId: "left", label: "走左边", intent: "left", consequenceSummary: "左", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
-      { id: "edge-2", versionId: "version-1", sourceNodeId: "start", targetNodeId: "right", label: "走右边", intent: "right", consequenceSummary: "右", sortOrder: 1, createdAt: timestamp, updatedAt: timestamp },
-      { id: "edge-3", versionId: "version-1", sourceNodeId: "left", targetNodeId: "merge", label: "返回", intent: "merge", consequenceSummary: "汇合", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
-      { id: "edge-4", versionId: "version-1", sourceNodeId: "right", targetNodeId: "merge", label: "穿过", intent: "merge", consequenceSummary: "汇合", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
-      { id: "edge-5", versionId: "version-1", sourceNodeId: "merge", targetNodeId: "ending", label: "决定", intent: "end", consequenceSummary: "结束", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
+      { id: "edge-1", versionId: "version-1", sourceNodeId: "start", targetNodeId: "left", label: "走左边", intent: "left", consequenceSummary: "左", branchType: "main", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
+      { id: "edge-2", versionId: "version-1", sourceNodeId: "start", targetNodeId: "right", label: "走右边", intent: "right", consequenceSummary: "右", branchType: "side", sortOrder: 1, createdAt: timestamp, updatedAt: timestamp },
+      { id: "edge-3", versionId: "version-1", sourceNodeId: "left", targetNodeId: "merge", label: "返回", intent: "merge", consequenceSummary: "汇合", branchType: "main", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
+      { id: "edge-4", versionId: "version-1", sourceNodeId: "right", targetNodeId: "merge", label: "穿过", intent: "merge", consequenceSummary: "汇合", branchType: "main", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
+      { id: "edge-5", versionId: "version-1", sourceNodeId: "merge", targetNodeId: "ending", label: "决定", intent: "end", consequenceSummary: "结束", branchType: "main", sortOrder: 0, createdAt: timestamp, updatedAt: timestamp },
     ],
   };
 }
@@ -62,7 +62,7 @@ describe("OutlineTree", () => {
     expect(chapterHeadings[0]).toHaveTextContent("第一章 · 分岔");
     expect(chapterHeadings[1]).toHaveTextContent("第二章 · 回声");
     expect(screen.getAllByRole("button", { name: /汇合点/ })).toHaveLength(1);
-    expect(screen.getByText("穿过 · 汇合至 汇合点")).toBeInTheDocument();
+    expect(screen.getByText("主线 · 穿过 · 汇合至 汇合点")).toBeInTheDocument();
     expect(screen.getByRole("treeitem", { name: /左路/ })).toHaveAttribute("data-depth", "1");
   });
 
