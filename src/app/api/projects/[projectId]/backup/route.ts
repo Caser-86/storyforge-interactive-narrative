@@ -1,4 +1,4 @@
-import { ProjectBackupV1Schema, exportProjectBackup } from "@/lib/authoring/backup";
+import { ProjectBackupV2Schema, exportProjectBackup } from "@/lib/authoring/backup";
 import { errorResponse } from "@/lib/authoring/api-contracts";
 
 type BackupRouteContext = {
@@ -9,7 +9,7 @@ export async function GET(_request: Request, { params }: BackupRouteContext): Pr
   try {
     const { projectId } = await params;
     const backup = await exportProjectBackup(projectId);
-    return new Response(JSON.stringify(ProjectBackupV1Schema.parse(backup), null, 2), {
+    return new Response(JSON.stringify(ProjectBackupV2Schema.parse(backup), null, 2), {
       status: 200,
       headers: {
         "content-type": "application/json; charset=utf-8",

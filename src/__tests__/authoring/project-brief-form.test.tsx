@@ -84,6 +84,22 @@ describe("ProjectBriefForm", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("blocks a custom size that cannot contain the requested endings", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.mocked(fetch);
+    render(<ProjectBriefForm />);
+    await user.click(screen.getByRole("radio", { name: /自定义/ }));
+    await fillRequiredFields(user);
+    await user.clear(screen.getByLabelText("目标节点数"));
+    await user.type(screen.getByLabelText("目标节点数"), "8");
+    await user.clear(screen.getByLabelText("目标结局数"));
+    await user.type(screen.getByLabelText("目标结局数"), "10");
+    await user.click(screen.getByRole("button", { name: "创建项目" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("结局数必须少于节点数至少 2 个");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("creates the project and moves into the generation step", async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockResolvedValue(okCreateResponse());

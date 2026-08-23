@@ -15,6 +15,7 @@ import { GenerationErrorCodeSchema, GenerationStageSchema, GenerationStepStatusS
 import { ValidationIssueStatusSchema, ValidationRunStatusSchema, ValidationSeveritySchema, ValidationSourceSchema } from "./validation/schemas";
 import type { AuthoringDatabaseOptions } from "./database";
 import type { Chapter, JsonValue, Project, StoryEdge, StoryNode } from "./schemas";
+import { InteractiveSceneSchema, InteractiveSessionStatusSchema, InteractiveStateSchema } from "@/lib/interactive/schemas";
 
 const BackupGenerationRunSchema = z
   .object({
@@ -117,32 +118,80 @@ const BackupVersionSchema = StoryVersionSchema.extend({
   validationLimitsJson: JsonValueSchema,
 }).strict();
 
+const BackupInteractiveSessionSchema = z
+  .object({
+    id: z.string().min(1),
+    projectId: z.string().min(1),
+    status: InteractiveSessionStatusSchema,
+    turn: z.number().int().min(0),
+    targetTurns: z.number().int().min(2).max(40),
+    state: InteractiveStateSchema,
+    currentTurnId: z.string().min(1).nullable(),
+    lastError: z.string().min(1).nullable(),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
+const BackupInteractiveTurnSchema = z
+  .object({
+    id: z.string().min(1),
+    sessionId: z.string().min(1),
+    turn: z.number().int().min(1),
+    scene: InteractiveSceneSchema,
+    selectedChoiceId: z.string().min(1).nullable(),
+    selectedAt: z.string().min(1).nullable(),
+    createdAt: z.string().min(1),
+  })
+  .strict();
+
+const projectBackupCoreShape = {
+  exportedAt: z.string().min(1),
+  project: ProjectSchema,
+  versions: z.array(BackupVersionSchema),
+  chapters: z.array(ChapterSchema),
+  nodes: z.array(StoryNodeSchema),
+  edges: z.array(StoryEdgeSchema),
+  generation: z
+    .object({
+      runs: z.array(BackupGenerationRunSchema),
+      steps: z.array(BackupGenerationStepSchema),
+      candidates: z.array(BackupGenerationCandidateSchema),
+    })
+    .strict(),
+  validation: z
+    .object({
+      runs: z.array(BackupValidationRunSchema),
+      issues: z.array(BackupValidationIssueSchema),
+    })
+    .strict(),
+};
+
 export const ProjectBackupV1Schema = z
   .object({
     schema: z.literal("storyforge-project@1"),
-    exportedAt: z.string().min(1),
-    project: ProjectSchema,
-    versions: z.array(BackupVersionSchema),
-    chapters: z.array(ChapterSchema),
-    nodes: z.array(StoryNodeSchema),
-    edges: z.array(StoryEdgeSchema),
-    generation: z
+    ...projectBackupCoreShape,
+  })
+  .strict();
+
+export type ProjectBackupV1 = z.infer<typeof ProjectBackupV1Schema>;
+
+export const ProjectBackupV2Schema = z
+  .object({
+    schema: z.literal("storyforge-project@2"),
+    ...projectBackupCoreShape,
+    interactive: z
       .object({
-        runs: z.array(BackupGenerationRunSchema),
-        steps: z.array(BackupGenerationStepSchema),
-        candidates: z.array(BackupGenerationCandidateSchema),
-      })
-      .strict(),
-    validation: z
-      .object({
-        runs: z.array(BackupValidationRunSchema),
-        issues: z.array(BackupValidationIssueSchema),
+        sessions: z.array(BackupInteractiveSessionSchema),
+        turns: z.array(BackupInteractiveTurnSchema),
       })
       .strict(),
   })
   .strict();
 
-export type ProjectBackupV1 = z.infer<typeof ProjectBackupV1Schema>;
+export const ProjectBackupSchema = z.union([ProjectBackupV1Schema, ProjectBackupV2Schema]);
+export type ProjectBackupV2 = z.infer<typeof ProjectBackupV2Schema>;
+export type ProjectBackup = z.infer<typeof ProjectBackupSchema>;
 
 function parseJson(text: string): JsonValue {
   return JsonValueSchema.parse(JSON.parse(text));
@@ -167,7 +216,7 @@ function validationError(error: unknown, message: string): AuthoringError {
   });
 }
 
-function readProjectBackup(db: Database.Database, projectId: string): ProjectBackupV1 {
+function readProjectBackup(db: Database.Database, projectId: string): ProjectBackupV2 {
   const projectRow = db.prepare("SELECT * FROM projects WHERE id = ?").get(projectId) as Record<string, unknown> | undefined;
   if (!projectRow) throw new AuthoringError("NOT_FOUND", "Project not found", { projectId });
 
@@ -351,8 +400,36 @@ function readProjectBackup(db: Database.Database, projectId: string): ProjectBac
     }),
   );
 
-  return ProjectBackupV1Schema.parse({
-    schema: "storyforge-project@1",
+  const interactiveSessions = (db.prepare("SELECT * FROM interactive_sessions WHERE project_id = ? ORDER BY created_at, id").all(projectId) as Record<string, unknown>[]).map((row) =>
+    BackupInteractiveSessionSchema.parse({
+      id: row.id,
+      projectId: row.project_id,
+      status: row.status,
+      turn: row.turn,
+      targetTurns: row.target_turns,
+      state: InteractiveStateSchema.parse(JSON.parse(String(row.state_json))),
+      currentTurnId: row.current_turn_id,
+      lastError: safeMessage(row.last_error as string | null),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }),
+  );
+  const interactiveSessionIds = interactiveSessions.map((session) => session.id);
+  const interactiveSessionPlaceholders = interactiveSessionIds.length > 0 ? interactiveSessionIds.map(() => "?").join(",") : "NULL";
+  const interactiveTurns = (db.prepare(`SELECT * FROM interactive_turns WHERE session_id IN (${interactiveSessionPlaceholders}) ORDER BY session_id, turn, id`).all(...interactiveSessionIds) as Record<string, unknown>[]).map((row) =>
+    BackupInteractiveTurnSchema.parse({
+      id: row.id,
+      sessionId: row.session_id,
+      turn: row.turn,
+      scene: InteractiveSceneSchema.parse(JSON.parse(String(row.scene_json))),
+      selectedChoiceId: row.selected_choice_id,
+      selectedAt: row.selected_at,
+      createdAt: row.created_at,
+    }),
+  );
+
+  return ProjectBackupV2Schema.parse({
+    schema: "storyforge-project@2",
     exportedAt: new Date().toISOString(),
     project,
     versions,
@@ -361,10 +438,11 @@ function readProjectBackup(db: Database.Database, projectId: string): ProjectBac
     edges,
     generation: { runs, steps, candidates },
     validation: { runs: validationRuns, issues: validationIssues },
+    interactive: { sessions: interactiveSessions, turns: interactiveTurns },
   });
 }
 
-export async function exportProjectBackup(projectId: string, options: AuthoringDatabaseOptions = {}): Promise<ProjectBackupV1> {
+export async function exportProjectBackup(projectId: string, options: AuthoringDatabaseOptions = {}): Promise<ProjectBackupV2> {
   let db: Database.Database | undefined;
   try {
     db = initializeAuthoringDatabase(options);
@@ -376,14 +454,15 @@ export async function exportProjectBackup(projectId: string, options: AuthoringD
   }
 }
 
-function mapIds(backup: ProjectBackupV1, remap: boolean): {
-  project: ProjectBackupV1["project"];
-  versions: ProjectBackupV1["versions"];
+function mapIds(backup: ProjectBackup, remap: boolean): {
+  project: ProjectBackup["project"];
+  versions: ProjectBackup["versions"];
   chapters: Chapter[];
   nodes: StoryNode[];
   edges: StoryEdge[];
-  generation: ProjectBackupV1["generation"];
-  validation: ProjectBackupV1["validation"];
+  generation: ProjectBackup["generation"];
+  validation: ProjectBackup["validation"];
+  interactive: ProjectBackupV2["interactive"];
 } {
   const id = (value: string | null): string | null => (value && remap ? randomUUID() : value);
   const projectId = remap ? randomUUID() : backup.project.id;
@@ -393,6 +472,11 @@ function mapIds(backup: ProjectBackupV1, remap: boolean): {
   const runIds = new Map(backup.generation.runs.map((run) => [run.id, id(run.id)!]));
   const stepIds = new Map(backup.generation.steps.map((step) => [step.id, id(step.id)!]));
   const validationRunIds = new Map(backup.validation.runs.map((run) => [run.id, id(run.id)!]));
+  const interactive = backup.schema === "storyforge-project@2"
+    ? backup.interactive
+    : { sessions: [], turns: [] };
+  const interactiveSessionIds = new Map(interactive.sessions.map((session) => [session.id, id(session.id)!]));
+  const interactiveTurnIds = new Map(interactive.turns.map((turn) => [turn.id, id(turn.id)!]));
 
   const project = {
     ...backup.project,
@@ -442,17 +526,35 @@ function mapIds(backup: ProjectBackupV1, remap: boolean): {
       edgeId: issue.edgeId ? edgeIds.get(issue.edgeId) ?? null : null,
     })),
   };
+  const mappedInteractive = {
+    sessions: interactive.sessions.map((session) => ({
+      ...session,
+      id: interactiveSessionIds.get(session.id)!,
+      projectId,
+      currentTurnId: session.currentTurnId ? interactiveTurnIds.get(session.currentTurnId) ?? null : null,
+    })),
+    turns: interactive.turns.map((turn) => ({
+      ...turn,
+      id: interactiveTurnIds.get(turn.id)!,
+      sessionId: interactiveSessionIds.get(turn.sessionId)!,
+    })),
+  };
 
-  return { project, versions, chapters, nodes, edges, generation, validation };
+  return { project, versions, chapters, nodes, edges, generation, validation, interactive: mappedInteractive };
 }
 
-function assertRelations(backup: ProjectBackupV1): void {
+function assertRelations(backup: ProjectBackup): void {
   const versionIds = new Set(backup.versions.map((version) => version.id));
   const chapterIds = new Set(backup.chapters.map((chapter) => chapter.id));
   const nodeIds = new Set(backup.nodes.map((node) => node.id));
   const runIds = new Set(backup.generation.runs.map((run) => run.id));
   const stepIds = new Set(backup.generation.steps.map((step) => step.id));
   const validationRunIds = new Set(backup.validation.runs.map((run) => run.id));
+  const interactive = backup.schema === "storyforge-project@2"
+    ? backup.interactive
+    : { sessions: [], turns: [] };
+  const interactiveSessionIds = new Set(interactive.sessions.map((session) => session.id));
+  const interactiveTurnIds = new Set(interactive.turns.map((turn) => turn.id));
   if (!backup.project.activeDraftVersionId || !versionIds.has(backup.project.activeDraftVersionId)) throw new Error("active draft version is missing");
   for (const version of backup.versions) if (version.projectId !== backup.project.id || (version.sourceVersionId && !versionIds.has(version.sourceVersionId))) throw new Error("version relation is invalid");
   for (const chapter of backup.chapters) if (!versionIds.has(chapter.versionId)) throw new Error("chapter version relation is invalid");
@@ -463,9 +565,11 @@ function assertRelations(backup: ProjectBackupV1): void {
   for (const candidate of backup.generation.candidates) if (candidate.projectId !== backup.project.id || !versionIds.has(candidate.versionId) || !nodeIds.has(candidate.nodeId) || (candidate.runId && !runIds.has(candidate.runId)) || (candidate.stepId && !stepIds.has(candidate.stepId))) throw new Error("generation candidate relation is invalid");
   for (const run of backup.validation.runs) if (run.projectId !== backup.project.id || !versionIds.has(run.versionId)) throw new Error("validation run relation is invalid");
   for (const issue of backup.validation.issues) if (issue.projectId !== backup.project.id || !versionIds.has(issue.versionId) || (issue.runId && !validationRunIds.has(issue.runId)) || (issue.nodeId && !nodeIds.has(issue.nodeId))) throw new Error("validation issue relation is invalid");
+  for (const session of interactive.sessions) if (session.projectId !== backup.project.id || (session.currentTurnId && !interactiveTurnIds.has(session.currentTurnId))) throw new Error("interactive session relation is invalid");
+  for (const turn of interactive.turns) if (!interactiveSessionIds.has(turn.sessionId) || (turn.selectedChoiceId && !turn.scene.choices.some((choice) => choice.id === turn.selectedChoiceId))) throw new Error("interactive turn relation is invalid");
 }
 
-function insertBackup(db: Database.Database, backup: ProjectBackupV1, mode: "new-id" | "replace"): Project {
+function insertBackup(db: Database.Database, backup: ProjectBackup, mode: "new-id" | "replace"): Project {
   assertRelations(backup);
   const mapped = mapIds(backup, mode === "new-id");
   if (mode === "replace") db.prepare("DELETE FROM projects WHERE id = ?").run(mapped.project.id);
@@ -492,13 +596,17 @@ function insertBackup(db: Database.Database, backup: ProjectBackupV1, mode: "new
   for (const run of mapped.validation.runs) insertValidationRun.run(run.id, run.projectId, run.versionId, run.draftRevision, JSON.stringify(run.sources), run.status, run.errorMessage, run.createdAt, run.completedAt);
   const insertValidationIssue = db.prepare("INSERT INTO validation_issues (id, project_id, version_id, run_id, draft_revision, source, severity, code, message, node_id, edge_id, details_json, fingerprint, status, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const issue of mapped.validation.issues) insertValidationIssue.run(issue.id, issue.projectId, issue.versionId, issue.runId, issue.draftRevision, issue.source, issue.severity, issue.code, issue.message, issue.nodeId, issue.edgeId, JSON.stringify(issue.detailsJson), issue.fingerprint, issue.status, issue.createdAt, issue.resolvedAt);
+  const insertInteractiveSession = db.prepare("INSERT INTO interactive_sessions (id, project_id, status, turn, target_turns, state_json, current_turn_id, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  for (const session of mapped.interactive.sessions) insertInteractiveSession.run(session.id, session.projectId, session.status, session.turn, session.targetTurns, JSON.stringify(session.state), session.currentTurnId, session.lastError, session.createdAt, session.updatedAt);
+  const insertInteractiveTurn = db.prepare("INSERT INTO interactive_turns (id, session_id, turn, scene_json, selected_choice_id, selected_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+  for (const turn of mapped.interactive.turns) insertInteractiveTurn.run(turn.id, turn.sessionId, turn.turn, JSON.stringify(turn.scene), turn.selectedChoiceId, turn.selectedAt, turn.createdAt);
   return mapped.project;
 }
 
 export async function importProjectBackup(input: unknown, mode: "new-id" | "replace", options: AuthoringDatabaseOptions = {}): Promise<Project> {
-  let backup: ProjectBackupV1;
+  let backup: ProjectBackup;
   try {
-    backup = ProjectBackupV1Schema.parse(input);
+    backup = ProjectBackupSchema.parse(input);
     assertRelations(backup);
   } catch (error) {
     throw validationError(error, "Invalid StoryForge project backup");

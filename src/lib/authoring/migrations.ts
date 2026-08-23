@@ -408,4 +408,40 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
       );
     `,
   },
+  {
+    version: 7,
+    name: "interactive_generation_sessions",
+    up: `
+      CREATE TABLE IF NOT EXISTS interactive_sessions (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('generating', 'active', 'ended', 'failed')),
+        turn INTEGER NOT NULL DEFAULT 0,
+        target_turns INTEGER NOT NULL,
+        state_json TEXT NOT NULL DEFAULT '{}',
+        current_turn_id TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS interactive_turns (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        turn INTEGER NOT NULL,
+        scene_json TEXT NOT NULL,
+        selected_choice_id TEXT,
+        selected_at TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (session_id) REFERENCES interactive_sessions(id) ON DELETE CASCADE,
+        UNIQUE (session_id, turn)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_interactive_sessions_project
+        ON interactive_sessions(project_id, updated_at);
+      CREATE INDEX IF NOT EXISTS idx_interactive_turns_session
+        ON interactive_turns(session_id, turn);
+    `,
+  },
 ];

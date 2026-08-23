@@ -102,4 +102,54 @@ test.describe("authoring release gate", () => {
     expect(restored.nodes).toHaveLength(graph.nodes.length);
     expect(restored.edges).toHaveLength(graph.edges.length);
   });
+
+  test("keeps project filters and actions usable on desktop and mobile", async ({ page, request }) => {
+    const createProject = async (title: string) => {
+      const response = await request.post("/api/projects", {
+        data: {
+          title,
+          premise: "A local project remains searchable throughout its authoring lifecycle.",
+          genre: "mystery",
+          tone: "measured",
+          pointOfView: "third person",
+          rating: "PG-13",
+          size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+        },
+      });
+      expect(response.ok()).toBe(true);
+      return (await response.json()).project as { id: string };
+    };
+
+    await createProject("潮汐档案");
+    const archivedProject = await createProject("归档手记");
+    const archiveResponse = await request.patch(`/api/projects/${archivedProject.id}`, {
+      data: { status: "archived" },
+    });
+    expect(archiveResponse.ok()).toBe(true);
+
+    for (const viewport of [
+      { width: 1280, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      await expect(page.getByRole("heading", { name: "项目库" })).toBeVisible();
+
+      await page.getByLabel("筛选项目").fill("潮汐");
+      await expect(page.getByRole("heading", { name: "潮汐档案" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "归档手记" })).not.toBeVisible();
+
+      await page.getByLabel("筛选项目").fill("");
+      await page.getByLabel("项目状态").selectOption("archived");
+      await expect(page.getByRole("heading", { name: "归档手记" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "潮汐档案" })).not.toBeVisible();
+
+      const actionButtons = page.locator(".project-actions button");
+      for (let index = 0; index < await actionButtons.count(); index += 1) {
+        const button = actionButtons.nth(index);
+        await button.focus();
+        await expect(button).toBeFocused();
+      }
+    }
+  });
 });

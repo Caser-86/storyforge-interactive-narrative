@@ -73,6 +73,7 @@ describe("generation prompts", () => {
     expect(biblePrompt).toContain('"characters": [{ "id": "string"');
     expect(outlinePrompt).toContain('"chapters": [{ "id": "string"');
     expect(outlinePrompt).toContain('"nodes": [{ "id": "string"');
+    expect(outlinePrompt).toContain("exactly 8 total nodes");
     expect(graphPrompt).toContain('"branchType": "main | side"');
     expect(graphPrompt).toContain("mainline");
     expect(graphPrompt).toContain("side branch");

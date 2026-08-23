@@ -105,6 +105,7 @@ export async function materializeGenerationRunOutputs(
 
 function fixedProvider(project: Awaited<ReturnType<AuthoringRepository["getProject"]>>): GenerationProvider {
   const provider = new FakeGenerationProvider();
+  const versionPrefix = project.activeDraftVersionId ? `${project.activeDraftVersionId}:` : "";
   const chapter = { id: "chapter-1", title: "Below the Tramline", goal: "Find the orchard entrance.", summary: "Mara follows a service map below the city." };
   const nodes = [
     ["node-start", "start", "The Service Door"],
@@ -167,8 +168,8 @@ function fixedProvider(project: Awaited<ReturnType<AuthoringRepository["getProje
   provider.reply("outline", "outline:main", { chapters: [chapter], nodes: nodes.map(({ summary: _summary, topologicalRank: _rank, ...node }) => node) });
   provider.reply("graph", "graph:main", { chapters: [chapter], nodes, edges });
   for (const node of nodes) {
-    provider.reply("nodes", `nodes:${node.id}`, {
-      nodeId: node.id,
+    provider.reply("nodes", `nodes:${versionPrefix}${node.id}`, {
+      nodeId: `${versionPrefix}${node.id}`,
       body: `${node.title} unfolds with a concrete choice and consequence.`,
       summary: node.summary,
       objective: node.objective,

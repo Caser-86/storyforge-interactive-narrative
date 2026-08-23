@@ -1,37 +1,67 @@
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { buildBriefPrompt, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../lib/authoring/generation/prompts";
+import { OpenAICompatibleGenerationProvider } from "../lib/authoring/generation/openai-provider";
+import { buildSmokeReport } from "../lib/authoring/generation/smoke";
+import { BriefOutputSchema } from "../lib/authoring/generation/stages/types";
+import { getErrorMessage } from "../lib/errors";
+
 const args = new Set(process.argv.slice(2));
-const presetIndex = process.argv.indexOf("--preset");
-const preset = presetIndex >= 0 ? process.argv[presetIndex + 1] : "micro";
-const presets = {
-  micro: { targetNodes: 8, targetEndings: 2 },
-  short: { targetNodes: 24, targetEndings: 4 },
-  medium: { targetNodes: 48, targetEndings: 6 },
-} as const;
-
-if (!(preset in presets)) {
-  console.error(`Unknown preset: ${preset}`);
-  process.exit(1);
-}
-
-const size = presets[preset as keyof typeof presets];
-const stages = ["brief", "bible", "outline", "graph", "structural_check", "nodes", "continuity_review"];
-const maxProviderCalls = size.targetNodes + 5;
 const model = process.env.OPENAI_MODEL || "deepseek-v4-flash";
-const baseURL = process.env.OPENAI_BASE_URL || "https://api.deepseek.com";
 
-console.log("StoryForge authoring LLM smoke");
-console.log(`preset: ${preset}`);
-console.log(`stages: ${stages.join(" -> ")}`);
-console.log(`target nodes: ${size.targetNodes}`);
-console.log(`target endings: ${size.targetEndings}`);
-console.log(`maximum provider calls: ${maxProviderCalls}`);
-console.log(`model: ${model}`);
-console.log(`base URL: ${baseURL}`);
-console.log(`API key: ${process.env.OPENAI_API_KEY ? "configured (redacted)" : "not configured"}`);
-
-if (args.has("--dry-run")) {
-  console.log("dry-run: no database, provider client, or network request was created");
-  process.exit(0);
+function smokeContext() {
+  return {
+    projectId: "manual-llm-smoke",
+    versionId: "manual-llm-smoke",
+    title: "第九档案室",
+    premise: "一名档案员在封存的档案室中发现一扇不该存在的门。",
+    genre: "悬疑",
+    tone: "克制紧张",
+    pointOfView: "第二人称",
+    rating: "PG-13",
+    language: "Chinese",
+    size: { preset: "micro" as const, targetNodes: 8, targetEndings: 2 },
+    model,
+  };
 }
 
-console.error("Only --dry-run is supported by this safe smoke command.");
-process.exit(1);
+async function smoke(): Promise<void> {
+  if (args.has("--dry-run")) {
+    console.log(JSON.stringify({ status: "dry-run", model, networkRequest: false }));
+    return;
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required for the manual LLM smoke test.");
+  }
+
+  const provider = new OpenAICompatibleGenerationProvider();
+  const context = smokeContext();
+  const result = await provider.generate({
+    stage: "brief",
+    stepKey: "brief:manual-smoke",
+    systemPrompt: STAGE_SYSTEM_PROMPT,
+    userPrompt: buildBriefPrompt(context),
+    outputSchema: BriefOutputSchema,
+    model,
+    maxTokens: STAGE_MAX_TOKENS.brief,
+  });
+
+  console.log(JSON.stringify(buildSmokeReport({
+    model: result.model,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    latencyMs: result.latencyMs,
+  })));
+}
+
+function isDirectRun(): boolean {
+  const entry = process.argv[1];
+  return Boolean(entry && import.meta.url === pathToFileURL(path.resolve(entry)).href);
+}
+
+if (isDirectRun()) {
+  smoke().catch((error) => {
+    console.error(getErrorMessage(error));
+    process.exit(1);
+  });
+}

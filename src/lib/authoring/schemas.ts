@@ -29,7 +29,11 @@ export const ProjectSizeSchema = z
     targetNodes: z.number().int().min(8).max(80),
     targetEndings: z.number().int().min(2).max(10),
   })
-  .strict();
+  .strict()
+  .refine((size) => size.targetEndings <= size.targetNodes - 2, {
+    path: ["targetEndings"],
+    message: "Target endings must be at least 2 below target nodes.",
+  });
 
 export const StoryVersionSchema = z
   .object({

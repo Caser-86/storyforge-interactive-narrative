@@ -7,6 +7,7 @@ import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository, CreateProjectInput } from "@/lib/authoring/repository";
 import {
   ProjectBackupV1Schema,
+  ProjectBackupV2Schema,
   exportProjectBackup,
   importProjectBackup,
 } from "@/lib/authoring/backup";
@@ -120,6 +121,69 @@ async function createProjectWithGraph() {
         "PRIVATE_CANDIDATE_RESPONSE",
         "2026-08-21T00:00:00.000Z",
       );
+    const interactiveState = {
+      seedPrompt: project.premise,
+      turn: 2,
+      targetTurns: 8,
+      knownFacts: ["门后的记录"],
+      openThreads: ["门后的真相"],
+      resolvedThreads: [],
+      lastChoiceImpact: "调查方向发生了变化。",
+      endingReadiness: 20,
+    };
+    const interactiveScene = {
+      title: "门前",
+      body: "你站在门前。",
+      summary: "你必须做出决定。",
+      choices: [
+        { id: "choice_a", label: "推门进入", intent: "确认门后的记录", risk: "medium", consequencePreview: "你会立即看到线索。" },
+        { id: "choice_b", label: "先行调查", intent: "寻找更安全的入口", risk: "low", consequencePreview: "你会获得额外信息。" },
+      ],
+      isEnding: false,
+      endingSummary: null,
+    };
+    database
+      .prepare(
+        `INSERT INTO interactive_sessions (
+          id, project_id, status, turn, target_turns, state_json, current_turn_id, last_error, created_at, updated_at
+        ) VALUES (?, ?, 'active', 2, 8, ?, ?, NULL, ?, ?)`,
+      )
+      .run(
+        "interactive-session-1",
+        project.id,
+        JSON.stringify(interactiveState),
+        "interactive-turn-2",
+        "2026-08-21T00:00:00.000Z",
+        "2026-08-21T00:00:02.000Z",
+      );
+    database
+      .prepare(
+        `INSERT INTO interactive_turns (
+          id, session_id, turn, scene_json, selected_choice_id, selected_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "interactive-turn-1",
+        "interactive-session-1",
+        1,
+        JSON.stringify(interactiveScene),
+        "choice_a",
+        "2026-08-21T00:00:01.000Z",
+        "2026-08-21T00:00:00.000Z",
+      );
+    database
+      .prepare(
+        `INSERT INTO interactive_turns (
+          id, session_id, turn, scene_json, selected_choice_id, selected_at, created_at
+        ) VALUES (?, ?, ?, ?, NULL, NULL, ?)`,
+      )
+      .run(
+        "interactive-turn-2",
+        "interactive-session-1",
+        2,
+        JSON.stringify(interactiveScene),
+        "2026-08-21T00:00:02.000Z",
+      );
   } finally {
     database.close();
   }
@@ -147,7 +211,7 @@ describe("authoring project backup", () => {
     process.env.OPENAI_API_KEY = "SECRET_API_KEY";
 
     const backup = await exportProjectBackup(project.id, { dbPath, backupDir });
-    const parsed = ProjectBackupV1Schema.parse(backup);
+    const parsed = ProjectBackupV2Schema.parse(backup);
     const imported = await importProjectBackup(parsed, "new-id", { dbPath, backupDir });
 
     expect(imported.id).not.toBe(project.id);
@@ -161,6 +225,8 @@ describe("authoring project backup", () => {
     try {
       expect(database.prepare("SELECT COUNT(*) AS count FROM generation_runs WHERE project_id = ?").get(imported.id)).toEqual({ count: 1 });
       expect(database.prepare("SELECT COUNT(*) AS count FROM generation_steps WHERE run_id = 'run-1'").get()).toEqual({ count: 1 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM interactive_sessions WHERE project_id = ?").get(imported.id)).toEqual({ count: 1 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM interactive_turns WHERE session_id IN (SELECT id FROM interactive_sessions WHERE project_id = ?)").get(imported.id)).toEqual({ count: 2 });
     } finally {
       database.close();
     }
@@ -177,11 +243,29 @@ describe("authoring project backup", () => {
     expect((await repo().getProject(project.id)).title).toBe("潮汐档案");
   });
 
+  it("imports legacy V1 backups with empty interactive history", async () => {
+    const project = await createProjectWithGraph();
+    const current = await exportProjectBackup(project.id, { dbPath, backupDir });
+    const { interactive: _interactive, ...legacyBase } = current;
+    const legacy = ProjectBackupV1Schema.parse({
+      ...legacyBase,
+      schema: "storyforge-project@1",
+    });
+
+    const imported = await importProjectBackup(legacy, "new-id", { dbPath, backupDir });
+    const database = new Database(dbPath, { readonly: true });
+    try {
+      expect(database.prepare("SELECT COUNT(*) AS count FROM interactive_sessions WHERE project_id = ?").get(imported.id)).toEqual({ count: 0 });
+    } finally {
+      database.close();
+    }
+  });
+
   it("rejects invalid documents before writing", async () => {
     const project = await createProjectWithGraph();
     const backup = await exportProjectBackup(project.id, { dbPath, backupDir });
 
-    await expect(importProjectBackup({ ...backup, schema: "storyforge-project@2" }, "new-id", { dbPath, backupDir })).rejects.toMatchObject({
+    await expect(importProjectBackup({ ...backup, schema: "storyforge-project@3" }, "new-id", { dbPath, backupDir })).rejects.toMatchObject({
       code: "VALIDATION",
     });
     await expect(importProjectBackup({ ...backup, nodes: [{ ...backup.nodes[0], versionId: "missing-version" }, ...backup.nodes.slice(1)] }, "new-id", { dbPath, backupDir })).rejects.toMatchObject({

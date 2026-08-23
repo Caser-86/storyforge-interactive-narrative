@@ -5,6 +5,14 @@ import type { GenerationStepDescriptor } from "./schemas";
 import { ProviderError } from "./provider-errors";
 import { retryDecision } from "./retry";
 
+function storedGenerationErrorMessage(error: ProviderError): string {
+  if (error.code === "SCHEMA" && error.details !== undefined && typeof error.details === "object") {
+    return `${error.message}: ${JSON.stringify(error.details)}`;
+  }
+
+  return error.message;
+}
+
 export interface GenerationStepExecutionResult {
   parsedResponse?: JsonValue | null;
   rawResponse?: JsonValue | string | null;
@@ -75,7 +83,7 @@ export class GenerationExecutor {
         if (decision.error.code === "AUTH") {
           await this.repository.pauseRun(runId, now, {
             code: decision.error.code,
-            message: decision.error.message,
+            message: storedGenerationErrorMessage(decision.error),
           });
           return { shouldStop: true };
         }
@@ -85,7 +93,7 @@ export class GenerationExecutor {
           leaseExpiresAt: step.leaseExpiresAt!,
           failedAt: now,
           code: decision.error.code,
-          message: decision.error.message,
+          message: storedGenerationErrorMessage(decision.error),
           retryable: decision.retryable,
           nextAttemptAt: decision.nextAttemptAt,
         });

@@ -46,7 +46,15 @@ async function readError(response: Response): Promise<string> {
 export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) {
   const [actionState, setActionState] = useState<ActionState>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ProjectSummary["status"] | "all">("all");
   const importInputRef = useRef<HTMLInputElement>(null);
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleProjects = projects.filter((project) => {
+    const matchesStatus = statusFilter === "all" || project.status === statusFilter;
+    const searchableText = `${project.title} ${project.genre} ${project.premise}`.toLocaleLowerCase();
+    return matchesStatus && (!normalizedQuery || searchableText.includes(normalizedQuery));
+  });
 
   async function runAction(project: ProjectSummary, action: "duplicate" | "archive" | "delete") {
     if (action === "delete" && !window.confirm(`确定删除“${project.title}”吗？此操作无法撤销。`)) {
@@ -169,6 +177,37 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
           </div>
         ) : null}
 
+        {projects.length > 0 ? (
+          <section className="library-filters" aria-label="项目筛选">
+            <label className="library-filter-field" htmlFor="project-search">
+              <span>筛选项目</span>
+              <input
+                id="project-search"
+                aria-label="筛选项目"
+                value={query}
+                placeholder="搜索标题、类型或简介"
+                type="search"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <label className="library-filter-field" htmlFor="project-status-filter">
+              <span>项目状态</span>
+              <select
+                id="project-status-filter"
+                aria-label="项目状态"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as ProjectSummary["status"] | "all")}
+              >
+                <option value="all">全部状态</option>
+                {Object.entries(statusLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <span className="library-filter-count">显示 {visibleProjects.length} / {projects.length}</span>
+          </section>
+        ) : null}
+
         {projects.length === 0 ? (
           <section className="empty-library" aria-label="空项目库">
             <span className="empty-index">NO. 00</span>
@@ -178,9 +217,20 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
             </div>
             <Link className="text-link" href="/projects/new">开始第一份简报 <span aria-hidden="true">→</span></Link>
           </section>
+        ) : visibleProjects.length === 0 ? (
+          <section className="empty-library" aria-label="没有匹配的项目">
+            <span className="empty-index">NO. 00</span>
+            <div>
+              <h2>没有匹配项目</h2>
+              <p>换一个关键词或状态筛选，项目仍会保留在本地项目库中。</p>
+            </div>
+            <button className="text-link" type="button" onClick={() => { setQuery(""); setStatusFilter("all"); }}>
+              清除筛选 <span aria-hidden="true">↗</span>
+            </button>
+          </section>
         ) : (
           <section className="project-grid" aria-label="项目列表">
-            {projects.map((project, index) => {
+            {visibleProjects.map((project, index) => {
               const isBusy = actionState?.projectId === project.id;
               return (
                 <article className="project-card" key={project.id}>
@@ -257,7 +307,7 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
 
         <footer className="authoring-footer">
           <span>结构化创作 · 可回溯版本 · 不自动覆盖人工编辑</span>
-          <span>{projects.length} 个项目</span>
+          <span>{visibleProjects.length} / {projects.length} 个项目</span>
         </footer>
       </div>
     </main>

@@ -4,7 +4,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { CreateProjectInput } from "@/lib/authoring/repository";
-import { ProjectBackupV1Schema } from "@/lib/authoring/backup";
+import { ProjectBackupV2Schema } from "@/lib/authoring/backup";
 
 let tempDir: string;
 let originalDbPath: string | undefined;
@@ -48,7 +48,7 @@ describe("authoring backup routes", () => {
     const importRoute = await import("@/app/api/projects/import/route");
     const context = { params: Promise.resolve({ projectId: project.id }) };
     const downloaded = await route.GET(new Request(`http://local/api/projects/${project.id}/backup`), context);
-    const backup = ProjectBackupV1Schema.parse(await downloaded.json());
+    const backup = ProjectBackupV2Schema.parse(await downloaded.json());
     const imported = await importRoute.POST(
       new Request("http://local/api/projects/import", {
         method: "POST",

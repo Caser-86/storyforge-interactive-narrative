@@ -1,0 +1,7 @@
+services:
+  app:
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      STORYFORGE_HOST: "0.0.0.0"
+      STORYFORGE_ALLOW_LAN: "true"

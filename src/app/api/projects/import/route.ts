@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { ProjectBackupV1Schema, importProjectBackup } from "@/lib/authoring/backup";
+import { ProjectBackupSchema, importProjectBackup } from "@/lib/authoring/backup";
 import { ProjectResponseSchema, errorResponse, json, readJsonBody } from "@/lib/authoring/api-contracts";
 
 const ImportProjectBackupRequestSchema = z
   .object({
-    backup: ProjectBackupV1Schema,
+    backup: ProjectBackupSchema,
     mode: z.enum(["new-id", "replace"]),
   })
   .strict();

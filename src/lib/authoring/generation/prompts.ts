@@ -52,7 +52,7 @@ export function buildBiblePrompt(context: GenerationProjectContext, brief: Brief
 }
 
 export function buildOutlinePrompt(context: GenerationProjectContext, brief: BriefOutput, bible: BibleOutput): string {
-  return `Create a bounded chapter and node outline. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. Allocate stable chapter and node IDs, exactly one start node, and at least ${context.size.targetEndings} ending node plans. Return exactly this JSON shape: { "chapters": [{ "id": "string", "title": "string", "goal": "string", "summary": "string" }], "nodes": [{ "id": "string", "chapterId": "string", "kind": "start | scene | ending", "title": "string", "objective": "string" }] }. Use kind exactly as one of start, scene, or ending. Do not include extra keys, final node bodies, markdown, or scene prose.`;
+  return `Create a bounded chapter and node outline. Project: ${projectFrame(context)}. Brief: ${JSON.stringify(brief)}. Bible: ${JSON.stringify(bible)}. The outline must contain exactly ${context.size.targetNodes} total nodes, never more or fewer. Allocate stable chapter and node IDs, exactly one start node, and exactly ${context.size.targetEndings} ending node plans; use the remaining node budget for scene nodes. Return exactly this JSON shape: { "chapters": [{ "id": "string", "title": "string", "goal": "string", "summary": "string" }], "nodes": [{ "id": "string", "chapterId": "string", "kind": "start | scene | ending", "title": "string", "objective": "string" }] }. Use kind exactly as one of start, scene, or ending. Do not include extra keys, final node bodies, markdown, or scene prose.`;
 }
 
 export function buildGraphPrompt(

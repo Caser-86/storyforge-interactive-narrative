@@ -5,6 +5,21 @@ import type { BriefOutput, BibleOutput, OutlineOutput, StageExecutionResult } fr
 import { OutlineOutputSchema } from "./types";
 import { assertUnique, schemaFailure } from "./common";
 
+function repairMissingEndings(context: GenerationProjectContext, output: OutlineOutput): OutlineOutput {
+  const endingCount = output.nodes.filter((node) => node.kind === "ending").length;
+  const missingCount = context.size.targetEndings - endingCount;
+  if (missingCount <= 0) return output;
+
+  const candidates = output.nodes.filter((node) => node.kind === "scene").slice(-missingCount);
+  if (candidates.length < missingCount) return output;
+
+  const candidateIds = new Set(candidates.map((node) => node.id));
+  return {
+    ...output,
+    nodes: output.nodes.map((node) => candidateIds.has(node.id) ? { ...node, kind: "ending" as const } : node),
+  };
+}
+
 export async function executeOutlineStage(
   context: GenerationProjectContext,
   provider: GenerationProvider,
@@ -24,8 +39,8 @@ export async function executeOutlineStage(
 
   assertUnique(output.chapters.map((chapter) => chapter.id), "Chapter");
   assertUnique(output.nodes.map((node) => node.id), "Node");
-  if (output.nodes.length > context.size.targetNodes) {
-    throw schemaFailure("Outline exceeds the project node budget", {
+  if (output.nodes.length !== context.size.targetNodes) {
+    throw schemaFailure("Outline must contain exactly the project node budget", {
       nodeCount: output.nodes.length,
       targetNodes: context.size.targetNodes,
     });
@@ -34,15 +49,20 @@ export async function executeOutlineStage(
   if (output.nodes.some((node) => !chapterIds.has(node.chapterId))) {
     throw schemaFailure("Outline node references an unknown chapter");
   }
-  if (output.nodes.filter((node) => node.kind === "start").length !== 1) {
+  const repairedOutput = repairMissingEndings(context, output);
+  if (repairedOutput.nodes.filter((node) => node.kind === "start").length !== 1) {
     throw schemaFailure("Outline must contain exactly one start node");
   }
-  if (output.nodes.filter((node) => node.kind === "ending").length < context.size.targetEndings) {
-    throw schemaFailure("Outline does not contain enough ending nodes", { targetEndings: context.size.targetEndings });
+  const endingCount = repairedOutput.nodes.filter((node) => node.kind === "ending").length;
+  if (endingCount !== context.size.targetEndings) {
+    throw schemaFailure("Outline must contain exactly the requested ending nodes", {
+      endingCount,
+      targetEndings: context.size.targetEndings,
+    });
   }
 
   return {
-    output,
+    output: repairedOutput,
     providerResult,
     nextSteps: [{ stepKey: "graph:main", stage: "graph", sortOrder: 3 }],
   };

@@ -90,6 +90,7 @@ describe("OpenAI-compatible generation provider", () => {
     expect(create).toHaveBeenCalledWith(expect.objectContaining({
       model: "deepseek-v4-flash",
       response_format: { type: "json_object" },
+      thinking: { type: "disabled" },
     }));
   });
 

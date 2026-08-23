@@ -10,6 +10,7 @@ interface ChatCompletionClient {
         model: string;
         messages: Array<{ role: "system" | "user"; content: string }>;
         response_format: { type: "json_object" };
+        thinking?: { type: "enabled" | "disabled" };
         temperature?: number;
         max_tokens?: number;
       }): Promise<unknown>;
@@ -62,6 +63,8 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
     const model = request.model ?? this.options.defaultModel ?? process.env.OPENAI_MODEL ?? "deepseek-v4-flash";
 
     try {
+      const baseURL = this.options.baseURL ?? process.env.OPENAI_BASE_URL ?? "https://api.deepseek.com";
+      const isDeepSeek = model.toLowerCase().startsWith("deepseek-") || baseURL.toLowerCase().includes("deepseek.com");
       const response = (await this.getClient().chat.completions.create({
         model,
         messages: [
@@ -69,6 +72,7 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
           { role: "user", content: request.userPrompt },
         ],
         response_format: { type: "json_object" },
+        ...(isDeepSeek ? { thinking: { type: "disabled" as const } } : {}),
         temperature: request.temperature,
         max_tokens: request.maxTokens,
       })) as ChatCompletionResponse;

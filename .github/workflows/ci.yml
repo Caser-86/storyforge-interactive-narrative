@@ -22,6 +22,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run verify
       - run: npm run db:authoring:smoke
       - run: npm run legacy:export -- --dry-run

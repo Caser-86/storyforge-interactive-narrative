@@ -58,11 +58,11 @@ npm run dev
 | `npm run build` | Next 生产构建 |
 | `npm run start` | loopback 生产启动 |
 | `npm run verify` | typecheck、lint、Vitest、生产构建 |
-| `npm run test:e2e:authoring` | 生产构建下的 6 项完整 authoring E2E |
+| `npm run test:e2e:authoring` | 生产构建下的 8 项完整 authoring E2E |
 | `npm run db:authoring:smoke` | SQLite authoring 生命周期 smoke |
 | `npm run db:authoring:backup` | 迁移前 SQLite 备份、完整性和 SHA-256 检查 |
 | `npm run legacy:export -- --dry-run` | 只读检查旧 session，不删除源数据 |
-| `npm run authoring:llm:smoke -- --preset micro --dry-run` | 不发网络请求的 LLM 配置检查 |
+| `npm run authoring:llm:smoke -- --dry-run` | 不发网络请求的 LLM 配置检查 |
 
 ## 数据与恢复
 
@@ -79,7 +79,7 @@ Docker Compose 只启动一个本地文本 authoring 服务，并将 SQLite 数�
 docker compose up --build
 ```
 
-容器内部为了端口映射使用 `0.0.0.0`，Compose 已明确设置 LAN override；不代表应用适合公网部署。
+默认 Compose 仅把端口发布到 `127.0.0.1`。如确需局域网访问，使用 `docker-compose.lan.yml` 显式覆盖；这不会增加登录或多用户隔离能力，禁止端口转发到公网。
 
 ## 目录结构
 

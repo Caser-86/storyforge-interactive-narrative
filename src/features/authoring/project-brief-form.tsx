@@ -101,6 +101,9 @@ export function ProjectBriefForm() {
     if (!Number.isInteger(targetEndings) || targetEndings < selectedPreset.endings[0] || targetEndings > selectedPreset.endings[1]) {
       next.targetEndings = `目标结局数需要在 ${selectedPreset.endings[0]}–${selectedPreset.endings[1]} 之间`;
     }
+    if (Number.isInteger(targetNodes) && Number.isInteger(targetEndings) && targetEndings > targetNodes - 2) {
+      next.targetEndings = "目标结局数必须少于节点数至少 2 个";
+    }
 
     return next;
   }

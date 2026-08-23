@@ -4,7 +4,7 @@ services:
       context: .
       target: runner
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     env_file:
       - path: .env
         required: false
@@ -14,8 +14,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
       - SQLITE_DB_PATH=/app/data/storyforge.sqlite
       - SQLITE_BACKUP_DIR=/app/data/backups
-      - STORYFORGE_HOST=0.0.0.0
-      - STORYFORGE_ALLOW_LAN=true
+      - STORYFORGE_HOST=127.0.0.1
     volumes:
       - storyforge-data:/app/data
     healthcheck:
