@@ -9,6 +9,7 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] `SQLITE_DB_PATH` points to the intended private local database.
 - [x] The default server binds to `127.0.0.1`.
 - [x] Docker LAN access requires the explicit `docker-compose.lan.yml` override.
+- [x] `package.json`, `package-lock.json`, README, and changelog report version `0.1.3`.
 - [x] No real API key is copied into logs, backups, exports, or test fixtures.
 
 ## Verification

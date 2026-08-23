@@ -1,11 +1,11 @@
 # StoryForge Authoring Release Verification
 
 - Date: 2026-08-24
-- Release candidate: `v0.1.3`
-- Candidate: formal release hardening candidate
+- Release: `v0.1.3`
+- Release notes: `CHANGELOG.md`
 - Runtime: Node `v24.18.0`, npm `11.16.0`
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, V2 backup/restore, bounded interactive sessions, project/session lifecycle controls, and legacy read-only export.
-- Remote CI: workflow committed but GitHub Actions were not executed from this environment.
+- Remote CI: workflow is included in this release; GitHub Actions will run after the branch and tag are pushed.
 
 ## Install Evidence
 
