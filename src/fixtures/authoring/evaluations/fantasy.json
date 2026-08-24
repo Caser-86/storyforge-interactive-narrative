@@ -1,0 +1,11 @@
+{
+  "id": "zh-fantasy-01",
+  "title": "潮汐王冠",
+  "genre": "奇幻",
+  "language": "zh-CN",
+  "targetNodes": 10,
+  "targetEndings": 2,
+  "minimumDecisionPoints": 2,
+  "requiredTerms": ["潮汐", "王冠"],
+  "expectedOutcome": "completed"
+}

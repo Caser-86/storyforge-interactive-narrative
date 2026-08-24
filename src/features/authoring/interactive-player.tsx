@@ -1,0 +1,246 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import type { InteractiveSession } from "@/lib/interactive/schemas";
+
+type InteractivePlayerProps = { projectId: string; projectTitle: string };
+
+function sessionStatusLabel(status: InteractiveSession["status"]): string {
+  return status === "ended" ? "已结束" : status === "active" ? "进行中" : status === "generating" ? "生成中" : "失败";
+}
+
+export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayerProps) {
+  const [session, setSession] = useState<InteractiveSession | null>(null);
+  const [history, setHistory] = useState<InteractiveSession[]>([]);
+  const [isBusy, setIsBusy] = useState(false);
+  const [historyBusyId, setHistoryBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const deletedHistoryIdsRef = useRef(new Set<string>());
+  const storageKey = `storyforge:interactive-session:${projectId}`;
+
+  useEffect(() => {
+    let canceled = false;
+    const savedSessionId = window.localStorage.getItem(storageKey);
+
+    if (!savedSessionId) {
+      return () => {
+        canceled = true;
+      };
+    }
+
+    void fetch(`/api/projects/${projectId}/play/${encodeURIComponent(savedSessionId)}`)
+      .then(async (response) => {
+        const payload = await response.json() as { session?: InteractiveSession; error?: { message?: string } };
+        if (response.status === 404 || payload.session?.status === "failed") {
+          window.localStorage.removeItem(storageKey);
+          return;
+        }
+        if (!response.ok || !payload.session) {
+          throw new Error(payload.error?.message ?? "互动进度恢复失败");
+        }
+        if (!canceled) {
+          setError(null);
+          setSession(payload.session);
+        }
+      })
+      .catch((restoreError) => {
+        if (!canceled) setError(restoreError instanceof Error ? restoreError.message : "互动进度恢复失败");
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [projectId, storageKey]);
+
+  useEffect(() => {
+    let canceled = false;
+    void fetch(`/api/projects/${projectId}/play/sessions`)
+      .then(async (response) => {
+        const payload = await response.json() as { sessions?: InteractiveSession[]; error?: { message?: string } };
+        if (!response.ok || !Array.isArray(payload.sessions)) throw new Error(payload.error?.message ?? "互动记录读取失败");
+        if (!canceled) {
+          setHistoryError(null);
+          setHistory(payload.sessions.filter((item) => !deletedHistoryIdsRef.current.has(item.id)));
+        }
+      })
+      .catch((historyLoadError) => {
+        if (!canceled) setHistoryError(historyLoadError instanceof Error ? historyLoadError.message : "互动记录读取失败");
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [projectId]);
+
+  async function refreshHistory(): Promise<void> {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/play/sessions`);
+      const payload = await response.json() as { sessions?: InteractiveSession[]; error?: { message?: string } };
+      if (!response.ok || !Array.isArray(payload.sessions)) throw new Error(payload.error?.message ?? "互动记录读取失败");
+      setHistoryError(null);
+      setHistory(payload.sessions.filter((item) => !deletedHistoryIdsRef.current.has(item.id)));
+    } catch (historyLoadError) {
+      setHistoryError(historyLoadError instanceof Error ? historyLoadError.message : "互动记录读取失败");
+    }
+  }
+
+  function activateSession(nextSession: InteractiveSession): void {
+    setSession(nextSession);
+    window.localStorage.setItem(storageKey, nextSession.id);
+  }
+
+  async function start() {
+    if (window.localStorage.getItem(storageKey) && !error) {
+      setError("正在恢复互动进度，请稍候…");
+      return;
+    }
+
+    setIsBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/play`, { method: "POST" });
+      const payload = await response.json() as { session?: InteractiveSession; error?: { message?: string } };
+      if (!response.ok || !payload.session) throw new Error(payload.error?.message ?? "开场生成失败");
+      activateSession(payload.session);
+      void refreshHistory();
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : "开场生成失败");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function choose(choiceId: string) {
+    if (!session || session.status !== "active" || isBusy) return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/play/${session.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ choiceId }),
+      });
+      const payload = await response.json() as { session?: InteractiveSession; error?: { message?: string } };
+      if (!response.ok || !payload.session) throw new Error(payload.error?.message ?? "下一段生成失败");
+      activateSession(payload.session);
+      void refreshHistory();
+    } catch (choiceError) {
+      setError(choiceError instanceof Error ? choiceError.message : "下一段生成失败");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function resumeHistorySession(sessionId: string): Promise<void> {
+    setHistoryBusyId(sessionId);
+    setError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/play/${encodeURIComponent(sessionId)}`);
+      const payload = await response.json() as { session?: InteractiveSession; error?: { message?: string } };
+      if (!response.ok || !payload.session) throw new Error(payload.error?.message ?? "互动记录恢复失败");
+      activateSession(payload.session);
+    } catch (resumeError) {
+      setError(resumeError instanceof Error ? resumeError.message : "互动记录恢复失败");
+    } finally {
+      setHistoryBusyId(null);
+    }
+  }
+
+  async function deleteHistorySession(sessionId: string): Promise<void> {
+    if (!window.confirm("确定删除这条互动记录吗？此操作无法撤销。")) return;
+    setHistoryBusyId(sessionId);
+    setHistoryError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/play/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+      const payload = response.status === 204 ? null : await response.json() as { error?: { message?: string } };
+      if (!response.ok) throw new Error(payload?.error?.message ?? "互动记录删除失败");
+      deletedHistoryIdsRef.current.add(sessionId);
+      setHistory((current) => current.filter((item) => item.id !== sessionId));
+      if (window.localStorage.getItem(storageKey) === sessionId) {
+        window.localStorage.removeItem(storageKey);
+        setSession(null);
+      }
+    } catch (deleteError) {
+      setHistoryError(deleteError instanceof Error ? deleteError.message : "互动记录删除失败");
+    } finally {
+      setHistoryBusyId(null);
+    }
+  }
+
+  const scene = session?.scene;
+  return (
+    <main className="interactive-page">
+      <header className="interactive-header">
+        <div className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true">SF</span>
+          <div><p className="eyebrow">INTERACTIVE MODE / DEEPSEEK</p><p className="brand-name">{projectTitle}</p></div>
+        </div>
+        <div className="interactive-header-actions">
+          <Link className="text-link" href={`/projects/${projectId}/edit`}>返回编辑器</Link>
+          <span className="preview-readonly">逐幕生成</span>
+        </div>
+      </header>
+
+      {!session ? (
+        <section className="interactive-start">
+          <p className="eyebrow">PLAYER-DRIVEN GENERATION</p>
+          <h1>你选择，故事才继续。</h1>
+          <p>每一幕只生成当前段落。你做出选择后，DeepSeek 才会根据选择生成下一幕，故事在预设回合内收束。</p>
+          {error ? <p className="interactive-error" role="alert">{error}</p> : null}
+          <button className="button button-primary" type="button" disabled={isBusy} onClick={() => void start()}>{isBusy ? "正在生成开场…" : "开始互动故事"}</button>
+        </section>
+      ) : (
+        <section className="interactive-stage">
+          <div className="interactive-progress"><span>第 {session.state.turn} / {session.state.targetTurns} 幕</span><span>{session.status === "ended" ? "故事已结束" : session.status === "generating" ? "正在恢复上一段生成…" : isBusy ? "正在根据你的选择生成…" : "等待选择"}</span></div>
+          {scene ? <article className="interactive-scene">
+            <p className="eyebrow">{scene.isEnding ? "ENDING" : `SCENE ${String(session.state.turn).padStart(2, "0")}`}</p>
+            <h1>{scene.title}</h1>
+            <div className="interactive-body">{scene.body.split(/\n\s*\n/).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
+            <p className="interactive-summary">{scene.summary}</p>
+          </article> : null}
+          {error ? <p className="interactive-error" role="alert">{error}</p> : null}
+          {session.status === "generating" ? (
+          <p className="interactive-error" role="status">上一段生成尚未完成，请稍候刷新</p>
+          ) : session.status === "ended" || scene?.isEnding ? (
+          <div className="interactive-ending"><strong>{scene?.endingSummary ?? "本次互动已完成。"}</strong><button className="button button-small button-quiet" type="button" onClick={() => { setSession(null); setError(null); window.localStorage.removeItem(storageKey); }}>重新开始</button></div>
+          ) : (
+            <div className="interactive-choices"><p className="eyebrow">选择你的行动</p>{scene?.choices.map((choice) => <button className="interactive-choice" key={choice.id} type="button" disabled={isBusy} onClick={() => void choose(choice.id)}><span className={`interactive-risk interactive-risk-${choice.risk}`}>{choice.risk === "low" ? "低风险" : choice.risk === "medium" ? "中风险" : "高风险"}</span><strong>{choice.label}</strong><small>{choice.consequencePreview}</small></button>)}</div>
+          )}
+          <div className="interactive-footer-actions">
+            <a className="text-link" href={`/api/projects/${projectId}/play/${encodeURIComponent(session.id)}/export?format=markdown`}>导出 Markdown</a>
+            <a className="text-link" href={`/api/projects/${projectId}/play/${encodeURIComponent(session.id)}/export?format=json`}>导出 JSON</a>
+          </div>
+        </section>
+      )}
+      {historyError ? <p className="interactive-error" role="alert">{historyError}</p> : null}
+      {history.length > 0 ? (
+        <section className="interactive-history" aria-labelledby="interactive-history-title">
+          <div className="interactive-history-heading">
+            <div>
+              <p className="eyebrow">LOCAL SESSION ARCHIVE</p>
+              <h2 id="interactive-history-title">互动记录</h2>
+            </div>
+            <span>{history.length} 条</span>
+          </div>
+          <div className="interactive-history-list">
+            {history.map((item) => (
+              <article className="interactive-history-item" key={item.id}>
+                <div>
+                  <span className="interactive-history-status">{sessionStatusLabel(item.status)}</span>
+                  <strong>{projectTitle}</strong>
+                  <small>第 {item.turn} / {item.targetTurns} 幕</small>
+                </div>
+                <div className="interactive-history-actions">
+                  <button className="button button-small button-quiet" type="button" disabled={historyBusyId !== null} aria-label={`恢复${projectTitle}第 ${item.turn} 幕`} onClick={() => void resumeHistorySession(item.id)}>恢复</button>
+                  <button className="icon-button icon-button-danger" type="button" disabled={historyBusyId !== null} aria-label={`删除${projectTitle}第 ${item.turn} 幕`} onClick={() => void deleteHistorySession(item.id)}>删除</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </main>
+  );
+}

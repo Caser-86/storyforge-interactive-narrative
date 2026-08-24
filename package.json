@@ -1,51 +1,60 @@
 {
   "name": "storyforge-interactive-narrative",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "description": "StoryForge - 基于 LLM 的互动叙事生成器",
   "repository": {
     "type": "git",
     "url": "https://github.com/Caser-86/storyforge-interactive-narrative.git"
   },
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev --webpack --hostname 127.0.0.1",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "next start --hostname 127.0.0.1",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "db:init": "tsx src/scripts/init-db.ts",
-    "db:smoke": "tsx src/scripts/db-smoke-test.ts",
-    "db:sqlite:smoke": "tsx src/scripts/sqlite-smoke-test.ts",
-    "db:sqlite:backup": "tsx src/scripts/sqlite-backup.ts",
-    "llm:smoke": "tsx src/scripts/llm-smoke-test.ts",
-    "worker": "tsx src/scripts/asset-worker.ts",
+    "db:authoring:smoke": "tsx src/scripts/authoring-db-smoke.ts",
+    "db:authoring:backup": "tsx src/scripts/authoring-db-backup.ts",
+    "db:authoring:checkpoint": "tsx src/scripts/authoring-db-checkpoint.ts",
+    "db:authoring:restore-check": "tsx src/scripts/authoring-db-restore-check.ts",
+    "authoring:doctor": "tsx src/scripts/authoring-doctor.ts",
+    "authoring:evaluate": "tsx src/scripts/authoring-evaluate.ts",
+    "package:smoke": "pwsh -File scripts/package-smoke.ps1 -Mode DryRun",
+    "package:standalone": "pwsh -File scripts/package-standalone.ps1",
+    "release:evidence": "pwsh -File scripts/release-evidence.ps1",
+    "legacy:export": "tsx src/scripts/legacy-export.ts",
+    "authoring:llm:smoke": "tsx src/scripts/authoring-llm-smoke.ts",
     "test": "vitest run",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "test:e2e": "playwright test",
+    "build:e2e:authoring": "tsx src/scripts/authoring-e2e-build.ts",
+    "test:e2e:authoring": "npm run build:e2e:authoring && playwright test \"e2e/authoring-.*\\.spec\\.ts\"",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1048.0",
     "better-sqlite3": "^12.10.0",
-    "bullmq": "^5",
     "geist": "^1.7.0",
-    "ioredis": "^5",
-    "next": "^16.2.9",
+    "next": "16.3.1",
     "openai": "^4",
-    "pg": "^8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "uuid": "^11",
-    "zod": "^3",
-    "zustand": "^5"
+    "zod": "^3"
   },
   "overrides": {
     "next": {
-      "postcss": "8.5.15"
+      "postcss": "8.5.23"
     }
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.5",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
@@ -53,7 +62,8 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.9",
+    "eslint-config-next": "16.3.1",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "tsx": "^4",
     "typescript": "5.9.3",

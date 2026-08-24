@@ -1,0 +1,11 @@
+{
+  "id": "zh-contemporary-01",
+  "title": "末班车之前",
+  "genre": "当代",
+  "language": "zh-CN",
+  "targetNodes": 8,
+  "targetEndings": 2,
+  "minimumDecisionPoints": 2,
+  "requiredTerms": ["车站", "信"],
+  "expectedOutcome": "completed"
+}
