@@ -21,7 +21,7 @@ All notable changes to StoryForge are documented here.
 - Release B evidence: checkpoint/restore-check commands and replacement recovery tests passed locally; the Recovery Centre and privacy-safe doctor are included.
 - Release C evidence: security baseline, request-size policy, axe accessibility flow, and fake generation evaluation passed locally.
 - Release D evidence: Windows package lifecycle smoke, live provider smoke, CycloneDX SBOM, and standalone checksum generation passed; no signed installer is published.
-- This release candidate is not tagged or merged to `master`; it is not a published release yet.
+- Published as GitHub Release `v0.1.4` from merged `master` commit `e175f84467af1ff9383c023121969be844fd13fa`; tag CI, SBOM, standalone checksums, and release evidence are recorded in `docs/release/authoring-verification.md`.
 
 ## [0.1.3] - 2026-08-24
 

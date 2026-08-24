@@ -1,11 +1,22 @@
 # StoryForge Authoring Release Verification
 
 - Date: 2026-08-24
-- Release candidate: `v0.1.4` (not published)
+- Published release: `v0.1.4`
+- GitHub Release: https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.4
 - Release notes: `CHANGELOG.md`
 - Runtime: Node `v24.18.0`, npm `11.16.0`
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, V2 backup/restore, bounded interactive sessions, project/session lifecycle controls, and legacy read-only export.
-- Remote CI: the historical `v0.1.3` tag points to `codex/storyforge-phase-0`, not `master`; its local evidence does not prove a remote Actions run. It will run when a pull request from this branch targets `master` and again when the `v0.1.4` tag is pushed from the merged `master` history.
+- Remote CI: PR #1 targeted `master`; `CI/verify` and `CI/e2e-authoring` passed before merge. Tag run `32687684469` passed on `v0.1.4` at merged commit `e175f84467af1ff9383c023121969be844fd13fa`.
+
+## Published v0.1.4 Evidence
+
+- Pull request: https://github.com/Caser-86/storyforge-interactive-narrative/pull/1
+- Merge commit: `e175f84467af1ff9383c023121969be844fd13fa`
+- Annotated tag: `v0.1.4`, resolving to the merge commit above.
+- Tag Actions run: https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/32687684469
+- GitHub Release: https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.4
+- Public assets: standalone Windows ZIP, ZIP SHA-256, CycloneDX SBOM, standalone SHA-256 list, and release evidence manifest.
+- Remote release manifest: version `0.1.4`, `packageFileCount: 2021`, `secretsIncluded: false`, `signed: false`.
 
 ## Release A Working-Tree Verification (Not A Published Release)
 
@@ -76,11 +87,10 @@ The clean production route table contains only `/api/health`, `/api/projects/**`
 
 ## Residual Risks
 
-- Remote GitHub Actions were not executed locally.
-- The live provider smoke passed for this candidate; a tagged release must still retain the redacted evidence.
-- The `v0.1.4` candidate changes are approved for the public repository release; they are not yet merged to `master` or published under a new version tag at the time of this local verification record.
+- Remote GitHub Actions passed for PR #1 and the `v0.1.4` tag; the Node.js 20 action-runtime deprecation annotation remains informational and should be addressed in a future CI maintenance change.
+- The live provider smoke passed locally with redacted evidence; the tagged release uses fake-provider CI and does not make a live provider request.
 - External GitHub audit: repository metadata reports `private: false`, matching the owner's public-repository decision. No open-source license is granted by that decision. `master` protection returned `404 Branch not protected` and remains a governance gap to resolve separately.
-- This is a private local application without login or multi-user isolation; do not expose it publicly.
+- This is a private local application without login or multi-user isolation; do not expose the runtime, author data, or credentials publicly.
 
 ## Current Working-Tree Updates
 
@@ -94,5 +104,5 @@ The clean production route table contains only `/api/health`, `/api/projects/**`
 - `npm audit --audit-level=high` passed with 0 vulnerabilities; the live smoke recorded only redacted provider metrics.
 - Local package lifecycle smoke passed `clean-install`, `health`, `upgrade`, `failed-upgrade`, `rollback`, and `uninstall-preserves-data`; the temporary root was removed and port `3110` had no listener afterward.
 - `npm run release:evidence` passed; generated CycloneDX `1.5` SBOM with `639` components, SHA-256 checksums for `2241` standalone files, and a release manifest with `secretsIncluded: false` and `signed: false`; the artifact secret scan passed.
-- These are local working-tree results, not a published release.
-- Remaining human gates are protected-branch review, remote Actions, clean Windows account install evidence, and signing decision. Public-release approval is recorded in the release checklist; tag and push remain operator execution steps.
+- These local results are supplemented by the published tag evidence recorded above.
+- Remaining human gates are protected-branch configuration, clean Windows account install evidence, and signing decision. Public-release approval, PR review, merge, tag, and publication are recorded above.

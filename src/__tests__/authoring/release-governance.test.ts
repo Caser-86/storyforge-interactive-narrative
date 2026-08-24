@@ -31,10 +31,12 @@ describe("release governance", () => {
     expect(readRepositoryFile(".gitignore")).toMatch(/^\/output\/$/m);
   });
 
-  it("does not claim that unobserved remote CI has passed", () => {
+  it("records observed remote release evidence without stale CI claims", () => {
     const verification = readRepositoryFile("docs/release/authoring-verification.md");
 
-    expect(verification).toContain("will run when a pull request from this branch targets `master`");
+    expect(verification).toContain("PR #1 targeted `master`; `CI/verify` and `CI/e2e-authoring` passed before merge.");
+    expect(verification).toContain("Tag run `32687684469` passed on `v0.1.4`");
+    expect(verification).toContain("Published v0.1.4 Evidence");
     expect(verification).not.toContain("will run after the branch and tag are pushed");
   });
 

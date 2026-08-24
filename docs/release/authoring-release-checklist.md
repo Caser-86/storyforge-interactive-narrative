@@ -45,9 +45,9 @@ Use this checklist before treating a local build as a releasable private authori
 ## Remote Release Evidence
 
 - [x] Owner explicitly confirmed that the GitHub repository remains public for this release; the runtime and author data remain private-local, and no open-source license is granted by this decision.
-- [ ] The pull request targets the protected `master` branch and all required Actions checks are green.
-- [ ] The release tag points to the merged `master` commit, not to a feature branch.
-- [ ] The GitHub Release links the tag, changelog, verification record, and any distribution checksums.
+- [x] PR #1 targeted `master`; GitHub Actions `CI/verify` and `CI/e2e-authoring` passed before merge. `master` is not currently protected and remains a governance gap.
+- [x] Annotated tag `v0.1.4` points to merged `master` commit `e175f84467af1ff9383c023121969be844fd13fa`, not to a feature branch.
+- [x] GitHub Release `v0.1.4` links the tag, changelog, verification record, standalone ZIP, SBOM, checksums, and release evidence manifest.
 
 - [x] Owner approved the public `v0.1.4` release candidate before commit, push, tag, and publication.
 
