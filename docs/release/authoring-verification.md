@@ -47,6 +47,7 @@
 | Private-field-free offline HTML | `src/__tests__/authoring/export-private-fields.test.ts`, `e2e/authoring-offline-export.spec.ts` | passed |
 | Local health and bind policy | `src/__tests__/authoring/local-security.test.ts`, `src/__tests__/api-health.test.ts` | passed |
 | Interactive session history, deletion, and stale-refresh protection | `src/__tests__/interactive/interactive-player.test.tsx`, `src/__tests__/interactive/session-routes.test.ts`, `e2e/authoring-interactive-flow.spec.ts` | passed |
+| Author-selected branch writing materialization and idempotent draft creation | `src/__tests__/interactive/materialize.test.ts`, `src/__tests__/interactive/materialize-repository.test.ts`, `src/__tests__/interactive/materialize-route.test.ts`, `e2e/authoring-interactive-flow.spec.ts` | passed |
 | V2 backup with interactive sessions and V1 import compatibility | `src/__tests__/authoring/backup.test.ts`, `src/__tests__/authoring/backup-api.test.ts` | passed |
 | Project search/status filters and responsive keyboard actions | `src/__tests__/authoring/project-library.test.tsx`, `e2e/authoring-release-flow.spec.ts` | passed at desktop and 390px |
 | Legacy read-only export | `src/__tests__/legacy-export.test.ts`, `npm run legacy:export -- --dry-run` | passed |
@@ -97,8 +98,8 @@ The clean production route table contains only `/api/health`, `/api/projects/**`
 - Release B checkpoint, restore-check, replacement recovery, doctor, and Recovery Centre focused tests passed locally.
 - Release C security baseline, request-size policy, production build, axe accessibility E2E, and fake generation evaluation passed locally.
 - Release D has a documented Node 24 standalone decision, data lifecycle, package dry-run, and a passing temporary-root lifecycle smoke for `0.1.4`. It is not a signed installer.
-- Final local gate: `npm run verify` passed with 62 Vitest files / 263 tests, typecheck, lint, and production build.
-- Final browser gate: `npm run test:e2e:authoring` passed 10/10 tests, including accessibility, cancellation, interactive play, offline export, release restore, and responsive filters.
+- Final local gate for the branch-writing change: `npm test` passed with 65 Vitest files / 271 tests; `npm run typecheck`, `npm run lint`, and `npm run build` also passed.
+- Final browser gate for the branch-writing change: `npm run test:e2e:authoring` passed 10/10 tests, including the author-selected path, formal draft materialization, refresh recovery, accessibility, cancellation, offline export, release restore, and responsive filters.
 - Final operational gate: checkpoint, migration backup, restore-check, doctor, fake evaluation, live dry-run, package smoke, `npm ci --dry-run --ignore-scripts`, and standalone `/api/health` smoke passed.
 - `authoring:doctor` reports database integrity ok, fresh backup, loopback-only binding, and provider configured after loading the local `.env.local` contract.
 - `npm audit --audit-level=high` passed with 0 vulnerabilities; the live smoke recorded only redacted provider metrics.

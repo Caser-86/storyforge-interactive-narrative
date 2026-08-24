@@ -43,7 +43,7 @@ export function EditorShell({ project, graph, issues, draftRevision: initialDraf
         <div className="editor-top-actions">
           <span className="editor-save-state">本地草稿 · 修订 {project.activeDraftVersionId ? "可追踪" : "未初始化"}</span>
           <Link className="button button-small button-quiet" href={`/projects/${project.id}/generate`}>生成流程</Link>
-          <Link className="button button-small button-quiet" href={`/projects/${project.id}/play`}>互动试玩</Link>
+          <Link className="button button-small button-quiet" href={`/projects/${project.id}/play`}>分支写作</Link>
           <Link className="button button-small button-primary" href={`/projects/${project.id}/preview`}>预览</Link>
         </div>
       </header>

@@ -132,4 +132,30 @@ describe("InteractivePlayer", () => {
     resolveRefresh(new Response(JSON.stringify({ sessions: [nextSession] }), { status: 200 }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "恢复第九档案室第 2 幕" })).not.toBeInTheDocument());
   });
+
+  it("offers to save an ended selected path as a formal draft", async () => {
+    const endedSession = { ...session, status: "ended" as const, turn: 8, materializedVersionId: null, state: { ...session.state, turn: 8 }, scene: { ...session.scene, title: "收束", body: "所有线索合拢。", summary: "真相已经完整。", choices: [], isEnding: true, endingSummary: "故事结束。" } };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/play/session-1/materialize") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ project: { activeDraftVersionId: "version-2" }, version: { id: "version-2" }, graph: {}, created: true }), { status: 201 }));
+      }
+      if (url.endsWith("/play/sessions")) {
+        return Promise.resolve(new Response(JSON.stringify({ sessions: [endedSession] }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ session: endedSession }), { status: 200 }));
+    });
+    localStorage.setItem("storyforge:interactive-session:project-1", endedSession.id);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "保存为正式故事草稿" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/play/session-1/materialize",
+      { method: "POST" },
+    ));
+    expect(await screen.findByText("已保存为正式故事草稿")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "进入编辑器" })).toHaveAttribute("href", "/projects/project-1/edit");
+  });
 });

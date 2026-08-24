@@ -24,6 +24,7 @@ type SessionRow = {
   state_json: string;
   current_turn_id: string | null;
   last_error: string | null;
+  materialized_version_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -74,6 +75,7 @@ function toSession(row: SessionRow, scene: InteractiveScene | null): Interactive
     targetTurns: row.target_turns,
     state: parseState(row.state_json),
     scene,
+    materializedVersionId: row.materialized_version_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });

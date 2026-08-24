@@ -452,4 +452,16 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
       ADD COLUMN budget_json TEXT NOT NULL DEFAULT '{}';
     `,
   },
+  {
+    version: 9,
+    name: "interactive_materialized_draft_links",
+    up: `
+      ALTER TABLE interactive_sessions
+      ADD COLUMN materialized_version_id TEXT
+      REFERENCES story_versions(id) ON DELETE SET NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_interactive_sessions_materialized_version
+        ON interactive_sessions(materialized_version_id);
+    `,
+  },
 ];

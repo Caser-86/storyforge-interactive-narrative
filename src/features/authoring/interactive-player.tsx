@@ -6,7 +6,8 @@ import type { InteractiveSession } from "@/lib/interactive/schemas";
 
 type InteractivePlayerProps = { projectId: string; projectTitle: string };
 
-function sessionStatusLabel(status: InteractiveSession["status"]): string {
+function sessionStatusLabel(status: InteractiveSession["status"], materializedVersionId: string | null): string {
+  if (materializedVersionId) return "已落稿";
   return status === "ended" ? "已结束" : status === "active" ? "进行中" : status === "generating" ? "生成中" : "失败";
 }
 
@@ -133,6 +134,23 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
     }
   }
 
+  async function materialize() {
+    if (!session || session.status !== "ended" || session.materializedVersionId || isBusy) return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/play/${encodeURIComponent(session.id)}/materialize`, { method: "POST" });
+      const payload = await response.json() as { version?: { id: string }; error?: { message?: string } };
+      if (!response.ok || !payload.version) throw new Error(payload.error?.message ?? "正式故事草稿保存失败");
+      setSession((current) => current ? { ...current, materializedVersionId: payload.version!.id } : current);
+      void refreshHistory();
+    } catch (materializeError) {
+      setError(materializeError instanceof Error ? materializeError.message : "正式故事草稿保存失败");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function resumeHistorySession(sessionId: string): Promise<void> {
     setHistoryBusyId(sessionId);
     setError(null);
@@ -175,21 +193,21 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
       <header className="interactive-header">
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">SF</span>
-          <div><p className="eyebrow">INTERACTIVE MODE / DEEPSEEK</p><p className="brand-name">{projectTitle}</p></div>
+          <div><p className="eyebrow">BRANCH WRITING / DEEPSEEK</p><p className="brand-name">{projectTitle}</p></div>
         </div>
         <div className="interactive-header-actions">
           <Link className="text-link" href={`/projects/${projectId}/edit`}>返回编辑器</Link>
-          <span className="preview-readonly">逐幕生成</span>
+          <span className="preview-readonly">作者选择推进</span>
         </div>
       </header>
 
       {!session ? (
         <section className="interactive-start">
-          <p className="eyebrow">PLAYER-DRIVEN GENERATION</p>
-          <h1>你选择，故事才继续。</h1>
-          <p>每一幕只生成当前段落。你做出选择后，DeepSeek 才会根据选择生成下一幕，故事在预设回合内收束。</p>
+          <p className="eyebrow">WRITER-DRIVEN GENERATION</p>
+          <h1>你选择方向，故事逐幕成形。</h1>
+          <p>每次只生成当前场景和下一组选项，不预生成未选择的分支。你亲自走完一条路径后，DeepSeek 负责收束，并可保存为正式故事草稿。</p>
           {error ? <p className="interactive-error" role="alert">{error}</p> : null}
-          <button className="button button-primary" type="button" disabled={isBusy} onClick={() => void start()}>{isBusy ? "正在生成开场…" : "开始互动故事"}</button>
+          <button className="button button-primary" type="button" disabled={isBusy} onClick={() => void start()}>{isBusy ? "正在生成开场…" : "开始分支写作"}</button>
         </section>
       ) : (
         <section className="interactive-stage">
@@ -204,7 +222,11 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
           {session.status === "generating" ? (
           <p className="interactive-error" role="status">上一段生成尚未完成，请稍候刷新</p>
           ) : session.status === "ended" || scene?.isEnding ? (
-          <div className="interactive-ending"><strong>{scene?.endingSummary ?? "本次互动已完成。"}</strong><button className="button button-small button-quiet" type="button" onClick={() => { setSession(null); setError(null); window.localStorage.removeItem(storageKey); }}>重新开始</button></div>
+          <div className="interactive-ending">
+            <strong>{scene?.endingSummary ?? "本次分支写作已收束。"}</strong>
+            {session.materializedVersionId ? <div className="interactive-draft-saved"><span>已保存为正式故事草稿</span><Link className="text-link" href={`/projects/${projectId}/edit`}>进入编辑器</Link></div> : <button className="button button-primary button-small" type="button" disabled={isBusy} onClick={() => void materialize()}>{isBusy ? "正在保存草稿…" : "保存为正式故事草稿"}</button>}
+            <button className="button button-small button-quiet" type="button" onClick={() => { setSession(null); setError(null); window.localStorage.removeItem(storageKey); }}>重新开始</button>
+          </div>
           ) : (
             <div className="interactive-choices"><p className="eyebrow">选择你的行动</p>{scene?.choices.map((choice) => <button className="interactive-choice" key={choice.id} type="button" disabled={isBusy} onClick={() => void choose(choice.id)}><span className={`interactive-risk interactive-risk-${choice.risk}`}>{choice.risk === "low" ? "低风险" : choice.risk === "medium" ? "中风险" : "高风险"}</span><strong>{choice.label}</strong><small>{choice.consequencePreview}</small></button>)}</div>
           )}
@@ -219,8 +241,8 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
         <section className="interactive-history" aria-labelledby="interactive-history-title">
           <div className="interactive-history-heading">
             <div>
-              <p className="eyebrow">LOCAL SESSION ARCHIVE</p>
-              <h2 id="interactive-history-title">互动记录</h2>
+              <p className="eyebrow">LOCAL WRITING SESSIONS</p>
+              <h2 id="interactive-history-title">分支写作记录</h2>
             </div>
             <span>{history.length} 条</span>
           </div>
@@ -228,7 +250,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
             {history.map((item) => (
               <article className="interactive-history-item" key={item.id}>
                 <div>
-                  <span className="interactive-history-status">{sessionStatusLabel(item.status)}</span>
+                  <span className="interactive-history-status">{sessionStatusLabel(item.status, item.materializedVersionId)}</span>
                   <strong>{projectTitle}</strong>
                   <small>第 {item.turn} / {item.targetTurns} 幕</small>
                 </div>

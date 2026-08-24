@@ -18,7 +18,7 @@ test.describe("interactive authoring flow", () => {
     page.on("dialog", (dialog) => dialog.accept());
     const projectResponse = await request.post("/api/projects", {
       data: {
-        title: "互动闭环测试",
+        title: "分支写作闭环测试",
         premise: "一名档案员发现一扇不该存在的门。",
         genre: "悬疑",
         tone: "克制紧张",
@@ -31,7 +31,7 @@ test.describe("interactive authoring flow", () => {
     const project = (await projectResponse.json()).project as { id: string };
 
     await page.goto(`/projects/${project.id}/play`);
-    await page.getByRole("button", { name: "开始互动故事" }).click();
+    await page.getByRole("button", { name: "开始分支写作" }).click();
     await expect(page.getByRole("heading", { name: "第 1 幕" })).toBeVisible();
     const stage = page.locator(".interactive-stage");
     await expect(stage.getByText("第 1 / 8 幕")).toBeVisible();
@@ -48,15 +48,29 @@ test.describe("interactive authoring flow", () => {
 
     await expect(page.getByText("故事已结束")).toBeVisible();
     await expect(page.getByText("本次互动已经收束。")).toBeVisible();
+    await page.getByRole("button", { name: "保存为正式故事草稿" }).click();
+    await expect(page.getByText("已保存为正式故事草稿")).toBeVisible();
+    await expect(page.getByRole("link", { name: "进入编辑器" })).toHaveAttribute("href", `/projects/${project.id}/edit`);
+    const savedProjectResponse = await request.get(`/api/projects/${project.id}`);
+    const savedProject = (await savedProjectResponse.json()).project as { activeDraftVersionId: string };
+    const savedGraphResponse = await request.get(`/api/projects/${project.id}/graph`);
+    const savedGraph = (await savedGraphResponse.json()).graph as { versionId: string; nodes: Array<{ kind: string }>; edges: Array<{ branchType: string }> };
+    expect(savedGraph.versionId).toBe(savedProject.activeDraftVersionId);
+    expect(savedGraph.nodes).toHaveLength(8);
+    expect(savedGraph.nodes[0]?.kind).toBe("start");
+    expect(savedGraph.nodes.at(-1)?.kind).toBe("ending");
+    expect(savedGraph.edges.every((edge) => edge.branchType === "main")).toBe(true);
+    await page.reload();
+    await expect(page.getByText("已保存为正式故事草稿")).toBeVisible();
     await expect(page.getByRole("button", { name: "重新开始" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "恢复互动闭环测试第 8 幕" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "恢复分支写作闭环测试第 8 幕" })).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("link", { name: "导出 Markdown" }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/-interactive\.md$/);
 
-    await page.getByRole("button", { name: "删除互动闭环测试第 8 幕" }).click();
-    await expect(page.getByRole("button", { name: "恢复互动闭环测试第 8 幕" })).not.toBeVisible();
+    await page.getByRole("button", { name: "删除分支写作闭环测试第 8 幕" }).click();
+    await expect(page.getByRole("button", { name: "恢复分支写作闭环测试第 8 幕" })).not.toBeVisible();
   });
 });
