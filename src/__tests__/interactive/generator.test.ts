@@ -75,7 +75,7 @@ describe("interactive scene generation", () => {
       model: "deepseek-v4-flash",
     });
 
-    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice });
+    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice }, new OpenAICompatibleGenerationProvider());
 
     expect(result.scene.isEnding).toBe(false);
     expect(generate.mock.calls[0]?.[0].userPrompt).toContain("Set isEnding to false and return exactly three meaningful choices.");
@@ -118,7 +118,7 @@ describe("interactive scene generation", () => {
       state: { ...state, turn: 7 },
       previousScene,
       selectedChoice,
-    });
+    }, new OpenAICompatibleGenerationProvider());
 
     expect(result.scene.endingSummary).toBe("故事达到预设回合，进入结局。");
   });
