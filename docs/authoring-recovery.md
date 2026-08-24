@@ -17,17 +17,41 @@
 
 ## 数据库恢复
 
-迁移前自动备份位于 `SQLITE_BACKUP_DIR`，默认是 `./data/backups`。手动备份命令会输出路径、完整性结果和 SHA-256：
+迁移前自动备份和日常 checkpoint 都位于 `SQLITE_BACKUP_DIR`，默认是 `./data/backups`。迁移前备份用于升级回滚，日常 checkpoint 带有 manifest 和保留策略。保留规则见 [backup-retention.md](operations/backup-retention.md)。
+
+创建日常 checkpoint：
+
+```powershell
+npm run db:authoring:checkpoint
+```
+
+命令会输出 SQLite 文件、manifest、完整性结果和 SHA-256。旧的迁移前备份命令仍可用于手动验证迁移前副本：
 
 ```powershell
 npm run db:authoring:backup
 ```
 
-恢复前停止 StoryForge，复制经 `PRAGMA integrity_check` 验证通过的 SQLite 文件，再启动应用。不要覆盖正在被运行中的 SQLite 文件，也不要删除旧数据库作为“修复”手段。
+恢复前停止 StoryForge，先对候选 checkpoint 做非破坏性恢复演练：
+
+```powershell
+npm run db:authoring:restore-check -- --latest
+```
+
+演练会在临时副本中运行迁移、`PRAGMA integrity_check`、外键检查和图谱读取检查，成功后删除临时副本。确认项目数量和图谱可读后，再把候选 SQLite 复制到新的恢复位置并启动应用。不要覆盖正在运行中的 SQLite 文件，也不要删除旧数据库作为“修复”手段。
 
 ## 导出恢复
 
 HTML 导出只依赖自身内嵌的故事数据和浏览器本地存储。即使 StoryForge 服务停止、网络被阻断或 `localStorage` 不可用，也应能完成当前路径；如果导出文件不能打开，请重新对当前修订通过校验并创建快照后再导出。
+
+## 本地 Doctor
+
+需要快速判断本地环境是否适合继续创作时运行：
+
+```powershell
+npm run authoring:doctor
+```
+
+报告只包含数据库完整性、迁移版本、可写性、checkpoint 新鲜度、loopback/LAN 模式和模型是否已配置，不包含文件路径、项目标题、API key、原始 prompt 或模型响应。项目库也会显示同一组恢复提示。
 
 ## 不包含的内容
 

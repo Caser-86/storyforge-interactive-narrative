@@ -187,6 +187,16 @@ describe("authoring project API routes", () => {
     expect(ProjectResponseSchema.parse(await read.json()).project.id).toBe(project.id);
   });
 
+  it("rejects an oversized JSON mutation before parsing the project schema", async () => {
+    const routes = await importRoutes();
+    const response = await routes.collection.POST(
+      request("http://local/api/projects", "POST", { ...fixtureProjectInput(), premise: "x".repeat(600_000) }),
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toMatch(/too large|大小|上限/i);
+  });
+
   it("rejects stale graph revisions", async () => {
     const project = await createProject();
     const graph = graphForVersion(project.activeDraftVersionId!);

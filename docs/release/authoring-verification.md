@@ -1,11 +1,23 @@
 # StoryForge Authoring Release Verification
 
 - Date: 2026-08-24
-- Release: `v0.1.3`
+- Release candidate: `v0.1.4` (not published)
 - Release notes: `CHANGELOG.md`
 - Runtime: Node `v24.18.0`, npm `11.16.0`
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, V2 backup/restore, bounded interactive sessions, project/session lifecycle controls, and legacy read-only export.
-- Remote CI: workflow is included in this release; GitHub Actions will run after the branch and tag are pushed.
+- Remote CI: the historical `v0.1.3` tag points to `codex/storyforge-phase-0`, not `master`; its local evidence does not prove a remote Actions run. It will run when a pull request from this branch targets `master` and again when the `v0.1.4` tag is pushed from the merged `master` history.
+
+## Release A Working-Tree Verification (Not A Published Release)
+
+- Date: 2026-08-24
+- Source: current working tree on `codex/storyforge-phase-0`; no tag was moved or created.
+- `npm run verify`: exit code `0`; typecheck, lint, production build, `57` Vitest files and `240` tests passed.
+- `npm run test:e2e:authoring`: exit code `0`; `9` authoring E2E tests passed, including cancellation during a queued generation run.
+- `npm run db:authoring:smoke`: exit code `0`; temporary SQLite project lifecycle passed.
+- `npm test -- src/__tests__/authoring/release-governance.test.ts`: exit code `0`; `4` release governance tests passed.
+- `npm run authoring:llm:smoke -- --dry-run`: exit code `0`; model `deepseek-v4-flash`, `networkRequest: false`.
+- `npm run db:authoring:backup`: exit code `0`; `Integrity: ok`.
+- These results are local evidence only. GitHub Actions, branch protection, and merge state remain operator steps.
 
 ## Install Evidence
 
@@ -29,6 +41,8 @@
 | Legacy read-only export | `src/__tests__/legacy-export.test.ts`, `npm run legacy:export -- --dry-run` | passed |
 | E2E build isolation from stale retired routes | `src/__tests__/authoring/e2e-build.test.ts`, `npm run test:e2e:authoring` | passed |
 | Full browser authoring loop | `npm run test:e2e:authoring` | passed |
+| Input, model, and generation budget guardrails | `src/__tests__/authoring/schemas.test.ts`, `src/__tests__/authoring/generation/budget.test.ts`, `src/__tests__/authoring/generation/api.test.ts`, `src/__tests__/authoring/generation/executor.test.ts` | passed |
+| Pause/cancel late-response safety | `src/__tests__/authoring/generation/repository.test.ts`, `src/__tests__/authoring/generation/executor.test.ts`, `e2e/authoring-generation-cancel.spec.ts` | passed |
 
 ## Command Results
 
@@ -44,9 +58,9 @@
 
 ## Real Provider Check
 
-- Live DeepSeek smoke was not run in this candidate because it is an opt-in network and cost operation.
-- The available command is `npm run authoring:llm:smoke`; run it without `--dry-run` only when a tagged release needs a live provider check.
-- The dry-run check did not send a request and did not record the API key, raw prompt, or raw response.
+- Live DeepSeek smoke passed for this candidate: `npm run authoring:llm:smoke` returned `status: passed`, model `deepseek-v4-flash`, `inputTokens: 236`, `outputTokens: 87`, and `latencyMs: 1412`.
+- The command recorded only redacted metrics; it did not print the API key, raw prompt, or raw response.
+- The dry-run check also passed with `networkRequest: false` and remains the CI-safe default.
 
 ## Post-release Generation Hardening
 
@@ -63,5 +77,22 @@ The clean production route table contains only `/api/health`, `/api/projects/**`
 ## Residual Risks
 
 - Remote GitHub Actions were not executed locally.
-- A live provider smoke remains an explicit operator step before a tagged release.
+- The live provider smoke passed for this candidate; a tagged release must still retain the redacted evidence.
+- The `v0.1.4` candidate changes are approved for the public repository release; they are not yet merged to `master` or published under a new version tag at the time of this local verification record.
+- External GitHub audit: repository metadata reports `private: false`, matching the owner's public-repository decision. No open-source license is granted by that decision. `master` protection returned `404 Branch not protected` and remains a governance gap to resolve separately.
 - This is a private local application without login or multi-user isolation; do not expose it publicly.
+
+## Current Working-Tree Updates
+
+- Release B checkpoint, restore-check, replacement recovery, doctor, and Recovery Centre focused tests passed locally.
+- Release C security baseline, request-size policy, production build, axe accessibility E2E, and fake generation evaluation passed locally.
+- Release D has a documented Node 24 standalone decision, data lifecycle, package dry-run, and a passing temporary-root lifecycle smoke for `0.1.4`. It is not a signed installer.
+- Final local gate: `npm run verify` passed with 62 Vitest files / 263 tests, typecheck, lint, and production build.
+- Final browser gate: `npm run test:e2e:authoring` passed 10/10 tests, including accessibility, cancellation, interactive play, offline export, release restore, and responsive filters.
+- Final operational gate: checkpoint, migration backup, restore-check, doctor, fake evaluation, live dry-run, package smoke, `npm ci --dry-run --ignore-scripts`, and standalone `/api/health` smoke passed.
+- `authoring:doctor` reports database integrity ok, fresh backup, loopback-only binding, and provider configured after loading the local `.env.local` contract.
+- `npm audit --audit-level=high` passed with 0 vulnerabilities; the live smoke recorded only redacted provider metrics.
+- Local package lifecycle smoke passed `clean-install`, `health`, `upgrade`, `failed-upgrade`, `rollback`, and `uninstall-preserves-data`; the temporary root was removed and port `3110` had no listener afterward.
+- `npm run release:evidence` passed; generated CycloneDX `1.5` SBOM with `639` components, SHA-256 checksums for `2241` standalone files, and a release manifest with `secretsIncluded: false` and `signed: false`; the artifact secret scan passed.
+- These are local working-tree results, not a published release.
+- Remaining human gates are protected-branch review, remote Actions, clean Windows account install evidence, and signing decision. Public-release approval is recorded in the release checklist; tag and push remain operator execution steps.

@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
+import fs from "fs";
+import path from "path";
 import { z } from "zod";
 import { AuthoringError } from "./errors";
 import { getAuthoringDbPath, initializeAuthoringDatabase } from "./database";
@@ -12,8 +14,10 @@ import {
   StoryVersionSchema,
 } from "./schemas";
 import { GenerationErrorCodeSchema, GenerationStageSchema, GenerationStepStatusSchema, GenerationRunStatusSchema, GenerationCandidateStatusSchema } from "./generation/schemas";
+import { GenerationBudgetSchema, LEGACY_GENERATION_BUDGET } from "./generation/budget";
 import { ValidationIssueStatusSchema, ValidationRunStatusSchema, ValidationSeveritySchema, ValidationSourceSchema } from "./validation/schemas";
 import type { AuthoringDatabaseOptions } from "./database";
+import { MAX_SETTINGS_JSON_CHARS } from "./schemas";
 import type { Chapter, JsonValue, Project, StoryEdge, StoryNode } from "./schemas";
 import { InteractiveSceneSchema, InteractiveSessionStatusSchema, InteractiveStateSchema } from "@/lib/interactive/schemas";
 
@@ -27,6 +31,7 @@ const BackupGenerationRunSchema = z
     progressCurrent: z.number().int().min(0),
     progressTotal: z.number().int().min(0),
     model: z.string().min(1).nullable(),
+    budget: GenerationBudgetSchema.optional().default(LEGACY_GENERATION_BUDGET),
     inputTokens: z.number().int().min(0),
     outputTokens: z.number().int().min(0),
     retryCount: z.number().int().min(0),
@@ -145,9 +150,16 @@ const BackupInteractiveTurnSchema = z
   })
   .strict();
 
+const BackupProjectSchema = ProjectSchema
+  .superRefine((project, context) => {
+    if (JSON.stringify(project.settingsJson).length > MAX_SETTINGS_JSON_CHARS) {
+      context.addIssue({ code: z.ZodIssueCode.too_big, maximum: MAX_SETTINGS_JSON_CHARS, type: "string", inclusive: true, path: ["settingsJson"], message: "settingsJson must be at most 32000 serialized characters" });
+    }
+  });
+
 const projectBackupCoreShape = {
   exportedAt: z.string().min(1),
-  project: ProjectSchema,
+  project: BackupProjectSchema,
   versions: z.array(BackupVersionSchema),
   chapters: z.array(ChapterSchema),
   nodes: z.array(StoryNodeSchema),
@@ -315,6 +327,7 @@ function readProjectBackup(db: Database.Database, projectId: string): ProjectBac
       progressCurrent: row.progress_current,
       progressTotal: row.progress_total,
       model: row.model,
+      budget: row.budget_json && row.budget_json !== "{}" ? JSON.parse(String(row.budget_json)) : undefined,
       inputTokens: row.input_tokens,
       outputTokens: row.output_tokens,
       retryCount: row.retry_count,
@@ -454,6 +467,36 @@ export async function exportProjectBackup(projectId: string, options: AuthoringD
   }
 }
 
+export interface ProjectBackupCheckpointReference {
+  fileName: string;
+  sha256: string;
+  createdAt: string;
+}
+
+export async function createProjectBackupCheckpoint(
+  projectId: string,
+  options: AuthoringDatabaseOptions = {},
+): Promise<ProjectBackupCheckpointReference> {
+  const backupDir = options.backupDir ?? process.env.SQLITE_BACKUP_DIR ?? "./data/backups";
+  const checkpointDir = path.join(backupDir, "project-checkpoints");
+  const createdAt = new Date().toISOString();
+  const fileName = `storyforge-project-checkpoint-${createdAt.replace(/[:.]/g, "-")}-${randomUUID()}.json`;
+  const filePath = path.join(checkpointDir, fileName);
+  const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    const backup = await exportProjectBackup(projectId, options);
+    fs.mkdirSync(checkpointDir, { recursive: true });
+    fs.writeFileSync(temporaryPath, JSON.stringify(backup, null, 2), { encoding: "utf8", flag: "wx" });
+    fs.renameSync(temporaryPath, filePath);
+    const sha256 = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+    return { fileName, sha256, createdAt };
+  } catch (error) {
+    if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+    if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
+    throw storageError(error, "Failed to create a verified project replacement checkpoint");
+  }
+}
+
 function mapIds(backup: ProjectBackup, remap: boolean): {
   project: ProjectBackup["project"];
   versions: ProjectBackup["versions"];
@@ -586,8 +629,8 @@ function insertBackup(db: Database.Database, backup: ProjectBackup, mode: "new-i
   for (const node of mapped.nodes) insertNode.run(node.id, node.versionId, node.chapterId, node.nodeKey, node.kind, node.title, node.body, node.summary, node.objective, node.topologicalRank, node.contentStatus, node.authorModified ? 1 : 0, node.contentRevision, node.createdAt, node.updatedAt);
   const insertEdge = db.prepare("INSERT INTO story_edges (id, version_id, source_node_id, target_node_id, label, intent, consequence_summary, branch_type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const edge of mapped.edges) insertEdge.run(edge.id, edge.versionId, edge.sourceNodeId, edge.targetNodeId, edge.label, edge.intent, edge.consequenceSummary, edge.branchType, edge.sortOrder, edge.createdAt, edge.updatedAt);
-  const insertRun = db.prepare("INSERT INTO generation_runs (id, project_id, version_id, stage, status, progress_current, progress_total, model, input_tokens, output_tokens, retry_count, last_error_code, last_error_message, lease_expires_at, started_at, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)");
-  for (const run of mapped.generation.runs) insertRun.run(run.id, run.projectId, run.versionId, run.stage, run.status, run.progressCurrent, run.progressTotal, run.model, run.inputTokens, run.outputTokens, run.retryCount, run.lastErrorCode, run.lastErrorMessage, run.startedAt, run.createdAt, run.updatedAt, run.completedAt);
+  const insertRun = db.prepare("INSERT INTO generation_runs (id, project_id, version_id, stage, status, progress_current, progress_total, model, budget_json, input_tokens, output_tokens, retry_count, last_error_code, last_error_message, lease_expires_at, started_at, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)");
+  for (const run of mapped.generation.runs) insertRun.run(run.id, run.projectId, run.versionId, run.stage, run.status, run.progressCurrent, run.progressTotal, run.model, JSON.stringify(run.budget ?? LEGACY_GENERATION_BUDGET), run.inputTokens, run.outputTokens, run.retryCount, run.lastErrorCode, run.lastErrorMessage, run.startedAt, run.createdAt, run.updatedAt, run.completedAt);
   const insertStep = db.prepare("INSERT INTO generation_steps (id, run_id, step_key, stage, subject_id, status, attempt, sort_order, lease_expires_at, next_attempt_at, model, request_json, raw_response, parsed_response_json, input_tokens, output_tokens, error_code, error_message, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, '{}', NULL, NULL, ?, ?, ?, ?, ?, ?, ?)");
   for (const step of mapped.generation.steps) insertStep.run(step.id, step.runId, step.stepKey, step.stage, step.subjectId, step.status, step.attempt, step.sortOrder, step.model, step.inputTokens, step.outputTokens, step.errorCode, step.errorMessage, step.createdAt, step.updatedAt, step.completedAt);
   const insertCandidate = db.prepare("INSERT INTO generation_candidates (id, project_id, version_id, run_id, step_id, node_id, base_content_revision, status, candidate_body, model, raw_response, created_at, applied_at, rejected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)");

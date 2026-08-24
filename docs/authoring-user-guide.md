@@ -8,6 +8,7 @@
 2. 在 `.env.local` 配置 `SQLITE_DB_PATH`，默认是 `./data/storyforge.sqlite`。
 3. 配置 OpenAI-compatible 文本模型：`OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL`。密钥只保留在本地环境文件，不会进入项目备份或 HTML 导出。
 4. 执行 `npm run dev`，默认只监听 `127.0.0.1:3000`。
+5. 普通 JSON 写接口限制为 512 KB；项目备份导入单独限制为 8 MB。超过限制时请缩小输入或拆分备份，不要反复重试同一个超大请求。
 
 ## 创作闭环
 
@@ -36,3 +37,12 @@
 ## 安全边界
 
 默认启动只允许本机访问。只有明确设置 `STORYFORGE_ALLOW_LAN=true` 并配置非 loopback host 时才会警告后启动；这不代表应用具备多用户隔离或公开部署安全性。
+
+页面和 API 默认带有防 MIME 嗅探、防嵌入、来源策略、权限策略和动态 nonce CSP。生产 CSP 不放开 `unsafe-eval`；开发环境仅为 Next 热更新保留必要的开发例外。文本-only 版本不配置远程图片源，也不允许固定局域网来源。
+
+## 可访问性
+
+- 页面支持浏览器缩放，移动端不通过 viewport 禁止放大。
+- 生成、保存和错误状态使用可读的 `status`/`alert` 区域；编辑器大纲支持键盘方向键导航。
+- 系统开启“减少动态效果”时会关闭页面动画和过渡。
+- CI/E2E 会用 axe 检查新建、项目库、生成、编辑器和互动试玩页面的 critical/serious 问题；发布前仍需要人工检查键盘顺序、焦点可见性、中文朗读和移动端视觉布局。

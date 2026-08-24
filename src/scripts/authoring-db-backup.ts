@@ -4,9 +4,11 @@ import { pathToFileURL } from "url";
 import { getAuthoringDbPath } from "../lib/authoring/database";
 import { backupBeforeMigration } from "../lib/authoring/database-backup";
 import { AUTHORING_MIGRATIONS } from "../lib/authoring/migrations";
+import { loadAuthoringEnv } from "../lib/authoring/local-env";
 import { getErrorMessage } from "../lib/errors";
 
 export async function backupAuthoringDatabase(): Promise<void> {
+  loadAuthoringEnv();
   const dbPath = getAuthoringDbPath();
   const backupDir = process.env.SQLITE_BACKUP_DIR ?? "./data/backups";
   if (!fs.existsSync(dbPath)) throw new Error(`Authoring database does not exist at ${dbPath}`);

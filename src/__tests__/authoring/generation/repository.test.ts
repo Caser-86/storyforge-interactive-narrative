@@ -172,6 +172,55 @@ describe("authoring generation repository", () => {
     });
   });
 
+  it("ignores late writes after a run is paused or canceled", async () => {
+    const project = await createProject();
+    const runs = createRunsRepo();
+    const run = await runs.createRun(project.id, project.activeDraftVersionId!, {
+      now: date(0),
+      steps: [DEFAULT_GENERATION_STEP_DESCRIPTORS[0]],
+    });
+    const [leased] = await runs.leaseNextSteps(run.id, date(1), 1);
+
+    await runs.pauseRun(run.id, date(2));
+    expect((await runs.completeStep(leased.id, {
+      ...leaseInput(leased),
+      completedAt: date(3),
+      parsedResponse: { late: "paused" },
+      inputTokens: 11,
+      outputTokens: 13,
+    })).status).toBe("queued");
+    expect((await runs.failStep(leased.id, {
+      ...leaseInput(leased),
+      failedAt: date(3),
+      code: "NETWORK",
+      message: "late failure after pause",
+      retryable: false,
+    })).status).toBe("queued");
+    expect(await runs.getRun(run.id)).toMatchObject({
+      status: "paused",
+      inputTokens: 0,
+      outputTokens: 0,
+    });
+
+    await runs.resumeRun(run.id, date(4));
+    const [reclaimed] = await runs.leaseNextSteps(run.id, date(5), 1);
+    await runs.cancelRun(run.id, date(6));
+
+    expect((await runs.completeStep(reclaimed.id, {
+      ...leaseInput(reclaimed),
+      completedAt: date(7),
+      parsedResponse: { late: "canceled" },
+      inputTokens: 17,
+      outputTokens: 19,
+    })).status).toBe("canceled");
+    expect((await runs.getStep(reclaimed.id)).status).toBe("canceled");
+    expect(await runs.getRun(run.id)).toMatchObject({
+      status: "canceled",
+      inputTokens: 0,
+      outputTokens: 0,
+    });
+  });
+
   it("leases scheduled retry steps only after their next attempt time", async () => {
     const project = await createProject();
     const runs = createRunsRepo();
@@ -314,7 +363,7 @@ describe("authoring generation repository", () => {
     expect((await runs.getRun(run.id)).status).toBe("failed");
   });
 
-  it("rejects illegal terminal step transitions and preserves terminal runs", async () => {
+  it("ignores late terminal step transitions and preserves terminal runs", async () => {
     const project = await createProject();
     const runs = createRunsRepo();
     const run = await runs.createRun(project.id, project.activeDraftVersionId!, {
@@ -324,15 +373,13 @@ describe("authoring generation repository", () => {
     const [step] = await runs.leaseNextSteps(run.id, date(1), 1);
     await runs.completeStep(step.id, { ...leaseInput(step), completedAt: date(2) });
 
-    await expect(
-      runs.failStep(step.id, {
-        ...leaseInput(step),
-        failedAt: date(3),
-        code: "NETWORK",
-        message: "late failure",
-        retryable: false,
-      }),
-    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await runs.failStep(step.id, {
+      ...leaseInput(step),
+      failedAt: date(3),
+      code: "NETWORK",
+      message: "late failure",
+      retryable: false,
+    })).status).toBe("completed");
     expect((await runs.cancelRun(run.id, date(4))).status).toBe("completed");
   });
 

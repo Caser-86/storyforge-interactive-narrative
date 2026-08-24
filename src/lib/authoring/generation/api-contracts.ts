@@ -5,7 +5,7 @@ import { StoryNodeSchema } from "../schemas";
 export const GenerationCreateInputSchema = z
   .object({
     versionId: z.string().min(1).optional(),
-    model: z.string().min(1).optional(),
+    model: z.string().trim().min(1).max(80).optional(),
   })
   .strict();
 

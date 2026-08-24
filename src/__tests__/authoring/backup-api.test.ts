@@ -61,4 +61,38 @@ describe("authoring backup routes", () => {
     expect(imported.status).toBe(201);
     expect((await imported.json()).project.id).not.toBe(project.id);
   });
+
+  it("requires explicit target identity and title confirmation for replacement", async () => {
+    const repo = createAuthoringRepository();
+    const project = await repo.createProject(input());
+    repo.close();
+
+    const route = await import("@/app/api/projects/[projectId]/backup/route");
+    const importRoute = await import("@/app/api/projects/import/route");
+    const downloaded = await route.GET(new Request(`http://local/api/projects/${project.id}/backup`), { params: Promise.resolve({ projectId: project.id }) });
+    const backup = ProjectBackupV2Schema.parse(await downloaded.json());
+
+    const missingContract = await importRoute.POST(new Request("http://local/api/projects/import", {
+      method: "POST",
+      body: JSON.stringify({ backup, mode: "replace" }),
+    }));
+    expect(missingContract.status).toBe(400);
+
+    const wrongConfirmation = await importRoute.POST(new Request("http://local/api/projects/import", {
+      method: "POST",
+      body: JSON.stringify({ backup, mode: "replace", targetProjectId: project.id, confirmation: "替换项目：错误标题" }),
+    }));
+    expect(wrongConfirmation.status).toBe(400);
+
+    const replaced = await importRoute.POST(new Request("http://local/api/projects/import", {
+      method: "POST",
+      body: JSON.stringify({ backup, mode: "replace", targetProjectId: project.id, confirmation: `替换项目：${project.title}` }),
+    }));
+    expect(replaced.status).toBe(201);
+    const payload = (await replaced.json()) as { recovery?: { fileName?: string; sha256?: string }; project?: { id?: string } };
+    expect(payload.project?.id).toBe(project.id);
+    expect(payload.recovery?.fileName).toMatch(/\.json$/);
+    expect(payload.recovery?.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(fs.existsSync(path.join(process.env.SQLITE_BACKUP_DIR!, "project-checkpoints", payload.recovery!.fileName!))).toBe(true);
+  });
 });

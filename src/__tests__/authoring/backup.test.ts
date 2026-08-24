@@ -271,6 +271,13 @@ describe("authoring project backup", () => {
     await expect(importProjectBackup({ ...backup, nodes: [{ ...backup.nodes[0], versionId: "missing-version" }, ...backup.nodes.slice(1)] }, "new-id", { dbPath, backupDir })).rejects.toMatchObject({
       code: "VALIDATION",
     });
+    await expect(importProjectBackup({ ...backup, project: { ...backup.project, settingsJson: "x".repeat(32_001) } }, "new-id", { dbPath, backupDir })).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
+    await expect(importProjectBackup({ ...backup, nodes: [...backup.nodes, backup.nodes[0]!] }, "replace", { dbPath, backupDir })).rejects.toMatchObject({
+      code: "STORAGE",
+    });
+    expect((await repo().getProject(project.id)).title).toBe(project.title);
 
     expect((await repo().listProjects()).filter((item) => item.id !== project.id)).toHaveLength(0);
   });

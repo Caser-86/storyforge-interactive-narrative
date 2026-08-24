@@ -444,4 +444,12 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
         ON interactive_turns(session_id, turn);
     `,
   },
+  {
+    version: 8,
+    name: "generation_run_budgets",
+    up: `
+      ALTER TABLE generation_runs
+      ADD COLUMN budget_json TEXT NOT NULL DEFAULT '{}';
+    `,
+  },
 ];

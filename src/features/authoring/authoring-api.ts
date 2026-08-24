@@ -59,8 +59,8 @@ export async function getGenerationStatus(projectId: string, runId: string): Pro
   return parseJson(response, (value) => GenerationStatusResponseSchema.parse(value));
 }
 
-export async function advanceGeneration(projectId: string, runId: string) {
-  const response = await fetch(`/api/projects/${projectId}/generation/${runId}/next`, { method: "POST" });
+export async function advanceGeneration(projectId: string, runId: string, signal?: AbortSignal) {
+  const response = await fetch(`/api/projects/${projectId}/generation/${runId}/next`, { method: "POST", signal });
   return parseJson(response, (value) => GenerationNextResponseSchema.parse(value));
 }
 

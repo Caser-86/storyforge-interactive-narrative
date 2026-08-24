@@ -156,28 +156,28 @@ export function ProjectBriefForm() {
         <div className="form-fields">
           <label className="form-field form-field-wide" htmlFor="project-title">
             <span>项目名称</span>
-            <input id="project-title" value={form.title} onChange={(event) => updateField("title", event.target.value)} aria-invalid={Boolean(errors.title)} />
+            <input id="project-title" maxLength={120} value={form.title} onChange={(event) => updateField("title", event.target.value)} aria-invalid={Boolean(errors.title)} />
             {errors.title ? <small role="alert">{errors.title}</small> : null}
           </label>
           <label className="form-field form-field-wide" htmlFor="project-premise">
             <span>核心设定</span>
-            <textarea id="project-premise" value={form.premise} onChange={(event) => updateField("premise", event.target.value)} aria-invalid={Boolean(errors.premise)} rows={4} />
+            <textarea id="project-premise" maxLength={4000} value={form.premise} onChange={(event) => updateField("premise", event.target.value)} aria-invalid={Boolean(errors.premise)} rows={4} />
             <small className="field-hint">一句话写清楚主角、困境和最初的牵引力。</small>
             {errors.premise ? <small role="alert">{errors.premise}</small> : null}
           </label>
           <label className="form-field" htmlFor="project-genre">
             <span>类型</span>
-            <input id="project-genre" value={form.genre} onChange={(event) => updateField("genre", event.target.value)} placeholder="例如：悬疑奇幻" aria-invalid={Boolean(errors.genre)} />
+            <input id="project-genre" maxLength={80} value={form.genre} onChange={(event) => updateField("genre", event.target.value)} placeholder="例如：悬疑奇幻" aria-invalid={Boolean(errors.genre)} />
             {errors.genre ? <small role="alert">{errors.genre}</small> : null}
           </label>
           <label className="form-field" htmlFor="project-tone">
             <span>基调</span>
-            <input id="project-tone" value={form.tone} onChange={(event) => updateField("tone", event.target.value)} placeholder="例如：克制、潮湿" aria-invalid={Boolean(errors.tone)} />
+            <input id="project-tone" maxLength={160} value={form.tone} onChange={(event) => updateField("tone", event.target.value)} placeholder="例如：克制、潮湿" aria-invalid={Boolean(errors.tone)} />
             {errors.tone ? <small role="alert">{errors.tone}</small> : null}
           </label>
           <label className="form-field" htmlFor="project-point-of-view">
             <span>叙事视角</span>
-            <input id="project-point-of-view" value={form.pointOfView} onChange={(event) => updateField("pointOfView", event.target.value)} placeholder="例如：第三人称限知" aria-invalid={Boolean(errors.pointOfView)} />
+            <input id="project-point-of-view" maxLength={80} value={form.pointOfView} onChange={(event) => updateField("pointOfView", event.target.value)} placeholder="例如：第三人称限知" aria-invalid={Boolean(errors.pointOfView)} />
             {errors.pointOfView ? <small role="alert">{errors.pointOfView}</small> : null}
           </label>
           <label className="form-field" htmlFor="project-rating">

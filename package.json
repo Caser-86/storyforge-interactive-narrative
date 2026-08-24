@@ -1,6 +1,6 @@
 {
   "name": "storyforge-interactive-narrative",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "engines": {
     "node": ">=24 <25"
@@ -18,6 +18,13 @@
     "typecheck": "tsc --noEmit",
     "db:authoring:smoke": "tsx src/scripts/authoring-db-smoke.ts",
     "db:authoring:backup": "tsx src/scripts/authoring-db-backup.ts",
+    "db:authoring:checkpoint": "tsx src/scripts/authoring-db-checkpoint.ts",
+    "db:authoring:restore-check": "tsx src/scripts/authoring-db-restore-check.ts",
+    "authoring:doctor": "tsx src/scripts/authoring-doctor.ts",
+    "authoring:evaluate": "tsx src/scripts/authoring-evaluate.ts",
+    "package:smoke": "pwsh -File scripts/package-smoke.ps1 -Mode DryRun",
+    "package:standalone": "pwsh -File scripts/package-standalone.ps1",
+    "release:evidence": "pwsh -File scripts/release-evidence.ps1",
     "legacy:export": "tsx src/scripts/legacy-export.ts",
     "authoring:llm:smoke": "tsx src/scripts/authoring-llm-smoke.ts",
     "test": "vitest run",
@@ -42,6 +49,7 @@
     }
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",

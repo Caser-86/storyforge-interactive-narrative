@@ -112,7 +112,7 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
 
   public async listSessions(projectId: string): Promise<InteractiveSession[]> {
     const rows = this.db
-      .prepare("SELECT * FROM interactive_sessions WHERE project_id = ? ORDER BY updated_at DESC, id DESC")
+      .prepare("SELECT * FROM interactive_sessions WHERE project_id = ? ORDER BY updated_at DESC, rowid DESC")
       .all(projectId) as SessionRow[];
     return rows.map((row) => this.readSession(row));
   }

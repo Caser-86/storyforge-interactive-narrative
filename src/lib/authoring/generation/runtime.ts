@@ -12,7 +12,7 @@ import { BibleOutputSchema, BriefOutputSchema, GraphOutputSchema, OutlineOutputS
 import { NodeContentOutputSchema } from "./stages/nodes";
 import type { StoryGraph } from "../schemas";
 
-function contextFor(project: Awaited<ReturnType<AuthoringRepository["getProject"]>>, versionId: string): GenerationProjectContext {
+function contextFor(project: Awaited<ReturnType<AuthoringRepository["getProject"]>>, versionId: string, model?: string | null): GenerationProjectContext {
   return {
     projectId: project.id,
     versionId,
@@ -30,7 +30,7 @@ function contextFor(project: Awaited<ReturnType<AuthoringRepository["getProject"
       targetNodes: project.targetNodeCount,
       targetEndings: project.targetEndingCount,
     },
-    model: process.env.OPENAI_MODEL,
+    model: model ?? undefined,
   };
 }
 
@@ -67,7 +67,7 @@ export async function materializeGenerationRunOutputs(
   const project = await authoringRepository.getProject(projectId);
   const run = await repository.getRun(runId);
   const steps = await repository.listSteps(runId);
-  const context = contextFor(project, run.versionId);
+  const context = contextFor(project, run.versionId, run.model);
   const graphOutput = readCompleted(steps, "graph:main", GraphOutputSchema);
   const structural = executeStructuralCheck(context, graphOutput);
   if (!structural.passed) {
@@ -190,26 +190,26 @@ export async function createProjectGenerationExecutor(
   const stepsFor = async (run: GenerationRun) => repository.listSteps(run.id);
   const handlers = {
     brief: async (_step: GenerationStep, run: GenerationRun) => {
-      const context = contextFor(project, run.versionId);
+      const context = contextFor(project, run.versionId, run.model);
       return resultFrom(await executeBriefStage(context, provider));
     },
     bible: async (_step: GenerationStep, run: GenerationRun) => {
-      const context = contextFor(project, run.versionId);
+      const context = contextFor(project, run.versionId, run.model);
       const steps = await stepsFor(run);
       return resultFrom(await executeBibleStage(context, provider, readCompleted(steps, "brief:main", BriefOutputSchema)));
     },
     outline: async (_step: GenerationStep, run: GenerationRun) => {
-      const context = contextFor(project, run.versionId);
+      const context = contextFor(project, run.versionId, run.model);
       const steps = await stepsFor(run);
       return resultFrom(await executeOutlineStage(context, provider, readCompleted(steps, "brief:main", BriefOutputSchema), readCompleted(steps, "bible:main", BibleOutputSchema)));
     },
     graph: async (_step: GenerationStep, run: GenerationRun) => {
-      const context = contextFor(project, run.versionId);
+      const context = contextFor(project, run.versionId, run.model);
       const steps = await stepsFor(run);
       return resultFrom(await executeGraphStage(context, provider, readCompleted(steps, "brief:main", BriefOutputSchema), readCompleted(steps, "bible:main", BibleOutputSchema), readCompleted(steps, "outline:main", OutlineOutputSchema)));
     },
     structural_check: async (_step: GenerationStep, run: GenerationRun) => {
-      const context = contextFor(project, run.versionId);
+      const context = contextFor(project, run.versionId, run.model);
       const graph = readCompleted(await stepsFor(run), "graph:main", GraphOutputSchema);
       const result = executeStructuralCheck(context, graph);
       if (!result.passed) {
@@ -221,11 +221,11 @@ export async function createProjectGenerationExecutor(
     nodes: async (step: GenerationStep, run: GenerationRun) => {
       if (!step.subjectId) throw new ProviderError("SCHEMA", "Node step has no subject", false);
       const graph = readCompleted(await stepsFor(run), "graph:main", GraphOutputSchema);
-      const result = await executeNodeBatch({ provider, graph, nodeIds: [step.subjectId], context: contextFor(project, run.versionId) }, 1);
+      const result = await executeNodeBatch({ provider, graph, nodeIds: [step.subjectId], context: contextFor(project, run.versionId, run.model) }, 1);
       return resultFrom({ output: result.outputs[0]!, providerResult: result.providerResults[0]! });
     },
     continuity_review: async (_step: GenerationStep, run: GenerationRun) => {
-      const context = contextFor(project, run.versionId);
+      const context = contextFor(project, run.versionId, run.model);
       const steps = await stepsFor(run);
       const graph = readCompleted(steps, "graph:main", GraphOutputSchema);
       const nodeContents = steps.filter((candidate) => candidate.stage === "nodes" && candidate.status === "completed" && candidate.parsedResponseJson !== null).map((candidate) => NodeContentOutputSchema.parse(candidate.parsedResponseJson));

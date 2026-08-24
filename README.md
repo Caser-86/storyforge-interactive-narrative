@@ -2,7 +2,7 @@
 
 StoryForge 是一个私人本地互动叙事创作工作台。主流程是：项目库 -> 有限生成 -> 图谱编辑 -> 质量校验 -> 快照 -> 离线 HTML 导出。
 
-当前发布版本：`v0.1.3`
+当前待发布版本：`v0.1.4`。该版本尚未合并到 `master`，也尚未创建新标签。
 
 当前产品只聚焦文字创作，不需要登录，不提供公开分享，不依赖 Redis、PostgreSQL 或图片 worker。默认服务只绑定 `127.0.0.1`。
 
@@ -28,6 +28,10 @@ npm ci
 OPENAI_API_KEY=sk-your-key
 OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-v4-flash
+# 可选：达到该输出 token 上限时暂停当前生成
+STORYFORGE_MAX_OUTPUT_TOKENS=250000
+# 可选：用于界面估算输出成本，不参与实际扣费
+STORYFORGE_OUTPUT_PRICE_PER_MILLION=0
 SQLITE_DB_PATH=./data/storyforge.sqlite
 SQLITE_BACKUP_DIR=./data/backups
 ```
@@ -60,9 +64,17 @@ npm run dev
 | `npm run build` | Next 生产构建 |
 | `npm run start` | loopback 生产启动 |
 | `npm run verify` | typecheck、lint、Vitest、生产构建 |
-| `npm run test:e2e:authoring` | 生产构建下的 8 项完整 authoring E2E |
+| `npm run test:e2e:authoring` | 生产构建下的 10 项完整 authoring E2E |
 | `npm run db:authoring:smoke` | SQLite authoring 生命周期 smoke |
 | `npm run db:authoring:backup` | 迁移前 SQLite 备份、完整性和 SHA-256 检查 |
+| `npm run db:authoring:checkpoint` | 日常 SQLite checkpoint、manifest 和保留策略 |
+| `npm run db:authoring:restore-check -- --latest` | 在临时副本中演练最近 checkpoint 的迁移、完整性和图谱读取 |
+| `npm run authoring:doctor` | 输出不含路径、故事内容和密钥的本地恢复诊断 |
+| `npm run authoring:evaluate -- --provider fake` | 不联网的版本化生成质量评测 |
+| `npm run package:smoke` | Windows 分发 smoke dry-run，不安装、不删除数据 |
+| `pwsh -File scripts/package-smoke.ps1 -Mode Local -Root "$env:TEMP\storyforge-package-smoke-0.1.4"` | 在隔离临时根中验证 standalone 安装、升级、回滚和卸载保留数据 |
+| `npm run package:standalone` | 生成不含作者数据和密钥的 Node standalone 目录 |
+| `npm run release:evidence` | 生成 CycloneDX SBOM、standalone SHA-256 清单和脱敏发布证据 |
 | `npm run legacy:export -- --dry-run` | 只读检查旧 session，不删除源数据 |
 | `npm run authoring:llm:smoke -- --dry-run` | 不发网络请求的 LLM 配置检查 |
 

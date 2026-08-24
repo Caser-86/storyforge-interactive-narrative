@@ -10,29 +10,36 @@ import {
   StoryNodePatchSchema,
   StoryNodeSchema,
   ValidationIssueSchema,
+  MAX_SETTINGS_JSON_CHARS,
 } from "./schemas";
 
 export const CreateProjectInputSchema = z
   .object({
-    title: z.string().trim().min(1),
-    premise: z.string().trim().min(1),
-    genre: z.string().trim().min(1),
-    tone: z.string().trim().min(1),
-    pointOfView: z.string().trim().min(1),
-    rating: z.string().trim().min(1),
+    title: z.string().trim().min(1).max(120),
+    premise: z.string().trim().min(1).max(4_000),
+    genre: z.string().trim().min(1).max(80),
+    tone: z.string().trim().min(1).max(160),
+    pointOfView: z.string().trim().min(1).max(80),
+    rating: z.string().trim().min(1).max(32),
     size: ProjectSizeSchema,
     settingsJson: JsonValueSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    const serialized = JSON.stringify(input.settingsJson ?? {});
+    if (serialized.length > MAX_SETTINGS_JSON_CHARS) {
+      context.addIssue({ code: z.ZodIssueCode.too_big, maximum: MAX_SETTINGS_JSON_CHARS, type: "string", inclusive: true, path: ["settingsJson"], message: "settingsJson must be at most 32000 serialized characters" });
+    }
+  });
 
 export const PatchProjectInputSchema = z
   .object({
-    title: z.string().trim().min(1).optional(),
-    premise: z.string().trim().min(1).optional(),
-    genre: z.string().trim().min(1).optional(),
-    tone: z.string().trim().min(1).optional(),
-    pointOfView: z.string().trim().min(1).optional(),
-    rating: z.string().trim().min(1).optional(),
+    title: z.string().trim().min(1).max(120).optional(),
+    premise: z.string().trim().min(1).max(4_000).optional(),
+    genre: z.string().trim().min(1).max(80).optional(),
+    tone: z.string().trim().min(1).max(160).optional(),
+    pointOfView: z.string().trim().min(1).max(80).optional(),
+    rating: z.string().trim().min(1).max(32).optional(),
     size: ProjectSizeSchema.optional(),
     status: z.enum(["draft", "generating", "ready", "archived"]).optional(),
     settingsJson: JsonValueSchema.optional(),
@@ -40,6 +47,12 @@ export const PatchProjectInputSchema = z
   .strict()
   .refine((input) => Object.keys(input).length > 0, {
     message: "At least one editable project field is required.",
+  })
+  .superRefine((input, context) => {
+    const serialized = JSON.stringify(input.settingsJson ?? {});
+    if (serialized.length > MAX_SETTINGS_JSON_CHARS) {
+      context.addIssue({ code: z.ZodIssueCode.too_big, maximum: MAX_SETTINGS_JSON_CHARS, type: "string", inclusive: true, path: ["settingsJson"], message: "settingsJson must be at most 32000 serialized characters" });
+    }
   });
 
 export const GraphWriteInputSchema = z
@@ -92,6 +105,20 @@ export const ProjectResponseSchema = z
   })
   .strict();
 
+export const ProjectImportResponseSchema = z
+  .object({
+    project: ProjectSchema,
+    recovery: z
+      .object({
+        fileName: z.string().min(1),
+        sha256: z.string().regex(/^[a-f0-9]{64}$/),
+        createdAt: z.string().min(1),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
 export const CreateProjectResponseSchema = ProjectResponseSchema;
 
 export const ListProjectsResponseSchema = z
@@ -137,12 +164,51 @@ function validationDetails(error: z.ZodError): Record<string, unknown> {
   };
 }
 
-export async function readJsonBody<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
+export async function readJsonBody<T>(request: Request, schema: z.ZodType<T>, maxBytes = 512_000): Promise<T> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    const parsedLength = Number(contentLength);
+    if (Number.isFinite(parsedLength) && parsedLength > maxBytes) {
+      throw new AuthoringError("VALIDATION", "Request body is too large.");
+    }
+  }
+
+  const readBody = async (): Promise<string> => {
+    if (request.body === null) return "";
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        totalBytes += chunk.value.byteLength;
+        if (totalBytes > maxBytes) {
+          await reader.cancel();
+          throw new AuthoringError("VALIDATION", "Request body is too large.");
+        }
+        chunks.push(chunk.value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(bytes);
+  };
+
   let json: unknown;
 
   try {
-    json = await request.json();
-  } catch {
+    json = JSON.parse(await readBody());
+  } catch (error) {
+    if (error instanceof AuthoringError) {
+      throw error;
+    }
     throw new AuthoringError("VALIDATION", "Malformed JSON");
   }
 

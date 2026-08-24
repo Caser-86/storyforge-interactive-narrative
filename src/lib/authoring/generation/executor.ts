@@ -1,4 +1,5 @@
 import type { JsonValue } from "../schemas";
+import { AuthoringError } from "../errors";
 import type { GenerationRepository } from "./repository";
 import type { GenerationRun, GenerationStage, GenerationStep } from "./schemas";
 import type { GenerationStepDescriptor } from "./schemas";
@@ -11,6 +12,11 @@ function storedGenerationErrorMessage(error: ProviderError): string {
   }
 
   return error.message;
+}
+
+function exceedsHardOutputCap(run: GenerationRun, additionalOutputTokens = 0): boolean {
+  const cap = run.budget?.hardCapOutputTokens;
+  return cap !== null && cap !== undefined && run.outputTokens + Math.max(0, additionalOutputTokens) > cap;
 }
 
 export interface GenerationStepExecutionResult {
@@ -56,6 +62,9 @@ export class GenerationExecutor {
 
     const processStep = async (step: GenerationStep): Promise<{ shouldStop: boolean }> => {
       const run = await this.repository.getRun(runId);
+      if (!["queued", "running"].includes(run.status)) {
+        return { shouldStop: true };
+      }
       const handler = this.options.handlers[step.stage];
 
       try {
@@ -63,7 +72,26 @@ export class GenerationExecutor {
           throw new ProviderError("UNKNOWN", `No generation handler registered for ${step.stage}`, false);
         }
 
+        if (exceedsHardOutputCap(run)) {
+          await this.repository.pauseRun(runId, now, {
+            code: "VALIDATION",
+            message: "Generation output budget reached.",
+          });
+          return { shouldStop: true };
+        }
+
         const result = await handler(step, run);
+        const latestRun = await this.repository.getRun(runId);
+        if (["paused", "failed", "completed", "canceled"].includes(latestRun.status)) {
+          return { shouldStop: true };
+        }
+        if (exceedsHardOutputCap(latestRun, result.outputTokens ?? 0)) {
+          await this.repository.pauseRun(runId, now, {
+            code: "VALIDATION",
+            message: "Generation output budget reached.",
+          });
+          return { shouldStop: true };
+        }
         if (result.nextSteps && result.nextSteps.length > 0) {
           await this.repository.appendSteps(runId, result.nextSteps, now);
         }
@@ -88,15 +116,22 @@ export class GenerationExecutor {
           return { shouldStop: true };
         }
 
-        await this.repository.failStep(step.id, {
-          attempt: step.attempt,
-          leaseExpiresAt: step.leaseExpiresAt!,
-          failedAt: now,
-          code: decision.error.code,
-          message: storedGenerationErrorMessage(decision.error),
-          retryable: decision.retryable,
-          nextAttemptAt: decision.nextAttemptAt,
-        });
+        try {
+          await this.repository.failStep(step.id, {
+            attempt: step.attempt,
+            leaseExpiresAt: step.leaseExpiresAt!,
+            failedAt: now,
+            code: decision.error.code,
+            message: storedGenerationErrorMessage(decision.error),
+            retryable: decision.retryable,
+            nextAttemptAt: decision.nextAttemptAt,
+          });
+        } catch (failureError) {
+          if (failureError instanceof AuthoringError && failureError.code === "CONFLICT") {
+            return { shouldStop: true };
+          }
+          throw failureError;
+        }
         return { shouldStop: !decision.retryable };
       }
     };

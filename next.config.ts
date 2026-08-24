@@ -7,16 +7,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   distDir: process.env.NEXT_DIST_DIR || ".next",
   outputFileTracingRoot: process.cwd(),
-  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.31.199"],
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   transpilePackages: ["geist"],
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-    ],
-  },
 };
 
 export default nextConfig;

@@ -10,6 +10,7 @@ import {
   GenerationStepDescriptorSchema,
   GenerationStepSchema,
 } from "./schemas";
+import { GenerationBudgetSchema, LEGACY_GENERATION_BUDGET } from "./budget";
 import type {
   GenerationCandidate,
   GenerationErrorCode,
@@ -18,6 +19,7 @@ import type {
   GenerationStep,
   GenerationStepDescriptor,
 } from "./schemas";
+import type { GenerationBudget } from "./budget";
 import { StoryNodeSchema } from "../schemas";
 import type { StoryNode } from "../schemas";
 
@@ -43,6 +45,7 @@ export const DEFAULT_GENERATION_STEP_DESCRIPTORS: GenerationStepDescriptor[] = [
 export interface CreateGenerationRunOptions {
   now?: Date;
   model?: string | null;
+  budget?: GenerationBudget;
   steps?: GenerationStepDescriptor[];
 }
 
@@ -115,6 +118,7 @@ type GenerationRunRow = {
   progress_current: number;
   progress_total: number;
   model: string | null;
+  budget_json: string | null;
   input_tokens: number;
   output_tokens: number;
   retry_count: number;
@@ -206,6 +210,15 @@ function stringifyJson(value: JsonValue | string | null | undefined): string | n
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
+function parseBudget(text: string | null): GenerationBudget {
+  if (!text || text === "{}") {
+    return LEGACY_GENERATION_BUDGET;
+  }
+
+  const parsed = GenerationBudgetSchema.safeParse(JSON.parse(text));
+  return parsed.success ? parsed.data : LEGACY_GENERATION_BUDGET;
+}
+
 function toRun(row: GenerationRunRow): GenerationRun {
   return GenerationRunSchema.parse({
     id: row.id,
@@ -216,6 +229,7 @@ function toRun(row: GenerationRunRow): GenerationRun {
     progressCurrent: row.progress_current,
     progressTotal: row.progress_total,
     model: row.model,
+    budget: parseBudget(row.budget_json),
     inputTokens: row.input_tokens,
     outputTokens: row.output_tokens,
     retryCount: row.retry_count,
@@ -395,10 +409,10 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
             `
               INSERT INTO generation_runs (
                 id, project_id, version_id, stage, status, progress_current, progress_total,
-                model, input_tokens, output_tokens, retry_count, last_error_code,
+                model, budget_json, input_tokens, output_tokens, retry_count, last_error_code,
                 last_error_message, lease_expires_at, started_at, created_at, updated_at, completed_at
               )
-              VALUES (?, ?, ?, ?, ?, 0, ?, ?, 0, 0, 0, NULL, NULL, NULL, NULL, ?, ?, ?)
+              VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, 0, NULL, NULL, NULL, NULL, ?, ?, ?)
             `,
           )
           .run(
@@ -409,6 +423,7 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
             orderedSteps.length === 0 ? "completed" : "queued",
             orderedSteps.length,
             options.model ?? null,
+            JSON.stringify(options.budget ?? LEGACY_GENERATION_BUDGET),
             timestamp,
             timestamp,
             orderedSteps.length === 0 ? timestamp : null,
@@ -849,7 +864,7 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
     try {
       const complete = this.db.transaction(() => {
         const current = this.requireStepRow(stepId);
-        if (current.status === "completed") {
+        if (current.status !== "running") {
           return toStep(current);
         }
 
@@ -908,7 +923,7 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
     try {
       const fail = this.db.transaction(() => {
         const current = this.requireStepRow(stepId);
-        if (current.status === "failed") {
+        if (current.status !== "running") {
           return toStep(current);
         }
 

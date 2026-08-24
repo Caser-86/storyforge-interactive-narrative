@@ -2,6 +2,27 @@
 
 All notable changes to StoryForge are documented here.
 
+## [Unreleased]
+
+暂无未发布变更。
+
+## [0.1.4] - 2026-08-24
+
+### Reliability and Generation Controls
+
+- Made pause and cancellation safe against late provider responses; discarded results are no longer persisted after the run stops.
+- Added server-side authoring input limits, configured-model enforcement, per-run output budgets, large-run confirmation, and optional hard output caps.
+- Added generation budget persistence with a backward-compatible SQLite migration and backup/import support.
+- Added CI tag/manual triggers, failure artifact retention, and a documented GitHub release procedure.
+
+### Verification
+
+- Release A working-tree evidence: `npm run verify`, 57 Vitest files / 240 tests, 9 authoring E2E tests, and SQLite smoke all passed on 2026-08-24.
+- Release B evidence: checkpoint/restore-check commands and replacement recovery tests passed locally; the Recovery Centre and privacy-safe doctor are included.
+- Release C evidence: security baseline, request-size policy, axe accessibility flow, and fake generation evaluation passed locally.
+- Release D evidence: Windows package lifecycle smoke, live provider smoke, CycloneDX SBOM, and standalone checksum generation passed; no signed installer is published.
+- This release candidate is not tagged or merged to `master`; it is not a published release yet.
+
 ## [0.1.3] - 2026-08-24
 
 ### Product

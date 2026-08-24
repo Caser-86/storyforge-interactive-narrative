@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { JsonValueSchema } from "../schemas";
+import { GenerationBudgetSchema } from "./budget";
 
 export const GenerationStageSchema = z.enum([
   "brief",
@@ -52,6 +53,7 @@ export const GenerationRunSchema = z
     progressCurrent: z.number().int().min(0),
     progressTotal: z.number().int().min(0),
     model: z.string().min(1).nullable(),
+    budget: GenerationBudgetSchema.optional(),
     inputTokens: z.number().int().min(0),
     outputTokens: z.number().int().min(0),
     retryCount: z.number().int().min(0),

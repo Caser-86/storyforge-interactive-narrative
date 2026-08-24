@@ -113,6 +113,57 @@ describe("generation executor", () => {
     }
   });
 
+  it("does not surface a provider result that arrives after cancellation", async () => {
+    const setupState = await setup();
+    try {
+      const run = await setupState.repository.createRun(setupState.project.id, setupState.project.activeDraftVersionId!, {
+        now: NOW,
+        steps: [DEFAULT_GENERATION_STEP_DESCRIPTORS[0]],
+      });
+      const handler = vi.fn(async (step: GenerationStep) => {
+        await setupState.repository.cancelRun(run.id, new Date(NOW.getTime() + 1_000));
+        return handlerResult(step);
+      });
+      const executor = createGenerationExecutor(setupState.repository, { handlers: { brief: handler } });
+
+      await expect(executor.executeNext(run.id, NOW)).resolves.toMatchObject({
+        runStatus: "canceled",
+        processedSteps: 1,
+      });
+      expect((await setupState.repository.listSteps(run.id))[0]!.status).toBe("canceled");
+      expect((await setupState.repository.getRun(run.id)).inputTokens).toBe(0);
+    } finally {
+      setupState.close();
+    }
+  });
+
+  it("pauses before persisting a provider result that exceeds the hard output cap", async () => {
+    const setupState = await setup();
+    try {
+      const run = await setupState.repository.createRun(setupState.project.id, setupState.project.activeDraftVersionId!, {
+        now: NOW,
+        budget: {
+          policyVersion: "generation-budget@1",
+          providerCallCount: 1,
+          maxOutputTokens: 10,
+          hardCapOutputTokens: 4,
+          estimatedOutputCost: null,
+          requiresConfirmation: false,
+        },
+        steps: [DEFAULT_GENERATION_STEP_DESCRIPTORS[0]],
+      });
+      const handler = vi.fn(async (step: GenerationStep) => ({ ...handlerResult(step), outputTokens: 5 }));
+      const executor = createGenerationExecutor(setupState.repository, { handlers: { brief: handler } });
+
+      await expect(executor.executeNext(run.id, NOW)).resolves.toMatchObject({ runStatus: "paused" });
+      expect((await setupState.repository.getRun(run.id)).lastErrorCode).toBe("VALIDATION");
+      expect((await setupState.repository.getRun(run.id)).outputTokens).toBe(0);
+      expect((await setupState.repository.listSteps(run.id))[0]!.status).toBe("queued");
+    } finally {
+      setupState.close();
+    }
+  });
+
   it("caps transient retries at three attempts", async () => {
     const setupState = await setup();
     try {

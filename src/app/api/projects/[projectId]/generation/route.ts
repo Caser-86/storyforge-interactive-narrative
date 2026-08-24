@@ -3,6 +3,7 @@ import { errorResponse, json, readJsonBody } from "@/lib/authoring/api-contracts
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { GenerationCreateInputSchema, GenerationListResponseSchema, GenerationResponseSchema } from "@/lib/authoring/generation/api-contracts";
 import { createGenerationRepository } from "@/lib/authoring/generation/repository";
+import { calculateGenerationBudget, resolveGenerationModel } from "@/lib/authoring/generation/budget";
 
 type ProjectRouteContext = { params: Promise<{ projectId: string }> };
 
@@ -38,7 +39,13 @@ export async function POST(request: Request, { params }: ProjectRouteContext): P
       if (!versionId) {
         throw new AuthoringError("NOT_FOUND", "Project has no active draft version", { projectId });
       }
-      const run = await generation.createRun(projectId, versionId, { model: input.model });
+      const model = resolveGenerationModel(input.model);
+      const budget = calculateGenerationBudget({
+        preset: project.sizePreset,
+        targetNodes: project.targetNodeCount,
+        targetEndings: project.targetEndingCount,
+      });
+      const run = await generation.createRun(projectId, versionId, { model, budget });
       return json(GenerationResponseSchema, { run }, { status: 201 });
     } finally {
       generation.close();

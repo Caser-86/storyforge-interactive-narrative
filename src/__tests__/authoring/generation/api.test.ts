@@ -9,6 +9,7 @@ import {
   GenerationStatusResponseSchema,
 } from "@/lib/authoring/generation/api-contracts";
 import { CreateProjectResponseSchema } from "@/lib/authoring/api-contracts";
+import { GenerationCreateInputSchema } from "@/lib/authoring/generation/api-contracts";
 import { getProjectGenerationMetrics } from "@/lib/authoring/metrics";
 
 type ProjectContext = { params: Promise<{ projectId: string; runId: string }> };
@@ -17,6 +18,7 @@ let tempDir: string;
 let originalSqliteDbPath: string | undefined;
 let originalSqliteBackupDir: string | undefined;
 let originalGenerationProvider: string | undefined;
+let originalOpenAIModel: string | undefined;
 
 function request(url: string, method: string, body?: unknown): Request {
   return new Request(url, {
@@ -61,10 +63,12 @@ describe("generation control API", () => {
     originalSqliteDbPath = process.env.SQLITE_DB_PATH;
     originalSqliteBackupDir = process.env.SQLITE_BACKUP_DIR;
     originalGenerationProvider = process.env.GENERATION_PROVIDER;
+    originalOpenAIModel = process.env.OPENAI_MODEL;
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "storyforge-generation-api-"));
     process.env.SQLITE_DB_PATH = path.join(tempDir, "authoring.sqlite");
     process.env.SQLITE_BACKUP_DIR = path.join(tempDir, "backups");
     process.env.GENERATION_PROVIDER = "fake";
+    process.env.OPENAI_MODEL = "deepseek-v4-flash";
   });
 
   afterEach(() => {
@@ -74,6 +78,8 @@ describe("generation control API", () => {
     else process.env.SQLITE_BACKUP_DIR = originalSqliteBackupDir;
     if (originalGenerationProvider === undefined) delete process.env.GENERATION_PROVIDER;
     else process.env.GENERATION_PROVIDER = originalGenerationProvider;
+    if (originalOpenAIModel === undefined) delete process.env.OPENAI_MODEL;
+    else process.env.OPENAI_MODEL = originalOpenAIModel;
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -97,6 +103,37 @@ describe("generation control API", () => {
 
     const list = await routes.collection.GET(request("http://local/generation", "GET"), { params: Promise.resolve({ projectId: project.id }) });
     expect(GenerationListResponseSchema.parse(await list.json()).runs).toHaveLength(1);
+  });
+
+  it("resolves the configured model and persists a bounded budget", async () => {
+    const project = await createProject();
+    const routes = await importRoutes();
+    const rejected = await routes.collection.POST(
+      request(`http://local/api/projects/${project.id}/generation`, "POST", {
+        versionId: project.activeDraftVersionId,
+        model: "another-provider-model",
+      }),
+      { params: Promise.resolve({ projectId: project.id }) },
+    );
+    expect(rejected.status).toBe(400);
+
+    const created = await routes.collection.POST(
+      request(`http://local/api/projects/${project.id}/generation`, "POST", {
+        versionId: project.activeDraftVersionId,
+      }),
+      { params: Promise.resolve({ projectId: project.id }) },
+    );
+    const run = GenerationResponseSchema.parse(await created.json()).run;
+    expect(run.model).toBe("deepseek-v4-flash");
+    expect(run.budget).toMatchObject({
+      policyVersion: "generation-budget@1",
+      providerCallCount: 39,
+      maxOutputTokens: 134_400,
+    });
+  });
+
+  it("rejects an oversized model selector before opening a generation run", () => {
+    expect(() => GenerationCreateInputSchema.parse({ model: "x".repeat(81) })).toThrow();
   });
 
   it("leases bounded next work without returning provider payloads", async () => {

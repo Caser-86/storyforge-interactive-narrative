@@ -87,6 +87,31 @@ describe("GenerationProgress", () => {
     expect(await screen.findByText("准备生成")).toBeInTheDocument();
   });
 
+  it("requires confirmation before advancing a large generation budget", async () => {
+    const user = userEvent.setup();
+    const budgeted = run({
+      status: "queued",
+      budget: {
+        policyVersion: "generation-budget@1",
+        providerCallCount: 87,
+        maxOutputTokens: 400_000,
+        hardCapOutputTokens: null,
+        estimatedOutputCost: 0.8,
+        requiresConfirmation: true,
+      },
+    });
+    const completed = run({ status: "completed", stage: "ready", progressCurrent: 8, completedAt: "2026-08-21T00:01:00.000Z", budget: budgeted.budget });
+    api.listGenerationRuns.mockResolvedValue([budgeted]);
+    api.getGenerationStatus.mockResolvedValue(statusResponse(budgeted));
+    api.advanceGeneration.mockResolvedValue(statusResponse(completed));
+    render(<GenerationProgress projectId="project-1" projectTitle="夜航船" />);
+
+    expect(await screen.findByRole("button", { name: "确认预算并开始生成" })).toBeInTheDocument();
+    expect(api.advanceGeneration).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "确认预算并开始生成" }));
+    await waitFor(() => expect(api.advanceGeneration).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  });
+
   it("sends an explicit resume action", async () => {
     const user = userEvent.setup();
     const resumed = run({ status: "queued" });
@@ -113,5 +138,31 @@ describe("GenerationProgress", () => {
 
     await waitFor(() => expect(api.advanceGeneration).toHaveBeenCalledTimes(2), { timeout: 2500 });
     expect(await screen.findByText("生成完成")).toBeInTheDocument();
+  });
+
+  it("aborts in-flight advancement before sending a pause or cancel action", async () => {
+    const user = userEvent.setup();
+    const queued = run({ status: "queued", progressCurrent: 1 });
+    const canceled = run({ status: "canceled", progressCurrent: 1, lastErrorCode: "CANCELED" });
+    api.listGenerationRuns.mockResolvedValue([queued]);
+    api.getGenerationStatus
+      .mockResolvedValueOnce(statusResponse(queued))
+      .mockResolvedValue(statusResponse(canceled));
+    api.advanceGeneration.mockImplementation((_projectId: string, _runId: string, signal?: AbortSignal) => (
+      new Promise((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      })
+    ));
+    api.generationAction.mockResolvedValue(canceled);
+
+    render(<GenerationProgress projectId="project-1" projectTitle="夜航船" />);
+    await waitFor(() => expect(api.advanceGeneration).toHaveBeenCalledTimes(1), { timeout: 2500 });
+    const signal = api.advanceGeneration.mock.calls[0]![2] as AbortSignal;
+
+    await user.click(await screen.findByRole("button", { name: "取消流程" }));
+
+    await waitFor(() => expect(api.generationAction).toHaveBeenCalledWith("project-1", "run-1", "cancel"));
+    expect(signal.aborted).toBe(true);
+    expect(await screen.findByText("已取消")).toBeInTheDocument();
   });
 });

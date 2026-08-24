@@ -1,0 +1,11 @@
+{
+  "id": "zh-suspense-01",
+  "title": "第九档案室",
+  "genre": "悬疑",
+  "language": "zh-CN",
+  "targetNodes": 8,
+  "targetEndings": 2,
+  "minimumDecisionPoints": 2,
+  "requiredTerms": ["档案", "门"],
+  "expectedOutcome": "completed"
+}

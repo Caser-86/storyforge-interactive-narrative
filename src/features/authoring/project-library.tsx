@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { ProjectSummary } from "@/lib/authoring/repository";
+import { DiagnosticReportSchema } from "@/lib/authoring/diagnostic-contracts";
+import type { DiagnosticReport } from "@/lib/authoring/diagnostic-contracts";
 
 type ProjectLibraryProps = {
   projects: ProjectSummary[];
@@ -34,6 +36,10 @@ function formatUpdatedAt(value: string): string {
   }).format(date);
 }
 
+function diagnosticStatusLabel(status: DiagnosticReport["status"]): string {
+  return status === "ok" ? "本地状态正常" : status === "warning" ? "需要留意" : "需要处理";
+}
+
 async function readError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: { message?: string } };
@@ -46,6 +52,7 @@ async function readError(response: Response): Promise<string> {
 export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) {
   const [actionState, setActionState] = useState<ActionState>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticReport | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectSummary["status"] | "all">("all");
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +62,22 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
     const searchableText = `${project.title} ${project.genre} ${project.premise}`.toLocaleLowerCase();
     return matchesStatus && (!normalizedQuery || searchableText.includes(normalizedQuery));
   });
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve(fetch("/api/diagnostics"))
+      .then(async (response) => {
+        if (!response) throw new Error("诊断服务不可用");
+        const report = DiagnosticReportSchema.parse(await response.json());
+        if (active) setDiagnostics(report);
+      })
+      .catch(() => {
+        if (active) setDiagnostics(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function runAction(project: ProjectSummary, action: "duplicate" | "archive" | "delete") {
     if (action === "delete" && !window.confirm(`确定删除“${project.title}”吗？此操作无法撤销。`)) {
@@ -127,6 +150,34 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
     }
   }
 
+  async function importReplacement(event: ChangeEvent<HTMLInputElement>, project: ProjectSummary) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const expectedConfirmation = `替换项目：${project.title}`;
+    const confirmation = window.prompt(`这是高级替换操作。请输入“${expectedConfirmation}”以继续。`);
+    if (confirmation !== expectedConfirmation) {
+      setActionError("未完成替换：确认文字不匹配，原项目没有改变。");
+      return;
+    }
+
+    setActionState({ projectId: project.id, label: "替换中" });
+    setActionError(null);
+    try {
+      const backup = JSON.parse(await file.text()) as unknown;
+      const response = await fetch("/api/projects/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ backup, mode: "replace", targetProjectId: project.id, confirmation }),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      window.location.reload();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "替换导入失败，原项目应保持不变");
+      setActionState(null);
+    }
+  }
+
   return (
     <main className="authoring-shell">
       <div className="authoring-grain" aria-hidden="true" />
@@ -175,6 +226,25 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
             <strong>操作未完成</strong>
             <span>{actionError}</span>
           </div>
+        ) : null}
+
+        {diagnostics ? (
+          <section className={`local-diagnostics local-diagnostics-${diagnostics.status}`} aria-labelledby="local-diagnostics-title" role="status">
+            <div>
+              <p className="eyebrow">LOCAL RECOVERY CENTRE</p>
+              <h2 id="local-diagnostics-title">{diagnosticStatusLabel(diagnostics.status)}</h2>
+              <p>数据库完整性：{diagnostics.database.integrity === "ok" ? "正常" : "需要检查"} · checkpoint：{diagnostics.backup.freshness === "fresh" ? "新鲜" : diagnostics.backup.freshness === "stale" ? "已过期" : diagnostics.backup.freshness === "missing" ? "尚未创建" : "无法确认"}</p>
+            </div>
+            {diagnostics.status !== "ok" ? <a className="text-link" href="#recovery-actions">查看恢复操作 <span aria-hidden="true">→</span></a> : null}
+          </section>
+        ) : null}
+        {diagnostics && diagnostics.status !== "ok" ? (
+          <section className="recovery-actions" id="recovery-actions" aria-label="本地恢复操作">
+            <strong>建议操作</strong>
+            {diagnostics.backup.freshness !== "fresh" ? <span>先运行 <code>npm run db:authoring:checkpoint</code>，再运行 <code>npm run db:authoring:restore-check -- --latest</code>。</span> : null}
+            {diagnostics.provider.status === "not-configured" ? <span>需要真实生成时，在本地环境文件中配置模型凭证；不会上传项目数据。</span> : null}
+            {diagnostics.network.binding === "lan-override" ? <span>如不需要局域网访问，请关闭 <code>STORYFORGE_ALLOW_LAN</code>。</span> : null}
+          </section>
         ) : null}
 
         {projects.length > 0 ? (
@@ -277,6 +347,23 @@ export function ProjectLibrary({ projects, initialError }: ProjectLibraryProps) 
                       >
                         {isBusy && actionState?.label === "复制中" ? "…" : "复制"}
                       </button>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-label={`替换导入${project.title}`}
+                        disabled={isBusy}
+                        onClick={() => document.getElementById(`replace-backup-${project.id}`)?.click()}
+                      >
+                        {isBusy && actionState?.label === "替换中" ? "…" : "替换导入"}
+                      </button>
+                      <input
+                        id={`replace-backup-${project.id}`}
+                        aria-label="选择用于替换当前项目的备份文件"
+                        accept="application/json,.json"
+                        className="backup-file-input"
+                        type="file"
+                        onChange={(event) => void importReplacement(event, project)}
+                      />
                       {project.status !== "archived" ? (
                         <button
                           className="icon-button"

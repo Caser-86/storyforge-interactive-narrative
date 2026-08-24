@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import packageJson from "../../../../package.json";
 import { initializeAuthoringDatabase } from "@/lib/authoring/database";
-import { getErrorMessage } from "@/lib/errors";
 
 export async function GET(): Promise<Response> {
   const checks: Record<string, { status: string; latencyMs?: number; error?: string; details?: unknown }> = {};
@@ -17,8 +16,8 @@ export async function GET(): Promise<Response> {
       details: { driver: "sqlite", persistent: true },
     };
     if (integrity !== "ok") checks.authoring.error = "SQLite integrity check failed";
-  } catch (error) {
-    checks.authoring = { status: "error", error: getErrorMessage(error, "Authoring database unavailable") };
+  } catch {
+    checks.authoring = { status: "error", error: "Authoring database unavailable" };
   } finally {
     database?.close();
   }

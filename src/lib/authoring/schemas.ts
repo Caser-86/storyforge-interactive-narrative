@@ -4,6 +4,8 @@ const projectSizePresets = ["micro", "short", "medium", "custom"] as const;
 const storyNodeKinds = ["start", "scene", "ending"] as const;
 const versionKinds = ["draft", "snapshot"] as const;
 
+export const MAX_SETTINGS_JSON_CHARS = 32_000;
+
 export type ProjectSizePreset = (typeof projectSizePresets)[number];
 export type StoryNodeKind = (typeof storyNodeKinds)[number];
 export type VersionKind = (typeof versionKinds)[number];
@@ -57,9 +59,9 @@ export const ChapterSchema = z
     id: z.string().min(1),
     versionId: z.string().min(1),
     ordinal: z.number().int().min(0),
-    title: z.string().min(1),
-    goal: z.string().min(1),
-    summary: z.string().min(1),
+    title: z.string().min(1).max(200),
+    goal: z.string().min(1).max(600),
+    summary: z.string().min(1).max(600),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })
@@ -72,10 +74,10 @@ export const StoryNodeSchema = z
     chapterId: z.string().min(1),
     nodeKey: z.string().min(1),
     kind: StoryNodeKindSchema,
-    title: z.string().min(1),
-    body: z.string().min(1),
-    summary: z.string().min(1),
-    objective: z.string().min(1),
+    title: z.string().min(1).max(200),
+    body: z.string().min(1).max(12_000),
+    summary: z.string().min(1).max(600),
+    objective: z.string().min(1).max(600),
     topologicalRank: z.number().int().min(0),
     contentStatus: z.enum(["planned", "generated", "author_edited", "review_required"]),
     authorModified: z.boolean(),
@@ -87,19 +89,19 @@ export const StoryNodeSchema = z
 
 export const StoryNodePatchSchema = z
   .object({
-    title: z.string().trim().min(1).optional(),
-    body: z.string().trim().min(1).optional(),
-    summary: z.string().trim().min(1).optional(),
-    objective: z.string().trim().min(1).optional(),
+    title: z.string().trim().min(1).max(200).optional(),
+    body: z.string().trim().min(1).max(12_000).optional(),
+    summary: z.string().trim().min(1).max(600).optional(),
+    objective: z.string().trim().min(1).max(600).optional(),
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, { message: "At least one node field is required." });
 
 export const StoryEdgePatchSchema = z
   .object({
-    label: z.string().trim().min(1).optional(),
-    intent: z.string().trim().min(1).optional(),
-    consequenceSummary: z.string().trim().min(1).optional(),
+    label: z.string().trim().min(1).max(240).optional(),
+    intent: z.string().trim().min(1).max(600).optional(),
+    consequenceSummary: z.string().trim().min(1).max(800).optional(),
     branchType: BranchTypeSchema.optional(),
   })
   .strict()
@@ -111,9 +113,9 @@ export const StoryEdgeSchema = z
     versionId: z.string().min(1),
     sourceNodeId: z.string().min(1),
     targetNodeId: z.string().min(1),
-    label: z.string().min(1),
-    intent: z.string().min(1),
-    consequenceSummary: z.string().min(1),
+    label: z.string().min(1).max(240),
+    intent: z.string().min(1).max(600),
+    consequenceSummary: z.string().min(1).max(800),
     branchType: BranchTypeSchema,
     sortOrder: z.number().int().min(0),
     createdAt: z.string().min(1),
@@ -133,12 +135,12 @@ export const StoryGraphSchema = z
 export const ProjectSchema = z
   .object({
     id: z.string().min(1),
-    title: z.string().min(1),
-    premise: z.string().min(1),
-    genre: z.string().min(1),
-    tone: z.string().min(1),
-    pointOfView: z.string().min(1),
-    rating: z.string().min(1),
+    title: z.string().min(1).max(120),
+    premise: z.string().min(1).max(4_000),
+    genre: z.string().min(1).max(80),
+    tone: z.string().min(1).max(160),
+    pointOfView: z.string().min(1).max(80),
+    rating: z.string().min(1).max(32),
     sizePreset: ProjectSizePresetSchema,
     targetNodeCount: z.number().int().min(8).max(80),
     targetEndingCount: z.number().int().min(2).max(10),

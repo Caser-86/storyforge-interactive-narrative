@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { AuthoringError } from "@/lib/authoring/errors";
 import {
+  StoryEdgePatchSchema,
+  StoryEdgeSchema,
   ProjectSizeSchema,
+  StoryNodePatchSchema,
+  StoryNodeSchema,
   StoryGraphSchema,
   ValidationIssueSchema,
   StoryVersionSchema,
 } from "@/lib/authoring/schemas";
+import { CreateProjectInputSchema } from "@/lib/authoring/api-contracts";
 import type { ProjectSizePreset, StoryNodeKind, VersionKind } from "@/lib/authoring/schemas";
 
 describe("authoring schemas", () => {
@@ -29,6 +34,58 @@ describe("authoring schemas", () => {
 
   it("rejects stories larger than the first-release limit", () => {
     expect(() => ProjectSizeSchema.parse({ preset: "custom", targetNodes: 81, targetEndings: 5 })).toThrow();
+  });
+
+  it("rejects oversized authoring input before it reaches SQLite or the provider", () => {
+    const base = {
+      title: "Story",
+      premise: "Premise",
+      genre: "mystery",
+      tone: "quiet",
+      pointOfView: "second person",
+      rating: "PG-13",
+      size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+    } as const;
+
+    expect(() => CreateProjectInputSchema.parse({ ...base, title: "x".repeat(121) })).toThrow();
+    expect(() => CreateProjectInputSchema.parse({ ...base, premise: "x".repeat(4001) })).toThrow();
+    expect(() => CreateProjectInputSchema.parse({ ...base, genre: "x".repeat(81) })).toThrow();
+    expect(() => CreateProjectInputSchema.parse({ ...base, tone: "x".repeat(161) })).toThrow();
+    expect(() => CreateProjectInputSchema.parse({ ...base, pointOfView: "x".repeat(81) })).toThrow();
+    expect(() => CreateProjectInputSchema.parse({ ...base, rating: "x".repeat(33) })).toThrow();
+    expect(() => CreateProjectInputSchema.parse({ ...base, settingsJson: "x".repeat(32_001) })).toThrow();
+    expect(() => StoryNodePatchSchema.parse({ body: "x".repeat(12_001) })).toThrow();
+    expect(() => StoryEdgePatchSchema.parse({ label: "x".repeat(241) })).toThrow();
+    expect(() => StoryNodeSchema.parse({
+      id: "node-1",
+      versionId: "version-1",
+      chapterId: "chapter-1",
+      nodeKey: "start",
+      kind: "start",
+      title: "Start",
+      body: "x".repeat(12_001),
+      summary: "Summary",
+      objective: "Objective",
+      topologicalRank: 0,
+      contentStatus: "planned",
+      authorModified: false,
+      contentRevision: 0,
+      createdAt: "2026-08-19T00:00:00.000Z",
+      updatedAt: "2026-08-19T00:00:00.000Z",
+    })).toThrow();
+    expect(() => StoryEdgeSchema.parse({
+      id: "edge-1",
+      versionId: "version-1",
+      sourceNodeId: "node-1",
+      targetNodeId: "node-2",
+      label: "x".repeat(241),
+      intent: "Intent",
+      consequenceSummary: "Consequence",
+      branchType: "main",
+      sortOrder: 0,
+      createdAt: "2026-08-19T00:00:00.000Z",
+      updatedAt: "2026-08-19T00:00:00.000Z",
+    })).toThrow();
   });
 
   it("parses a typed graph payload", () => {
