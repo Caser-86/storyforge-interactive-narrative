@@ -1,6 +1,6 @@
 # StoryForge GitHub Release Procedure
 
-This procedure is for a private local release. It does not publish user stories, API keys, SQLite files, prompts, or provider responses.
+This procedure is for releasing a private-local runtime from a public source repository. It does not publish user stories, API keys, SQLite files, prompts, or provider responses.
 
 ## Preconditions
 
