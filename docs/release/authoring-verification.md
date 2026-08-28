@@ -8,6 +8,27 @@
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, V2 backup/restore, bounded interactive sessions, project/session lifecycle controls, and legacy read-only export.
 - Remote CI: PR #1 targeted `master`; `CI/verify` and `CI/e2e-authoring` passed before merge. Tag run `32687684469` passed on `v0.1.4` at merged commit `e175f84467af1ff9383c023121969be844fd13fa`.
 
+## v0.1.6 Author-Branch Editing Candidate (Not Published)
+
+- Date: 2026-08-28
+- Source branch: `codex/branch-writing-v0.1.5`
+- Candidate tag: `v0.1.6` will point to the reviewed commit after the manual release confirmation; no GitHub Release is being created from this feature branch.
+- Scope: author-created branch scene editing, one atomic graph write with revision protection, existing-ending closure, validation boundaries, and Windows E2E cleanup reliability.
+- Local candidate gate: `npm run verify` passed with 67 Vitest files / 276 tests; `npm run test:e2e:authoring` passed 11/11.
+- Release status: branch candidate only. Merge review, protected-branch CI, canonical-branch tag, GitHub Release, clean Windows account install evidence, and code signing remain human gates.
+
+## v0.1.5 Branch-Writing Candidate (Not Published)
+
+- Date: 2026-08-24
+- Source branch: `codex/branch-writing-v0.1.5`
+- Candidate commit: `600a7f0` (`feat: add author-driven branch writing`)
+- Candidate tag: `v0.1.5`, pushed with the feature branch; no GitHub Release has been created for it.
+- Scope: author-selected branch writing, one-scene-at-a-time generation, formal `review_required` draft materialization, idempotent save, backup compatibility, and editor continuation.
+- Local candidate gate: `npm test` passed with 65 Vitest files / 271 tests; `npm run typecheck`, `npm run lint`, and `npm run build` passed.
+- Browser candidate gate: `npm run test:e2e:authoring` passed 10/10, including author-selected path, formal draft materialization, refresh recovery, accessibility, cancellation, offline export, release restore, and responsive filters.
+- Focused materialization verification: the path mapper, repository transaction, API route, and interactive player tests cover ending validation, project isolation, idempotency, and the editor entry after saving.
+- Release status: feature branch and tag only. Merge review, protected-branch CI, GitHub Release, clean Windows account install evidence, and code signing remain human gates.
+
 ## Published v0.1.4 Evidence
 
 - Pull request: https://github.com/Caser-86/storyforge-interactive-narrative/pull/1

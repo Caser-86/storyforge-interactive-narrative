@@ -13,6 +13,7 @@ import {
   StoryGraphResponseSchema,
 } from "@/lib/authoring/api-contracts";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
+import { addAuthorBranch } from "@/lib/authoring/graph-branch";
 import type { AuthoringRepository, CreateProjectInput } from "@/lib/authoring/repository";
 import type { StoryGraph } from "@/lib/authoring/schemas";
 import { graphWithoutEnding, validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
@@ -106,10 +107,10 @@ async function importRoutes() {
   };
 }
 
-async function createProject() {
+async function createProject(input: CreateProjectInput = fixtureProjectInput()) {
   const routes = await importRoutes();
   const response = await routes.collection.POST(
-    request("http://local/api/projects", "POST", fixtureProjectInput()),
+    request("http://local/api/projects", "POST", input),
   );
 
   return CreateProjectResponseSchema.parse(await response.json()).project;
@@ -402,6 +403,54 @@ describe("authoring project API routes", () => {
       projectContext(project.id),
     );
     expect(StoryGraphResponseSchema.parse(await readByVersion.json()).graph.versionId).toBe(project.activeDraftVersionId);
+  });
+
+  it("writes an author branch atomically and rejects reusing the prior graph revision", async () => {
+    const routes = await importRoutes();
+    const project = await createProject(fixtureProjectInput({
+      size: { preset: "custom", targetNodes: 12, targetEndings: 2 },
+    }));
+    const graph = graphForVersion(project.activeDraftVersionId!);
+    expect((await putGraph(project.id, graph, 0)).status).toBe(200);
+
+    let edgeIndex = 0;
+    const branched = addAuthorBranch(
+      graph,
+      {
+        sourceNodeId: graph.nodes.find((node) => node.nodeKey === "left")!.id,
+        endingNodeId: graph.nodes.find((node) => node.nodeKey === "keeper-ending")!.id,
+        choiceLabel: "Cross the flooded gallery",
+        intent: "Trade time for a hidden route.",
+        consequenceSummary: "The courier reaches the archive from below.",
+        continuationLabel: "Follow the lantern below",
+        title: "Flooded Gallery",
+        body: "Water climbs the gallery steps as the courier finds a second entrance.",
+        summary: "The courier discovers a submerged route.",
+        objective: "Find a safe route back to the archive.",
+      },
+      { createId: (kind) => kind === "node" ? "author-branch-node" : `author-branch-edge-${++edgeIndex}`, now: "2026-08-28T00:00:00.000Z" },
+    );
+
+    const branchWrite = await putGraph(project.id, branched, 1);
+    expect(branchWrite.status).toBe(200);
+    const payload = GraphWriteResponseSchema.parse(await branchWrite.json());
+    expect(payload.issues).toEqual([]);
+    expect(payload.graph.nodes).toHaveLength(graph.nodes.length + 1);
+    expect(payload.graph.edges).toHaveLength(graph.edges.length + 2);
+
+    const staleWrite = await putGraph(project.id, branched, 1);
+    expect(staleWrite.status).toBe(409);
+    expect(ErrorResponseSchema.parse(await staleWrite.json()).error.code).toBe("CONFLICT");
+
+    const persisted = await routes.graph.GET(
+      request(`http://local/api/projects/${project.id}/graph`, "GET"),
+      projectContext(project.id),
+    );
+    const persistedGraph = StoryGraphResponseSchema.parse(await persisted.json()).graph;
+    expect(persistedGraph.nodes.find((node) => node.id === "author-branch-node")).toMatchObject({
+      contentStatus: "review_required",
+      authorModified: true,
+    });
   });
 
   it("rejects graph writes to snapshot versions", async () => {

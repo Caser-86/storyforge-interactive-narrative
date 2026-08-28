@@ -9,7 +9,7 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] `SQLITE_DB_PATH` points to the intended private local database.
 - [x] The default server binds to `127.0.0.1`.
 - [x] Docker LAN access requires the explicit `docker-compose.lan.yml` override.
-- [x] `package.json`, `package-lock.json`, README, and changelog report candidate version `0.1.4`.
+- [x] `package.json`, `package-lock.json`, README, and changelog report candidate version `0.1.6`.
 - [x] No real API key is copied into logs, backups, exports, or test fixtures.
 
 ## Verification
@@ -31,6 +31,24 @@ Use this checklist before treating a local build as a releasable private authori
 - [ ] Clean Windows account install evidence is recorded.
 - [ ] Code signing and a user-facing installer are approved; standalone directory is not yet a signed installer.
 
+## v0.1.6 Branch Candidate
+
+- [x] Authoring branch editing is implemented: one author-authored side scene can be added from an existing main-path node and connected to an existing ending.
+- [x] The candidate source branch is `codex/branch-writing-v0.1.5`; the new candidate tag is `v0.1.6`.
+- [x] Local candidate gate is recorded: 67 Vitest files / 276 tests, typecheck, lint, build, and 11/11 authoring E2E.
+- [ ] Candidate is merged into the canonical `master` branch.
+- [ ] The exact canonical-branch commit has a green remote CI run.
+- [ ] A GitHub Release is created from the reviewed canonical-branch tag.
+
+## v0.1.5 Branch Candidate (Historical)
+
+- [x] Author-driven branch writing is implemented and recorded in the current candidate commit.
+- [x] The candidate branch is `codex/branch-writing-v0.1.5`, commit `600a7f0`, with tag `v0.1.5`.
+- [x] Local candidate gate is recorded: 65 Vitest files / 271 tests, typecheck, lint, build, and 10/10 authoring E2E.
+- [ ] Candidate is merged into the canonical `master` branch.
+- [ ] The exact canonical-branch commit has a green remote CI run.
+- [ ] A GitHub Release is created from the reviewed canonical-branch tag.
+
 ## Release Review
 
 - [x] Backup restore uses a new project ID unless replacement is explicitly intended.
@@ -43,6 +61,8 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] `docs/release/authoring-verification.md` contains the exact command results for this release.
 
 ## Remote Release Evidence
+
+The following section is historical evidence for the published `v0.1.4` release. It does not assert that `v0.1.5` or `v0.1.6` has been published.
 
 - [x] Owner explicitly confirmed that the GitHub repository remains public for this release; the runtime and author data remain private-local, and no open-source license is granted by this decision.
 - [x] PR #1 targeted `master`; GitHub Actions `CI/verify` and `CI/e2e-authoring` passed before merge. `master` is not currently protected and remains a governance gap.
