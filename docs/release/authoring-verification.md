@@ -12,7 +12,7 @@
 
 - Date: 2026-08-28
 - Source branch: `codex/branch-writing-v0.1.5`
-- Candidate tag: `v0.1.6` will point to the reviewed commit after the manual release confirmation; no GitHub Release is being created from this feature branch.
+- Candidate tag: `v0.1.6` is reserved for the reviewed commit on this feature branch; no GitHub Release is being created from this feature branch.
 - Scope: author-created branch scene editing, one atomic graph write with revision protection, existing-ending closure, validation boundaries, and Windows E2E cleanup reliability.
 - Local candidate gate: `npm run verify` passed with 67 Vitest files / 276 tests; `npm run test:e2e:authoring` passed 11/11.
 - Release status: branch candidate only. Merge review, protected-branch CI, canonical-branch tag, GitHub Release, clean Windows account install evidence, and code signing remain human gates.
