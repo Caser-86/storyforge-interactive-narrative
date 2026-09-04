@@ -45,11 +45,11 @@ export async function listGenerationRuns(projectId: string): Promise<GenerationR
   return parseJson(response, (value) => GenerationListResponseSchema.parse(value).runs);
 }
 
-export async function createGenerationRun(projectId: string): Promise<GenerationRun> {
+export async function createGenerationRun(projectId: string, options: { freshDraft?: boolean } = {}): Promise<GenerationRun> {
   const response = await fetch(`/api/projects/${projectId}/generation`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(options),
   });
   return parseJson(response, (value) => GenerationResponseSchema.parse(value).run);
 }

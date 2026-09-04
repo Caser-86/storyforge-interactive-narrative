@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addAuthorBranch } from "@/lib/authoring/graph-branch";
+import { addAuthorBranch, addAuthorEnding } from "@/lib/authoring/graph-branch";
 import { validateStoryGraph } from "@/lib/authoring/graph";
 import { testLimits, validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
 
@@ -22,6 +22,21 @@ const draft = {
   summary: "The courier discovers a submerged route.",
   objective: "Find a safe route back to the archive.",
 };
+
+const endingDraft = {
+  sourceNodeId: "node-merge",
+  choiceLabel: "Open the final lantern",
+  intent: "Accept the archive's last decision.",
+  consequenceSummary: "The courier chooses a new way to carry the light.",
+  title: "A New Dawn",
+  body: "The final lantern opens, and the archive releases its first morning light.",
+  summary: "The courier creates a new future for the archive.",
+  objective: "Give the archive a future beyond its old rules.",
+};
+
+function createEndingIds() {
+  return (kind: "node" | "edge") => kind === "node" ? "new-ending" : "new-ending-edge";
+}
 
 describe("addAuthorBranch", () => {
   it("adds an author-authored side scene and connects it to an existing ending", () => {
@@ -78,6 +93,41 @@ describe("addAuthorBranch", () => {
     );
   });
 
+  it("adds an author-authored ending and connects it to a non-ending node", () => {
+    const graph = validReleaseGraph();
+    const next = addAuthorEnding(graph, endingDraft, { createId: createEndingIds(), now: NOW });
+
+    expect(next.nodes).toHaveLength(graph.nodes.length + 1);
+    expect(next.edges).toHaveLength(graph.edges.length + 1);
+    expect(next.nodes.find((node) => node.id === "new-ending")).toMatchObject({
+      versionId: graph.versionId,
+      chapterId: "chapter-1",
+      kind: "ending",
+      title: endingDraft.title,
+      body: endingDraft.body,
+      summary: endingDraft.summary,
+      objective: endingDraft.objective,
+      contentStatus: "review_required",
+      authorModified: true,
+      contentRevision: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    expect(next.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "new-ending-edge",
+        sourceNodeId: endingDraft.sourceNodeId,
+        targetNodeId: "new-ending",
+        label: endingDraft.choiceLabel,
+        intent: endingDraft.intent,
+        consequenceSummary: endingDraft.consequenceSummary,
+        branchType: "side",
+        sortOrder: 2,
+      }),
+    ]));
+    expect(validateStoryGraph(next, testLimits())).toEqual([]);
+  });
+
   it("rejects ending nodes and nodes without a main path", () => {
     const graph = validReleaseGraph();
 
@@ -90,6 +140,12 @@ describe("addAuthorBranch", () => {
     };
     expect(() => addAuthorBranch(graphWithoutMainPath, { ...draft, sourceNodeId: "node-left-detail" }, { createId: createTestIds(), now: NOW })).toThrow(
       /main/i,
+    );
+    expect(() => addAuthorEnding(graph, { ...endingDraft, sourceNodeId: "node-keeper-ending" }, { createId: createEndingIds(), now: NOW })).toThrow(
+      /ending/i,
+    );
+    expect(() => addAuthorEnding(graph, { ...endingDraft, choiceLabel: "Share the lantern" }, { createId: createEndingIds(), now: NOW })).toThrow(
+      /choice label/i,
     );
   });
 });

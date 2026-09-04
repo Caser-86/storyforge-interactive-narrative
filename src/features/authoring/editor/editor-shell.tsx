@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { getBlockingGraphIssues, RELEASE_GRAPH_LIMITS } from "@/lib/authoring/graph";
 import type { Project, StoryEdge, StoryGraph, StoryNode, ValidationIssue } from "@/lib/authoring/schemas";
 import { initialEditorState } from "./editor-store";
 import { NodeEditor } from "./node-editor";
@@ -12,25 +13,29 @@ import { IssuePanel } from "./issue-panel";
 import { ReleaseChecklist } from "./release-checklist";
 import { ProjectMetrics } from "../project-metrics";
 import { BranchEditor } from "./branch-editor";
+import { EndingEditor } from "./ending-editor";
+import { mergeDraftRevision } from "./draft-revision";
 
 type EditorShellProps = {
   project: Project;
   graph: StoryGraph;
-  issues: ValidationIssue[];
   draftRevision: number;
 };
 
-export function EditorShell({ project, graph, issues, draftRevision: initialDraftRevision }: EditorShellProps) {
+export function EditorShell({ project, graph, draftRevision: initialDraftRevision }: EditorShellProps) {
   const initial = initialEditorState(graph);
   const [draftGraph, setDraftGraph] = useState(graph);
-  const [draftIssues, setDraftIssues] = useState(issues);
   const [draftRevision, setDraftRevision] = useState(initialDraftRevision);
   const [graphSaveNotice, setGraphSaveNotice] = useState<string | null>(null);
   const [qualityRefreshToken, setQualityRefreshToken] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState(initial.selectedNodeId);
   const [collapsedChapterIds, setCollapsedChapterIds] = useState(initial.collapsedChapterIds);
   const selectedNode = draftGraph.nodes.find((node) => node.id === selectedNodeId) ?? null;
-  const blockingIssues = draftIssues.filter((issue) => issue.severity === "blocking");
+  const blockingIssues = getBlockingGraphIssues(draftGraph, {
+    ...RELEASE_GRAPH_LIMITS,
+    maxNodes: project.targetNodeCount,
+    maxEndings: project.targetEndingCount,
+  });
 
   function toggleChapter(chapterId: string) {
     setCollapsedChapterIds((current) => current.includes(chapterId) ? current.filter((id) => id !== chapterId) : [...current, chapterId]);
@@ -64,9 +69,11 @@ export function EditorShell({ project, graph, issues, draftRevision: initialDraf
               graph={draftGraph}
               draftRevision={draftRevision}
               maxNodes={project.targetNodeCount}
-              onSaved={(updatedNode, nextRevision) => { setDraftRevision(nextRevision); setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); setQualityRefreshToken((current) => current + 1); }}
-              onEdgeSaved={(updatedEdge, nextRevision) => { setDraftRevision(nextRevision); setDraftGraph((current) => ({ ...current, edges: current.edges.map((edge) => edge.id === updatedEdge.id ? updatedEdge : edge) })); setQualityRefreshToken((current) => current + 1); }}
-              onGraphSaved={(nextGraph, nextRevision, nextIssues, newNodeId) => { setDraftRevision(nextRevision); setDraftGraph(nextGraph); setDraftIssues(nextIssues); setSelectedNodeId(newNodeId); setGraphSaveNotice("已保存作者分支，已切换到新节点。"); setQualityRefreshToken((current) => current + 1); }}
+              maxEndings={project.targetEndingCount}
+              onSaved={(updatedNode, nextRevision) => { setDraftRevision((current) => mergeDraftRevision(current, nextRevision)); setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); setQualityRefreshToken((current) => current + 1); }}
+              onEdgeSaved={(updatedEdge, nextRevision) => { setDraftRevision((current) => mergeDraftRevision(current, nextRevision)); setDraftGraph((current) => ({ ...current, edges: current.edges.map((edge) => edge.id === updatedEdge.id ? updatedEdge : edge) })); setQualityRefreshToken((current) => current + 1); }}
+              onGraphSaved={(nextGraph, nextRevision, _nextIssues, newNodeId) => { setDraftRevision((current) => mergeDraftRevision(current, nextRevision)); setDraftGraph(nextGraph); setSelectedNodeId(newNodeId); setGraphSaveNotice("已保存作者分支，已切换到新节点。"); setQualityRefreshToken((current) => current + 1); }}
+              onEndingSaved={(nextGraph, nextRevision, _nextIssues, newNodeId) => { setDraftRevision((current) => mergeDraftRevision(current, nextRevision)); setDraftGraph(nextGraph); setSelectedNodeId(newNodeId); setGraphSaveNotice("已保存作者结局，已切换到新节点。"); setQualityRefreshToken((current) => current + 1); }}
             />
           ) : (
             <div className="editor-empty-node">从左侧大纲选择一个节点开始。</div>
@@ -82,21 +89,22 @@ export function EditorShell({ project, graph, issues, draftRevision: initialDraf
           <ReleaseChecklist projectId={project.id} refreshToken={qualityRefreshToken} />
           <ProjectMetrics projectId={project.id} />
           <IssuePanel projectId={project.id} onSelectNode={setSelectedNodeId} refreshToken={qualityRefreshToken} />
-          {selectedNode ? <NodeInspector key={selectedNode.id} projectId={project.id} node={selectedNode} onApplied={(updatedNode) => { setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); setQualityRefreshToken((current) => current + 1); }} /> : <p className="inspector-muted">尚未选择节点。</p>}
+          {selectedNode ? <NodeInspector key={selectedNode.id} projectId={project.id} node={selectedNode} onApplied={(updatedNode, nextDraftRevision) => { setDraftRevision((current) => mergeDraftRevision(current, nextDraftRevision)); setDraftGraph((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === updatedNode.id ? updatedNode : node) })); setQualityRefreshToken((current) => current + 1); }} /> : <p className="inspector-muted">尚未选择节点。</p>}
         </aside>
       </div>
     </main>
   );
 }
 
-function NodeCanvas({ projectId, node, graph, draftRevision, maxNodes, onSaved, onEdgeSaved, onGraphSaved }: { projectId: string; node: StoryNode; graph: StoryGraph; draftRevision: number; maxNodes: number; onSaved: (node: StoryNode, draftRevision: number) => void; onEdgeSaved: (edge: StoryEdge, draftRevision: number) => void; onGraphSaved: (graph: StoryGraph, draftRevision: number, issues: ValidationIssue[], newNodeId: string) => void }) {
+function NodeCanvas({ projectId, node, graph, draftRevision, maxNodes, maxEndings, onSaved, onEdgeSaved, onGraphSaved, onEndingSaved }: { projectId: string; node: StoryNode; graph: StoryGraph; draftRevision: number; maxNodes: number; maxEndings: number; onSaved: (node: StoryNode, draftRevision: number) => void; onEdgeSaved: (edge: StoryEdge, draftRevision: number) => void; onGraphSaved: (graph: StoryGraph, draftRevision: number, issues: ValidationIssue[], newNodeId: string) => void; onEndingSaved: (graph: StoryGraph, draftRevision: number, issues: ValidationIssue[], newNodeId: string) => void }) {
   const outgoing = graph.edges.filter((edge) => edge.sourceNodeId === node.id).sort((left, right) => left.sortOrder - right.sortOrder);
   return (
     <article className="node-canvas">
       <div className="node-canvas-kicker"><span className="eyebrow">NODE / {node.nodeKey}</span><span className={`content-status content-status-${node.contentStatus}`}>{node.contentStatus === "author_edited" ? "已改写" : node.contentStatus === "generated" ? "已生成" : node.contentStatus === "review_required" ? "需审阅" : "待生成"}</span></div>
-      <NodeEditor key={node.id} projectId={projectId} node={node} onSaved={onSaved} />
-      <div className="node-choices"><p className="eyebrow">CHOICES / {outgoing.length}</p>{outgoing.map((edge) => <ChoiceEditor key={`${edge.id}-${draftRevision}`} projectId={projectId} edge={edge} expectedRevision={draftRevision} onSaved={onEdgeSaved} />)}</div>
-      <BranchEditor key={`${node.id}-${draftRevision}`} projectId={projectId} graph={graph} sourceNode={node} expectedRevision={draftRevision} maxNodes={maxNodes} onSaved={onGraphSaved} />
+      <NodeEditor key={`node-editor-${node.id}`} projectId={projectId} node={node} onSaved={onSaved} />
+      <div className="node-choices"><p className="eyebrow">CHOICES / {outgoing.length}</p>{outgoing.map((edge) => <ChoiceEditor key={`choice-${edge.id}`} projectId={projectId} edge={edge} expectedRevision={draftRevision} onSaved={onEdgeSaved} />)}</div>
+      <BranchEditor key={`branch-${node.id}`} projectId={projectId} graph={graph} sourceNode={node} expectedRevision={draftRevision} maxNodes={maxNodes} onSaved={onGraphSaved} />
+      <EndingEditor key={`ending-${node.id}`} projectId={projectId} graph={graph} sourceNode={node} expectedRevision={draftRevision} maxNodes={maxNodes} maxEndings={maxEndings} onSaved={onEndingSaved} />
     </article>
   );
 }

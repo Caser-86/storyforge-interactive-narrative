@@ -198,6 +198,44 @@ describe("authoring project API routes", () => {
     expect((await response.json()).error.message).toMatch(/too large|大小|上限/i);
   });
 
+  it("accepts a graph containing the configured maximum node content", async () => {
+    const project = await createProject(fixtureProjectInput({
+      size: { preset: "custom", targetNodes: 80, targetEndings: 2 },
+    }));
+    const base = graphForVersion(project.activeDraftVersionId!);
+    const nodes = [...base.nodes];
+    for (let index = nodes.length; index < 80; index += 1) {
+      nodes.push({
+        ...base.nodes[0],
+        id: `${base.versionId}-large-node-${index}`,
+        chapterId: base.chapters[0]!.id,
+        nodeKey: `large-${index}`,
+        kind: "scene",
+        title: `Large node ${index}`,
+        body: "中".repeat(12_000),
+        summary: "Large node summary",
+        objective: "Large node objective",
+      });
+    }
+
+    const response = await putGraph(project.id, { ...base, nodes }, 0);
+
+    expect(response.status).toBe(200);
+  });
+
+  it("rejects duplicate graph ids as a validation error", async () => {
+    const project = await createProject();
+    const graph = graphForVersion(project.activeDraftVersionId!);
+
+    const response = await putGraph(project.id, {
+      ...graph,
+      nodes: [graph.nodes[0]!, ...graph.nodes],
+    }, 0);
+
+    expect(response.status).toBe(400);
+    expect(ErrorResponseSchema.parse(await response.json()).error.code).toBe("VALIDATION");
+  });
+
   it("rejects stale graph revisions", async () => {
     const project = await createProject();
     const graph = graphForVersion(project.activeDraftVersionId!);

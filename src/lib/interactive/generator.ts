@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AuthoringError } from "@/lib/authoring/errors";
 import type { Project } from "@/lib/authoring/schemas";
 import { OpenAICompatibleGenerationProvider } from "@/lib/authoring/generation/openai-provider";
 import type { GenerationProvider, ProviderResult } from "@/lib/authoring/generation/provider";
@@ -29,7 +30,15 @@ const InteractiveModelSceneSchema = z
     isEnding: z.boolean(),
     endingSummary: z.string().max(300).nullable(),
   })
-  .strip();
+  .strip()
+  .superRefine((scene, context) => {
+    if (!scene.isEnding && scene.choices.length < 2) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["choices"], message: "An active scene must offer at least two choices." });
+    }
+    if (scene.isEnding && scene.choices.length > 0) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["choices"], message: "An ending scene cannot offer choices." });
+    }
+  });
 
 export const InteractiveStatePatchSchema = z
   .object({
@@ -159,16 +168,25 @@ export async function generateInteractiveScene(input: InteractiveGenerationInput
 
   const nextTurn = input.state.turn + (input.selectedChoice ? 1 : 0);
   const normalizedScene = normalizeScene(providerResult.data.scene);
+  if (nextTurn < input.state.targetTurns && normalizedScene.isEnding) {
+    throw new AuthoringError("VALIDATION", "Interactive model ended before the planned turn limit.", { nextTurn, targetTurns: input.state.targetTurns });
+  }
   const scene = nextTurn >= input.state.targetTurns ? forceEnding(normalizedScene, language) : normalizedScene;
   const state = applyStatePatch(input.state, providerResult.data.statePatch, input.selectedChoice);
   return { scene, state, providerResult };
 }
 
 export function interactiveTargetTurns(project: Project): number {
-  if (project.sizePreset === "micro") return 6;
-  if (project.sizePreset === "short") return 8;
-  if (project.sizePreset === "medium") return 16;
-  return Math.max(8, Math.min(40, project.targetNodeCount));
+  const requestedTurns = project.sizePreset === "micro"
+    ? 6
+    : project.sizePreset === "short"
+      ? 8
+      : project.sizePreset === "medium"
+        ? 16
+        : Math.max(8, Math.min(40, project.targetNodeCount));
+  const endingNodesToReserve = Math.max(0, project.targetEndingCount - 1);
+  const availablePathNodes = project.targetNodeCount - endingNodesToReserve;
+  return Math.max(2, Math.min(requestedTurns, availablePathNodes));
 }
 
 export function createInteractiveState(project: Project, _sessionId: string): InteractiveState {

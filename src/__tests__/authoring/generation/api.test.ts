@@ -46,6 +46,7 @@ function context(projectId: string, runId: string): ProjectContext {
 async function importRoutes() {
   return {
     projects: await import("@/app/api/projects/route"),
+    project: await import("@/app/api/projects/[projectId]/route"),
     collection: await import("@/app/api/projects/[projectId]/generation/route"),
     run: await import("@/app/api/projects/[projectId]/generation/[runId]/route"),
     next: await import("@/app/api/projects/[projectId]/generation/[runId]/next/route"),
@@ -101,8 +102,32 @@ describe("generation control API", () => {
     );
     expect(conflict.status).toBe(409);
 
+    const freshConflict = await routes.collection.POST(
+      request(`http://local/api/projects/${project.id}/generation`, "POST", { freshDraft: true }),
+      { params: Promise.resolve({ projectId: project.id }) },
+    );
+    expect(freshConflict.status).toBe(409);
+    const currentProject = CreateProjectResponseSchema.parse(await (await routes.project.GET(request("http://local/project", "GET"), { params: Promise.resolve({ projectId: project.id }) })).json()).project;
+    expect(currentProject.activeDraftVersionId).toBe(project.activeDraftVersionId);
+
     const list = await routes.collection.GET(request("http://local/generation", "GET"), { params: Promise.resolve({ projectId: project.id }) });
     expect(GenerationListResponseSchema.parse(await list.json()).runs).toHaveLength(1);
+  });
+
+  it("starts a fresh generation on a new draft without replacing the previous draft", async () => {
+    const project = await createProject();
+    const originalVersionId = project.activeDraftVersionId;
+    const routes = await importRoutes();
+    const response = await routes.collection.POST(
+      request(`http://local/api/projects/${project.id}/generation`, "POST", { freshDraft: true }),
+      { params: Promise.resolve({ projectId: project.id }) },
+    );
+
+    expect(response.status).toBe(201);
+    const run = GenerationResponseSchema.parse(await response.json()).run;
+    expect(run.versionId).not.toBe(originalVersionId);
+    const currentProject = CreateProjectResponseSchema.parse(await (await routes.project.GET(request("http://local/project", "GET"), { params: Promise.resolve({ projectId: project.id }) })).json()).project;
+    expect(currentProject.activeDraftVersionId).toBe(run.versionId);
   });
 
   it("resolves the configured model and persists a bounded budget", async () => {

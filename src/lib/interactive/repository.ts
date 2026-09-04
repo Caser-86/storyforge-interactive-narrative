@@ -25,6 +25,7 @@ type SessionRow = {
   current_turn_id: string | null;
   last_error: string | null;
   materialized_version_id: string | null;
+  generation_token: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -46,13 +47,20 @@ export interface InteractiveRepository {
   deleteSession(projectId: string, sessionId: string): Promise<void>;
   listTurns(projectId: string, sessionId: string): Promise<InteractiveTurnRecord[]>;
   saveInitialScene(sessionId: string, scene: InteractiveScene, state: InteractiveState): Promise<InteractiveSession>;
-  claimChoice(projectId: string, sessionId: string, choiceId: string): Promise<{ session: InteractiveSession; choice: InteractiveChoice; scene: InteractiveScene }>;
-  saveNextScene(sessionId: string, scene: InteractiveScene, state: InteractiveState): Promise<InteractiveSession>;
-  releaseChoice(sessionId: string): Promise<void>;
+  claimChoice(projectId: string, sessionId: string, choiceId: string): Promise<InteractiveGenerationClaim & { session: InteractiveSession; choice: InteractiveChoice; scene: InteractiveScene }>;
+  saveNextScene(sessionId: string, claim: InteractiveGenerationClaim, scene: InteractiveScene, state: InteractiveState): Promise<InteractiveSession>;
+  releaseChoice(claim: InteractiveGenerationClaim): Promise<void>;
   recoverStaleGeneration(sessionId: string, staleAfterMs?: number): Promise<void>;
   failInitialGeneration(sessionId: string, message: string): Promise<void>;
   close(): void;
 }
+
+export type InteractiveGenerationClaim = {
+  sessionId: string;
+  generationToken: string;
+  turnId: string;
+  choiceId: string;
+};
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -93,8 +101,8 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
     const id = randomUUID();
     this.db
       .prepare(
-        `INSERT INTO interactive_sessions (id, project_id, status, turn, target_turns, state_json, current_turn_id, last_error, created_at, updated_at)
-         VALUES (?, ?, 'generating', 0, ?, ?, NULL, NULL, ?, ?)`,
+        `INSERT INTO interactive_sessions (id, project_id, status, turn, target_turns, state_json, current_turn_id, last_error, generation_token, created_at, updated_at)
+         VALUES (?, ?, 'generating', 0, ?, ?, NULL, NULL, NULL, ?, ?)`,
       )
       .run(id, projectId, state.targetTurns, JSON.stringify(state), timestamp, timestamp);
     return this.getSession(projectId, id);
@@ -170,7 +178,7 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
     return this.readSession(row);
   }
 
-  public async claimChoice(projectId: string, sessionId: string, choiceId: string): Promise<{ session: InteractiveSession; choice: InteractiveChoice; scene: InteractiveScene }> {
+  public async claimChoice(projectId: string, sessionId: string, choiceId: string): Promise<InteractiveGenerationClaim & { session: InteractiveSession; choice: InteractiveChoice; scene: InteractiveScene }> {
     const claim = this.db.transaction(() => {
       const session = this.requireSession(sessionId);
       if (session.project_id !== projectId) throw new AuthoringError("NOT_FOUND", "Interactive session not found", { sessionId });
@@ -186,18 +194,33 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
       if (!choice) throw new AuthoringError("VALIDATION", "Choice is not available in the current scene", { choiceId });
 
       const timestamp = nowIso();
-      this.db.prepare("UPDATE interactive_turns SET selected_choice_id = ?, selected_at = ? WHERE id = ? AND selected_choice_id IS NULL").run(choiceId, timestamp, turn.id);
-      this.db.prepare("UPDATE interactive_sessions SET status = 'generating', last_error = NULL, updated_at = ? WHERE id = ? AND status = 'active'").run(timestamp, sessionId);
-      return { session: toSession(session, scene), choice, scene };
+      const generationToken = randomUUID();
+      const turnUpdate = this.db
+        .prepare("UPDATE interactive_turns SET selected_choice_id = ?, selected_at = ? WHERE id = ? AND selected_choice_id IS NULL")
+        .run(choiceId, timestamp, turn.id);
+      if (turnUpdate.changes !== 1) {
+        throw new AuthoringError("CONFLICT", "This scene is already being advanced", { sessionId });
+      }
+      const sessionUpdate = this.db
+        .prepare("UPDATE interactive_sessions SET status = 'generating', generation_token = ?, last_error = NULL, updated_at = ? WHERE id = ? AND status = 'active' AND current_turn_id = ?")
+        .run(generationToken, timestamp, sessionId, turn.id);
+      if (sessionUpdate.changes !== 1) {
+        throw new AuthoringError("CONFLICT", "Interactive session is no longer accepting choices", { sessionId });
+      }
+      return { session: toSession(session, scene), choice, scene, sessionId, generationToken, turnId: turn.id, choiceId };
     });
     return claim();
   }
 
-  public async saveNextScene(sessionId: string, scene: InteractiveScene, state: InteractiveState): Promise<InteractiveSession> {
+  public async saveNextScene(sessionId: string, claim: InteractiveGenerationClaim, scene: InteractiveScene, state: InteractiveState): Promise<InteractiveSession> {
     const save = this.db.transaction(() => {
       const session = this.requireSession(sessionId);
-      if (session.status !== "generating" || !session.current_turn_id) {
+      if (session.status !== "generating" || session.generation_token !== claim.generationToken || session.current_turn_id !== claim.turnId) {
         throw new AuthoringError("CONFLICT", "Interactive session is not generating a next scene", { sessionId });
+      }
+      const currentTurn = this.db.prepare("SELECT * FROM interactive_turns WHERE id = ?").get(claim.turnId) as TurnRow | undefined;
+      if (!currentTurn || currentTurn.selected_choice_id !== claim.choiceId) {
+        throw new AuthoringError("CONFLICT", "Interactive generation attempt is stale", { sessionId });
       }
       const timestamp = nowIso();
       const turnId = randomUUID();
@@ -205,21 +228,29 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
       this.db
         .prepare("INSERT INTO interactive_turns (id, session_id, turn, scene_json, selected_choice_id, selected_at, created_at) VALUES (?, ?, ?, ?, NULL, NULL, ?)")
         .run(turnId, sessionId, nextTurn, JSON.stringify(scene), timestamp);
-      this.db
-        .prepare("UPDATE interactive_sessions SET status = ?, turn = ?, state_json = ?, current_turn_id = ?, last_error = NULL, updated_at = ? WHERE id = ?")
-        .run(scene.isEnding ? "ended" : "active", nextTurn, JSON.stringify(state), turnId, timestamp, sessionId);
+      const sessionUpdate = this.db
+        .prepare("UPDATE interactive_sessions SET status = ?, turn = ?, state_json = ?, current_turn_id = ?, generation_token = NULL, last_error = NULL, updated_at = ? WHERE id = ? AND status = 'generating' AND current_turn_id = ? AND generation_token = ?")
+        .run(scene.isEnding ? "ended" : "active", nextTurn, JSON.stringify(state), turnId, timestamp, sessionId, claim.turnId, claim.generationToken);
+      if (sessionUpdate.changes !== 1) {
+        throw new AuthoringError("CONFLICT", "Interactive generation attempt is stale", { sessionId });
+      }
     });
     save();
     return this.readSession(this.requireSession(sessionId));
   }
 
-  public async releaseChoice(sessionId: string): Promise<void> {
+  public async releaseChoice(claim: InteractiveGenerationClaim): Promise<void> {
     const timestamp = nowIso();
     this.db.transaction(() => {
-      const session = this.requireSession(sessionId);
-      if (!session.current_turn_id) return;
-      this.db.prepare("UPDATE interactive_turns SET selected_choice_id = NULL, selected_at = NULL WHERE id = ?").run(session.current_turn_id);
-      this.db.prepare("UPDATE interactive_sessions SET status = 'active', last_error = NULL, updated_at = ? WHERE id = ? AND status = 'generating'").run(timestamp, sessionId);
+      const session = this.requireSession(claim.sessionId);
+      if (session.status !== "generating" || session.generation_token !== claim.generationToken || session.current_turn_id !== claim.turnId) return;
+      const turnUpdate = this.db
+        .prepare("UPDATE interactive_turns SET selected_choice_id = NULL, selected_at = NULL WHERE id = ? AND selected_choice_id = ?")
+        .run(claim.turnId, claim.choiceId);
+      if (turnUpdate.changes !== 1) return;
+      this.db
+        .prepare("UPDATE interactive_sessions SET status = 'active', generation_token = NULL, last_error = NULL, updated_at = ? WHERE id = ? AND status = 'generating' AND current_turn_id = ? AND generation_token = ?")
+        .run(timestamp, claim.sessionId, claim.turnId, claim.generationToken);
     })();
   }
 
@@ -234,7 +265,7 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
       const timestamp = nowIso();
       if (!session.current_turn_id) {
         this.db
-          .prepare("UPDATE interactive_sessions SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?")
+          .prepare("UPDATE interactive_sessions SET status = 'failed', generation_token = NULL, last_error = ?, updated_at = ? WHERE id = ?")
           .run("Opening generation was interrupted.", timestamp, sessionId);
         return;
       }
@@ -244,7 +275,7 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
         .get(session.current_turn_id) as TurnRow | undefined;
       if (!turn) {
         this.db
-          .prepare("UPDATE interactive_sessions SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?")
+          .prepare("UPDATE interactive_sessions SET status = 'failed', generation_token = NULL, last_error = ?, updated_at = ? WHERE id = ?")
           .run("Current interactive scene is missing.", timestamp, sessionId);
         return;
       }
@@ -253,14 +284,14 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
         .prepare("UPDATE interactive_turns SET selected_choice_id = NULL, selected_at = NULL WHERE id = ?")
         .run(turn.id);
       this.db
-        .prepare("UPDATE interactive_sessions SET status = 'active', last_error = NULL, updated_at = ? WHERE id = ?")
+        .prepare("UPDATE interactive_sessions SET status = 'active', generation_token = NULL, last_error = NULL, updated_at = ? WHERE id = ?")
         .run(timestamp, sessionId);
     });
     recover();
   }
 
   public async failInitialGeneration(sessionId: string, message: string): Promise<void> {
-    this.db.prepare("UPDATE interactive_sessions SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?").run(message, nowIso(), sessionId);
+    this.db.prepare("UPDATE interactive_sessions SET status = 'failed', generation_token = NULL, last_error = ?, updated_at = ? WHERE id = ?").run(message, nowIso(), sessionId);
   }
 
   public close(): void {

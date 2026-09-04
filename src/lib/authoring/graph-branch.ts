@@ -13,6 +13,17 @@ export type AuthorBranchDraft = {
   objective: string;
 };
 
+export type AuthorEndingDraft = {
+  sourceNodeId: string;
+  choiceLabel: string;
+  intent: string;
+  consequenceSummary: string;
+  title: string;
+  body: string;
+  summary: string;
+  objective: string;
+};
+
 export type AuthorBranchIdFactory = (kind: "node" | "edge") => string;
 
 export type AddAuthorBranchOptions = {
@@ -123,6 +134,70 @@ export function addAuthorBranch(graph: StoryGraph, input: AuthorBranchDraft, opt
   };
 }
 
+export function addAuthorEnding(graph: StoryGraph, input: AuthorEndingDraft, options: AddAuthorBranchOptions): StoryGraph {
+  const sourceNode = graph.nodes.find((node) => node.id === input.sourceNodeId);
+  if (!sourceNode) {
+    throw new Error("Source node was not found.");
+  }
+  if (sourceNode.kind === "ending") {
+    throw new Error("Cannot add an author ending from an ending node.");
+  }
+
+  const sourceEdges = graph.edges.filter((edge) => edge.sourceNodeId === sourceNode.id);
+  const choiceLabel = requiredText(input.choiceLabel, "choiceLabel", fieldLimits.choiceLabel);
+  const intent = requiredText(input.intent, "intent", fieldLimits.intent);
+  const consequenceSummary = requiredText(input.consequenceSummary, "consequenceSummary", fieldLimits.consequenceSummary);
+  const title = requiredText(input.title, "title", fieldLimits.title);
+  const body = requiredText(input.body, "body", fieldLimits.body);
+  const summary = requiredText(input.summary, "summary", fieldLimits.summary);
+  const objective = requiredText(input.objective, "objective", fieldLimits.objective);
+
+  if (sourceEdges.some((edge) => edge.label.trim() === choiceLabel)) {
+    throw new Error(`The choice label "${choiceLabel}" already exists on this node.`);
+  }
+
+  const usedIds = new Set([...graph.nodes.map((node) => node.id), ...graph.edges.map((edge) => edge.id)]);
+  const endingNodeId = nextUniqueId(options.createId, "node", usedIds);
+  const endingEdgeId = nextUniqueId(options.createId, "edge", usedIds);
+  const createdAt = options.now;
+  const endingNode = {
+    id: endingNodeId,
+    versionId: graph.versionId,
+    chapterId: sourceNode.chapterId,
+    nodeKey: nextNodeKey(graph, "author-ending"),
+    kind: "ending" as const,
+    title,
+    body,
+    summary,
+    objective,
+    topologicalRank: sourceNode.topologicalRank + 1,
+    contentStatus: "review_required" as const,
+    authorModified: true,
+    contentRevision: 0,
+    createdAt,
+    updatedAt: createdAt,
+  };
+  const endingEdge = {
+    id: endingEdgeId,
+    versionId: graph.versionId,
+    sourceNodeId: sourceNode.id,
+    targetNodeId: endingNode.id,
+    label: choiceLabel,
+    intent,
+    consequenceSummary,
+    branchType: "side" as const,
+    sortOrder: sourceEdges.reduce((highest, edge) => Math.max(highest, edge.sortOrder), -1) + 1,
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  return {
+    ...graph,
+    nodes: [...graph.nodes, endingNode],
+    edges: [...graph.edges, endingEdge],
+  };
+}
+
 function requiredText(value: string, field: string, maxLength: number): string {
   const normalized = value.trim();
   if (normalized.length === 0) {
@@ -146,9 +221,9 @@ function nextUniqueId(createId: AuthorBranchIdFactory, kind: "node" | "edge", us
   throw new Error(`Could not create a unique ${kind} id.`);
 }
 
-function nextNodeKey(graph: StoryGraph): string {
+function nextNodeKey(graph: StoryGraph, prefix = "author-branch"): string {
   const keys = new Set(graph.nodes.map((node) => node.nodeKey));
   let index = graph.nodes.length + 1;
-  while (keys.has(`author-branch-${index}`)) index += 1;
-  return `author-branch-${index}`;
+  while (keys.has(`${prefix}-${index}`)) index += 1;
+  return `${prefix}-${index}`;
 }

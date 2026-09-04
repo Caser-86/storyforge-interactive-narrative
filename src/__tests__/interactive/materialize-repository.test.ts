@@ -59,10 +59,10 @@ afterEach(() => {
 async function createEndedSession(projectId: string): Promise<string> {
   const created = await interactive.createSession(projectId, state);
   await interactive.saveInitialScene(created.id, activeScene, state);
-  await interactive.claimChoice(projectId, created.id, "choice_a");
-  await interactive.saveNextScene(created.id, { ...activeScene, title: "门后" }, { ...state, turn: 2 });
-  await interactive.claimChoice(projectId, created.id, "choice_b");
-  await interactive.saveNextScene(created.id, endingScene, { ...state, turn: 3 });
+  const firstClaim = await interactive.claimChoice(projectId, created.id, "choice_a");
+  await interactive.saveNextScene(created.id, firstClaim, { ...activeScene, title: "门后" }, { ...state, turn: 2 });
+  const secondClaim = await interactive.claimChoice(projectId, created.id, "choice_b");
+  await interactive.saveNextScene(created.id, secondClaim, endingScene, { ...state, turn: 3 });
   return created.id;
 }
 
@@ -116,5 +116,30 @@ describe("interactive draft materialization", () => {
     });
 
     await expect(authoring.materializeInteractiveDraft(project.id, created.id, graph)).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("rejects materialization when a resized project has no room for its reserved ending", async () => {
+    const project = await authoring.createProject({
+      title: "预算收缩测试",
+      premise: state.seedPrompt,
+      genre: "悬疑",
+      tone: "克制",
+      pointOfView: "第二人称",
+      rating: "PG-13",
+      size: { preset: "custom", targetNodes: 9, targetEndings: 2 },
+    });
+    await createEndedSession(project.id);
+    const endedSessionId = (await interactive.listSessions(project.id))[0]!.id;
+    const turns = Array.from({ length: 8 }, (_, index) => ({
+      turn: index + 1,
+      scene: index === 7 ? endingScene : { ...activeScene, title: `第 ${index + 1} 幕` },
+      selectedChoiceId: index === 7 ? null : "choice_a",
+      selectedChoiceLabel: index === 7 ? null : "推门进入",
+      createdAt: `2026-09-02T00:0${index}:00.000Z`,
+    }));
+    const graph = materializeInteractivePath({ versionId: "pending", projectTitle: project.title, turns });
+    await authoring.updateProject(project.id, { size: { preset: "custom", targetNodes: 8, targetEndings: 2 } });
+
+    await expect(authoring.materializeInteractiveDraft(project.id, endedSessionId, graph)).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });

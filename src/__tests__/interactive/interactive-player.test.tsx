@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InteractivePlayer } from "@/features/authoring/interactive-player";
@@ -66,8 +66,45 @@ describe("InteractivePlayer", () => {
 
     render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
 
-    expect(await screen.findByText("上一段生成尚未完成，请稍候刷新")).toBeInTheDocument();
+    expect(await screen.findByText("上一段生成尚未完成，正在自动恢复，请稍候")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "推门进入" })).not.toBeInTheDocument();
+  });
+
+  it("polls a generating session until the next scene is available", async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem("storyforge:interactive-session:project-1", session.id);
+      const activeSession = { ...session, status: "active" as const };
+      let sessionCallCount = 0;
+      const fetchMock = vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/play/session-1")) {
+          sessionCallCount += 1;
+          const payload = sessionCallCount === 1 ? { ...session, status: "generating" as const } : activeSession;
+          return Promise.resolve(new Response(JSON.stringify({ session: payload }), { status: 200 }));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ sessions: [session] }), { status: 200 }));
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByText("上一段生成尚未完成，正在自动恢复，请稍候")).toBeInTheDocument();
+
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(screen.getByRole("button", { name: /推门进入/ })).toBeInTheDocument();
+      expect(sessionCallCount).toBeGreaterThanOrEqual(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows persisted history and removes a deleted session", async () => {

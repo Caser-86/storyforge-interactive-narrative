@@ -9,7 +9,7 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] `SQLITE_DB_PATH` points to the intended private local database.
 - [x] The default server binds to `127.0.0.1`.
 - [x] Docker LAN access requires the explicit `docker-compose.lan.yml` override.
-- [x] `package.json`, `package-lock.json`, README, and changelog report candidate version `0.1.6`.
+- [x] `package.json`, `package-lock.json`, README, and changelog report candidate version `0.1.7`.
 - [x] No real API key is copied into logs, backups, exports, or test fixtures.
 
 ## Verification
@@ -31,14 +31,20 @@ Use this checklist before treating a local build as a releasable private authori
 - [ ] Clean Windows account install evidence is recorded.
 - [ ] Code signing and a user-facing installer are approved; standalone directory is not yet a signed installer.
 
-## v0.1.6 Branch Candidate
+## v0.1.7 Branch Candidate
 
-- [x] Authoring branch editing is implemented: one author-authored side scene can be added from an existing main-path node and connected to an existing ending.
-- [x] The candidate source branch is `codex/branch-writing-v0.1.5`; the new candidate tag is `v0.1.6`.
-- [x] Local candidate gate is recorded: 67 Vitest files / 276 tests, typecheck, lint, build, and 11/11 authoring E2E.
+- [x] Authoring graph completion is implemented: an author-authored side scene can connect to an existing ending, and a new author-authored ending can be added from a non-ending node.
+- [x] The candidate source branch is `codex/branch-writing-v0.1.5`; reviewed audit fixes are included in the `v0.1.7` candidate tag.
+- [x] Previous local candidate gate is recorded: 70 Vitest files / 291 tests, typecheck, lint, build, and 12/12 authoring E2E.
+- [x] Current audit gate is recorded separately: `npm run verify` passed with 72 Vitest files / 302 tests, and `npm run test:e2e:authoring` passed 12/12.
 - [ ] Candidate is merged into the canonical `master` branch.
 - [ ] The exact canonical-branch commit has a green remote CI run.
 - [ ] A GitHub Release is created from the reviewed canonical-branch tag.
+
+## v0.1.6 Branch Candidate (Historical)
+
+- [x] The previous authoring branch editing candidate remains available as tag `v0.1.6`.
+- [x] The `v0.1.7` completion hardening changes are intentionally not retroactively moved onto `v0.1.6`.
 
 ## v0.1.5 Branch Candidate (Historical)
 
@@ -62,7 +68,7 @@ Use this checklist before treating a local build as a releasable private authori
 
 ## Remote Release Evidence
 
-The following section is historical evidence for the published `v0.1.4` release. It does not assert that `v0.1.5` or `v0.1.6` has been published.
+The following section is historical evidence for the published `v0.1.4` release. It does not assert that `v0.1.5`, `v0.1.6`, or `v0.1.7` has been published as a GitHub Release.
 
 - [x] Owner explicitly confirmed that the GitHub repository remains public for this release; the runtime and author data remain private-local, and no open-source license is granted by this decision.
 - [x] PR #1 targeted `master`; GitHub Actions `CI/verify` and `CI/e2e-authoring` passed before merge. `master` is not currently protected and remains a governance gap.
@@ -73,4 +79,4 @@ The following section is historical evidence for the published `v0.1.4` release.
 
 ## Operator Step Before Tagging
 
-- [x] Run `npm run authoring:llm:smoke` with the configured DeepSeek key; the redacted result is recorded without exposing the key or raw response.
+- [x] Run `npm run authoring:llm:smoke` with the configured OpenAI-compatible provider credentials; the redacted result is recorded without exposing the key or raw response.

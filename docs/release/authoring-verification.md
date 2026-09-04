@@ -8,14 +8,23 @@
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, V2 backup/restore, bounded interactive sessions, project/session lifecycle controls, and legacy read-only export.
 - Remote CI: PR #1 targeted `master`; `CI/verify` and `CI/e2e-authoring` passed before merge. Tag run `32687684469` passed on `v0.1.4` at merged commit `e175f84467af1ff9383c023121969be844fd13fa`.
 
-## v0.1.6 Author-Branch Editing Candidate (Not Published)
+## v0.1.7 Completion Hardening Candidate (Not Published)
 
-- Date: 2026-08-28
+- Date: 2026-09-04
 - Source branch: `codex/branch-writing-v0.1.5`
-- Candidate tag: `v0.1.6` is reserved for the reviewed commit on this feature branch; no GitHub Release is being created from this feature branch.
-- Scope: author-created branch scene editing, one atomic graph write with revision protection, existing-ending closure, validation boundaries, and Windows E2E cleanup reliability.
-- Local candidate gate: `npm run verify` passed with 67 Vitest files / 276 tests; `npm run test:e2e:authoring` passed 11/11.
+- Candidate tag: `v0.1.7` points to the reviewed feature-branch commit; no GitHub Release is being created from this feature branch.
+- Scope: author-created branch scene and ending editing, one atomic graph write with revision protection, interactive-path budget reservation, generation restart and polling UX, duplicate graph ID validation, validation boundaries, Windows E2E cleanup reliability, and in-flight editor input preservation.
+- Local candidate gate: `npm run verify` passed with 72 Vitest files / 302 tests; `npm run test:e2e:authoring` passed 12/12 in 39.1s.
+- Provider configuration dry-run: `npm run authoring:llm:smoke -- --dry-run` passed with model `doubao-seed-evolving` and `networkRequest: false`.
 - Release status: branch candidate only. Merge review, protected-branch CI, canonical-branch tag, GitHub Release, clean Windows account install evidence, and code signing remain human gates.
+
+## v0.1.6 Author-Branch Editing Candidate (Historical)
+
+- Date: 2026-08-30
+- Candidate tag: `v0.1.6` remains available as the prior author-branch editing candidate and does not include the `v0.1.7` completion hardening changes.
+- Scope: author-created branch scene and ending editing, one atomic graph write with revision protection, interactive-path budget reservation, generation restart and polling UX, duplicate graph ID validation, validation boundaries, and Windows E2E cleanup reliability.
+- Local candidate gate: `npm run verify` passed with 70 Vitest files / 291 tests; `npm run test:e2e:authoring` passed 12/12.
+- Release status: historical feature-branch candidate only. It was not merged to `master` and has no GitHub Release.
 
 ## v0.1.5 Branch-Writing Candidate (Not Published)
 

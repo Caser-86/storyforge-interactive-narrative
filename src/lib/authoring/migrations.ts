@@ -464,4 +464,12 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
         ON interactive_sessions(materialized_version_id);
     `,
   },
+  {
+    version: 10,
+    name: "interactive_generation_attempt_tokens",
+    up: `
+      ALTER TABLE interactive_sessions
+      ADD COLUMN generation_token TEXT;
+    `,
+  },
 ];

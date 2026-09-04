@@ -69,7 +69,7 @@ describe("interactive repository", () => {
     const claimed = await interactive.claimChoice(project.id, created.id, "choice_a");
     expect(claimed.choice.label).toBe("推门进入");
 
-    const next = await interactive.saveNextScene(created.id, {
+    const next = await interactive.saveNextScene(created.id, claimed, {
       ...opening,
       title: "门后",
       body: "门后亮起一排档案柜。",
@@ -98,13 +98,49 @@ describe("interactive repository", () => {
 
     const created = await interactive.createSession(project.id, state);
     await interactive.saveInitialScene(created.id, opening, state);
-    await interactive.claimChoice(project.id, created.id, "choice_a");
+    const firstClaim = await interactive.claimChoice(project.id, created.id, "choice_a");
 
     await interactive.recoverStaleGeneration(created.id, 0);
 
     const recovered = await interactive.getSession(project.id, created.id);
     expect(recovered.status).toBe("active");
     await expect(interactive.claimChoice(project.id, created.id, "choice_a")).resolves.toBeDefined();
+    await interactive.releaseChoice(firstClaim);
+  });
+
+  it("ignores a late save and release from an invalidated generation attempt", async () => {
+    const project = await authoring.createProject({
+      title: "互动竞态测试",
+      premise: state.seedPrompt,
+      genre: "mystery",
+      tone: "suspenseful",
+      pointOfView: "third person",
+      rating: "PG-13",
+      size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+    });
+
+    const created = await interactive.createSession(project.id, state);
+    await interactive.saveInitialScene(created.id, opening, state);
+    const firstClaim = await interactive.claimChoice(project.id, created.id, "choice_a");
+    await interactive.recoverStaleGeneration(created.id, 0);
+    const secondClaim = await interactive.claimChoice(project.id, created.id, "choice_b");
+
+    await expect(interactive.saveNextScene(created.id, firstClaim, {
+      ...opening,
+      title: "过期结果",
+    }, { ...state, turn: 2 })).rejects.toMatchObject({ code: "CONFLICT" });
+    await interactive.releaseChoice(firstClaim);
+
+    const stillGenerating = await interactive.getSession(project.id, created.id);
+    expect(stillGenerating.status).toBe("generating");
+    expect(stillGenerating.scene?.title).toBe("门前");
+
+    const next = await interactive.saveNextScene(created.id, secondClaim, {
+      ...opening,
+      title: "有效结果",
+    }, { ...state, turn: 2 });
+    expect(next.scene?.title).toBe("有效结果");
+    expect((await interactive.listTurns(project.id, created.id))[0]?.selectedChoiceLabel).toBe("先行调查");
   });
 
   it("lists sessions by recent activity and deletes only project-owned history", async () => {

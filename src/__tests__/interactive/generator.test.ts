@@ -82,12 +82,36 @@ describe("interactive scene generation", () => {
     expect(generate.mock.calls[0]?.[0].userPrompt).not.toContain("This is the final planned turn.");
   });
 
+  it("rejects an active model scene without enough choices", async () => {
+    vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate").mockResolvedValue({
+      data: {
+        scene: {
+          title: "门后",
+          body: "门后没有任何可辨认的出口。",
+          summary: "模型没有提供可选方向。",
+          choices: [],
+          isEnding: false,
+          endingSummary: null,
+        },
+        statePatch: {},
+      },
+      rawResponse: "{}",
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: 0,
+      model: "test-model",
+    });
+
+    await expect(generateInteractiveScene({ project, state, previousScene, selectedChoice }, new OpenAICompatibleGenerationProvider())).rejects.toThrow(/choices|choice/i);
+  });
+
   it("uses one bounded-turn policy for every project size", () => {
     expect(interactiveTargetTurns({ ...project, sizePreset: "micro" })).toBe(6);
-    expect(interactiveTargetTurns({ ...project, sizePreset: "short" })).toBe(8);
-    expect(interactiveTargetTurns({ ...project, sizePreset: "medium" })).toBe(16);
+    expect(interactiveTargetTurns({ ...project, sizePreset: "short", targetNodeCount: 15, targetEndingCount: 3 })).toBe(8);
+    expect(interactiveTargetTurns({ ...project, sizePreset: "medium", targetNodeCount: 40, targetEndingCount: 5 })).toBe(16);
     expect(interactiveTargetTurns({ ...project, sizePreset: "custom", targetNodeCount: 64 })).toBe(40);
-    expect(createInteractiveState({ ...project, sizePreset: "short" }, "session-1").targetTurns).toBe(8);
+    expect(interactiveTargetTurns({ ...project, sizePreset: "custom", targetNodeCount: 8 })).toBe(7);
+    expect(createInteractiveState({ ...project, sizePreset: "short", targetNodeCount: 15, targetEndingCount: 3 }, "session-1").targetTurns).toBe(8);
   });
 
   it("keeps forced ending fallbacks in Chinese for zh-CN projects", async () => {

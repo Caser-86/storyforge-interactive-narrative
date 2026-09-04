@@ -6,6 +6,7 @@ export const GenerationCreateInputSchema = z
   .object({
     versionId: z.string().min(1).optional(),
     model: z.string().trim().min(1).max(80).optional(),
+    freshDraft: z.boolean().optional(),
   })
   .strict();
 
@@ -52,7 +53,7 @@ export const GenerationNextResponseSchema = z
 export const CandidateApplyInputSchema = z.object({ expectedRevision: z.number().int().min(0) }).strict();
 export const NodeRegenerateInputSchema = z.object({ expectedRevision: z.number().int().min(0).optional() }).strict();
 export const CandidateResponseSchema = z.object({ candidate: GenerationCandidateSchema }).strict();
-export const CandidateApplyResponseSchema = z.object({ candidate: GenerationCandidateSchema, node: StoryNodeSchema }).strict();
+export const CandidateApplyResponseSchema = z.object({ candidate: GenerationCandidateSchema, node: StoryNodeSchema, draftRevision: z.number().int().min(0) }).strict();
 
 export type GenerationCreateInput = z.infer<typeof GenerationCreateInputSchema>;
 export type GenerationActionInput = z.infer<typeof GenerationActionInputSchema>;

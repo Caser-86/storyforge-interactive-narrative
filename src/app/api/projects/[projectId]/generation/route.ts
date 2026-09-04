@@ -35,15 +35,20 @@ export async function POST(request: Request, { params }: ProjectRouteContext): P
     const generation = createGenerationRepository();
     try {
       const project = await authoring.getProject(projectId);
-      const versionId = input.versionId ?? project.activeDraftVersionId;
+      if (input.freshDraft && input.versionId) {
+        throw new AuthoringError("VALIDATION", "freshDraft cannot be combined with versionId");
+      }
+      const model = resolveGenerationModel(input.model);
+      const generationDraft = input.freshDraft ? await authoring.createGenerationDraft(projectId) : null;
+      const targetProject = generationDraft?.project ?? project;
+      const versionId = input.versionId ?? targetProject.activeDraftVersionId;
       if (!versionId) {
         throw new AuthoringError("NOT_FOUND", "Project has no active draft version", { projectId });
       }
-      const model = resolveGenerationModel(input.model);
       const budget = calculateGenerationBudget({
-        preset: project.sizePreset,
-        targetNodes: project.targetNodeCount,
-        targetEndings: project.targetEndingCount,
+        preset: targetProject.sizePreset,
+        targetNodes: targetProject.targetNodeCount,
+        targetEndings: targetProject.targetEndingCount,
       });
       const run = await generation.createRun(projectId, versionId, { model, budget });
       return json(GenerationResponseSchema, { run }, { status: 201 });

@@ -70,8 +70,8 @@ describe("interactive materialize route", () => {
     const interactive = createInteractiveRepository();
     const session = await interactive.createSession(project.id, state);
     await interactive.saveInitialScene(session.id, opening, state);
-    await interactive.claimChoice(project.id, session.id, "choice_a");
-    await interactive.saveNextScene(session.id, ending, { ...state, turn: 2 });
+    const claim = await interactive.claimChoice(project.id, session.id, "choice_a");
+    await interactive.saveNextScene(session.id, claim, ending, { ...state, turn: 2 });
     interactive.close();
 
     const route = await import("@/app/api/projects/[projectId]/play/[sessionId]/materialize/route");

@@ -2,7 +2,7 @@
 
 StoryForge 是一个私人本地互动叙事创作工作台。主流程是：项目库 -> 有限生成 -> 图谱编辑 -> 质量校验 -> 快照 -> 离线 HTML 导出。
 
-当前开发候选版本：`v0.1.6`。该版本位于 `codex/branch-writing-v0.1.5`，并将随该分支推送标签；尚未合并到 `master`，不应视为正式 GitHub Release。
+当前开发候选版本：`v0.1.7`。标签指向 `codex/branch-writing-v0.1.5` 的本轮审查候选提交；尚未合并到 `master`，不应视为正式 GitHub Release。
 
 当前产品只聚焦文字创作，不需要登录，不提供公开分享，不依赖 Redis、PostgreSQL 或图片 worker。默认服务只绑定 `127.0.0.1`。
 
@@ -12,7 +12,7 @@ StoryForge 是一个私人本地互动叙事创作工作台。主流程是：项
 
 - Node.js `24.x`
 - npm `11.x`
-- DeepSeek API key（仅在需要真实生成时配置）
+- OpenAI-compatible 文本模型 API key（仅在需要真实生成时配置）
 
 ### 安装
 
@@ -25,9 +25,10 @@ npm ci
 创建 `.env.local`，不要把真实 key 提交到 Git：
 
 ```env
-OPENAI_API_KEY=sk-your-key
-OPENAI_BASE_URL=https://api.deepseek.com
-OPENAI_MODEL=deepseek-v4-flash
+# 火山方舟 Agent Plan 示例；变量名保留 OPENAI_* 是因为客户端采用 OpenAI 兼容协议
+OPENAI_API_KEY=your-ark-api-key
+OPENAI_BASE_URL=https://ark.cn-beijing.volces.com/api/plan/v3
+OPENAI_MODEL=doubao-seed-evolving
 # 可选：达到该输出 token 上限时暂停当前生成
 STORYFORGE_MAX_OUTPUT_TOKENS=250000
 # 可选：用于界面估算输出成本，不参与实际扣费
@@ -60,9 +61,9 @@ npm run dev
 
 编辑器中的“分支写作”是作者实际走一次创作路径，而不是播放预先生成的故事：系统先生成当前场景和 2-3 个选择，作者选择后才根据该选择生成下一幕，直到模型生成收束场景。未选择的分支不会被预先生成或伪造。
 
-到达结局后，作者可以点击“保存为正式故事草稿”。系统会创建新的 `review_required` 草稿版本，保留原草稿并把作者实际选择的线性主线路径写入 StoryGraph；进入编辑器后仍需补充分支、结局并完成质量校验，才能创建可发布快照。
+到达结局后，作者可以点击“保存为正式故事草稿”。系统会创建新的 `review_required` 草稿版本，保留原草稿并把作者实际选择的线性主线路径写入 StoryGraph；进入编辑器后可以继续补充分支和作者结局，并完成质量校验，才能创建可发布快照。
 
-在正式编辑器中，作者也可以选中一个已有主线的非结局节点，填写一条新的选择和场景内容。系统会以一次带修订号校验的整图写入新增作者支线，并自动连接到作者指定的已有结局；结局节点、没有主线的节点和达到项目节点上限时不会提供该操作。
+在正式编辑器中，作者可以选中一个非结局节点，新增作者支线或直接新增作者结局。两种操作都会以一次带修订号校验的整图写入保存；作者结局会创建新的 `ending` 节点，作者支线会连接到已有结局。结局节点、达到项目节点上限或达到项目结局上限时不会提供对应操作。
 
 ## 关键脚本
 
@@ -72,7 +73,7 @@ npm run dev
 | `npm run build` | Next 生产构建 |
 | `npm run start` | loopback 生产启动 |
 | `npm run verify` | typecheck、lint、Vitest、生产构建 |
-| `npm run test:e2e:authoring` | 生产构建下的 11 项完整 authoring E2E |
+| `npm run test:e2e:authoring` | 生产构建下的 12 项完整 authoring E2E |
 | `npm run db:authoring:smoke` | SQLite authoring 生命周期 smoke |
 | `npm run db:authoring:backup` | 迁移前 SQLite 备份、完整性和 SHA-256 检查 |
 | `npm run db:authoring:checkpoint` | 日常 SQLite checkpoint、manifest 和保留策略 |
@@ -80,7 +81,7 @@ npm run dev
 | `npm run authoring:doctor` | 输出不含路径、故事内容和密钥的本地恢复诊断 |
 | `npm run authoring:evaluate -- --provider fake` | 不联网的版本化生成质量评测 |
 | `npm run package:smoke` | Windows 分发 smoke dry-run，不安装、不删除数据 |
-| `pwsh -File scripts/package-smoke.ps1 -Mode Local -Root "$env:TEMP\storyforge-package-smoke-0.1.6"` | 在隔离临时根中验证 standalone 安装、升级、回滚和卸载保留数据 |
+| `pwsh -File scripts/package-smoke.ps1 -Mode Local -Root "$env:TEMP\storyforge-package-smoke-0.1.7"` | 在隔离临时根中验证 standalone 安装、升级、回滚和卸载保留数据 |
 | `npm run package:standalone` | 生成不含作者数据和密钥的 Node standalone 目录 |
 | `npm run release:evidence` | 生成 CycloneDX SBOM、standalone SHA-256 清单和脱敏发布证据 |
 | `npm run legacy:export -- --dry-run` | 只读检查旧 session，不删除源数据 |

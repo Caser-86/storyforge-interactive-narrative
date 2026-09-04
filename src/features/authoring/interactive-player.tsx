@@ -55,6 +55,46 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
     };
   }, [projectId, storageKey]);
 
+  const generatingSessionId = session?.status === "generating" ? session.id : null;
+
+  useEffect(() => {
+    if (!generatingSessionId) return;
+    let canceled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      if (canceled) return;
+      try {
+        const response = await fetch(`/api/projects/${projectId}/play/${encodeURIComponent(generatingSessionId)}`);
+        const payload = await response.json() as { session?: InteractiveSession; error?: { message?: string } };
+        if (response.status === 404 || payload.session?.status === "failed") {
+          window.localStorage.removeItem(storageKey);
+          if (!canceled) {
+            setSession(null);
+            setError(payload.error?.message ?? "互动进度已失效，请重新开始");
+          }
+          return;
+        }
+        if (!response.ok || !payload.session) throw new Error(payload.error?.message ?? "互动进度恢复失败");
+        if (canceled) return;
+        setError(null);
+        setSession(payload.session);
+        if (payload.session.status === "generating") timer = setTimeout(() => void poll(), 1000);
+      } catch (pollError) {
+        if (!canceled) {
+          setError(pollError instanceof Error ? pollError.message : "互动进度恢复失败");
+          timer = setTimeout(() => void poll(), 1500);
+        }
+      }
+    };
+
+    timer = setTimeout(() => void poll(), 750);
+    return () => {
+      canceled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [projectId, generatingSessionId, storageKey]);
+
   useEffect(() => {
     let canceled = false;
     void fetch(`/api/projects/${projectId}/play/sessions`)
@@ -193,7 +233,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
       <header className="interactive-header">
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">SF</span>
-          <div><p className="eyebrow">BRANCH WRITING / DEEPSEEK</p><p className="brand-name">{projectTitle}</p></div>
+          <div><p className="eyebrow">BRANCH WRITING / CONFIGURED MODEL</p><p className="brand-name">{projectTitle}</p></div>
         </div>
         <div className="interactive-header-actions">
           <Link className="text-link" href={`/projects/${projectId}/edit`}>返回编辑器</Link>
@@ -205,7 +245,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
         <section className="interactive-start">
           <p className="eyebrow">WRITER-DRIVEN GENERATION</p>
           <h1>你选择方向，故事逐幕成形。</h1>
-          <p>每次只生成当前场景和下一组选项，不预生成未选择的分支。你亲自走完一条路径后，DeepSeek 负责收束，并可保存为正式故事草稿。</p>
+          <p>每次只生成当前场景和下一组选项，不预生成未选择的分支。你亲自走完一条路径后，已配置的文本模型负责收束，并可保存为正式故事草稿。</p>
           {error ? <p className="interactive-error" role="alert">{error}</p> : null}
           <button className="button button-primary" type="button" disabled={isBusy} onClick={() => void start()}>{isBusy ? "正在生成开场…" : "开始分支写作"}</button>
         </section>
@@ -220,7 +260,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
           </article> : null}
           {error ? <p className="interactive-error" role="alert">{error}</p> : null}
           {session.status === "generating" ? (
-          <p className="interactive-error" role="status">上一段生成尚未完成，请稍候刷新</p>
+          <p className="interactive-error" role="status">上一段生成尚未完成，正在自动恢复，请稍候</p>
           ) : session.status === "ended" || scene?.isEnding ? (
           <div className="interactive-ending">
             <strong>{scene?.endingSummary ?? "本次分支写作已收束。"}</strong>

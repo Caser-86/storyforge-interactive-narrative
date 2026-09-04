@@ -1,19 +1,48 @@
 import { errorResponse, json, readJsonBody } from "@/lib/authoring/api-contracts";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { AuthoringError } from "@/lib/authoring/errors";
-import { createInteractiveRepository } from "@/lib/interactive/repository";
+import { createInteractiveRepository, type InteractiveGenerationClaim } from "@/lib/interactive/repository";
 import { generateInteractiveScene } from "@/lib/interactive/generator";
 import { InteractiveChoiceInputSchema, InteractiveSessionResponseSchema } from "@/lib/interactive/api-contracts";
+import type { InteractiveChoice, InteractiveScene, InteractiveState } from "@/lib/interactive/schemas";
 
 type SessionRouteContext = { params: Promise<{ projectId: string; sessionId: string }> };
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+async function generateNextSceneInBackground(
+  projectId: string,
+  sessionId: string,
+  claim: InteractiveGenerationClaim & { session: { state: InteractiveState }; scene: InteractiveScene; choice: InteractiveChoice },
+): Promise<void> {
+  const authoring = createAuthoringRepository();
+  const interactive = createInteractiveRepository();
+
+  try {
+    const project = await authoring.getProject(projectId);
+    const generated = await generateInteractiveScene({ project, state: claim.session.state, previousScene: claim.scene, selectedChoice: claim.choice });
+    await interactive.saveNextScene(sessionId, claim, generated.scene, generated.state);
+  } catch (error) {
+    if (!(error instanceof AuthoringError)) {
+      console.error("[interactive] next scene generation failed", error instanceof Error ? error.message : String(error));
+    }
+    try {
+      await interactive.releaseChoice(claim);
+    } catch (releaseError) {
+      console.error("[interactive] next scene recovery failed", releaseError instanceof Error ? releaseError.message : String(releaseError));
+    }
+  } finally {
+    interactive.close();
+    authoring.close();
+  }
+}
+
 export async function GET(_request: Request, { params }: SessionRouteContext): Promise<Response> {
   const interactive = createInteractiveRepository();
   try {
     const { projectId, sessionId } = await params;
+    await interactive.getSession(projectId, sessionId);
     await interactive.recoverStaleGeneration(sessionId);
     return json(InteractiveSessionResponseSchema, { session: await interactive.getSession(projectId, sessionId) });
   } catch (error) {
@@ -26,33 +55,15 @@ export async function GET(_request: Request, { params }: SessionRouteContext): P
 export async function POST(request: Request, { params }: SessionRouteContext): Promise<Response> {
   const authoring = createAuthoringRepository();
   const interactive = createInteractiveRepository();
-  let claimed = false;
   try {
     const { projectId, sessionId } = await params;
     const input = await readJsonBody(request, InteractiveChoiceInputSchema);
-    const project = await authoring.getProject(projectId);
+    await authoring.getProject(projectId);
     const claim = await interactive.claimChoice(projectId, sessionId, input.choiceId);
-    claimed = true;
-    const generated = await generateInteractiveScene({
-      project,
-      state: claim.session.state,
-      previousScene: claim.scene,
-      selectedChoice: claim.choice,
-    });
-    const session = await interactive.saveNextScene(sessionId, generated.scene, generated.state);
-    return json(InteractiveSessionResponseSchema, { session });
+    const generating = await interactive.getSession(projectId, sessionId);
+    void generateNextSceneInBackground(projectId, sessionId, claim);
+    return json(InteractiveSessionResponseSchema, { session: generating }, { status: 202 });
   } catch (error) {
-    if (!(error instanceof AuthoringError)) {
-      console.error("[interactive] next scene generation failed", error instanceof Error ? error.message : String(error));
-    }
-    if (claimed) {
-      try {
-        const { sessionId } = await params;
-        await interactive.releaseChoice(sessionId);
-      } catch {
-        // Preserve the original generation error; recovery is attempted on the next request.
-      }
-    }
     if (error instanceof AuthoringError) return errorResponse(error);
     return errorResponse(new AuthoringError("CONFLICT", "下一段生成失败，请重试。"));
   } finally {

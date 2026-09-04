@@ -87,6 +87,24 @@ describe("GenerationProgress", () => {
     expect(await screen.findByText("准备生成")).toBeInTheDocument();
   });
 
+  it("starts a fresh run after a completed run", async () => {
+    const user = userEvent.setup();
+    const completed = run({ status: "completed", stage: "ready", progressCurrent: 8, completedAt: "2026-08-21T00:01:00.000Z" });
+    const fresh = run({ id: "run-2", status: "queued", progressCurrent: 0, stage: "brief", createdAt: "2026-08-21T00:02:00.000Z", updatedAt: "2026-08-21T00:02:00.000Z" });
+    api.listGenerationRuns.mockResolvedValue([completed]);
+    api.getGenerationStatus
+      .mockResolvedValueOnce(statusResponse(completed))
+      .mockResolvedValueOnce(statusResponse(fresh));
+    api.createGenerationRun.mockResolvedValue(fresh);
+
+    render(<GenerationProgress projectId="project-1" projectTitle="夜航船" />);
+    await user.click(await screen.findByRole("button", { name: "新建生成" }));
+
+    await waitFor(() => expect(api.createGenerationRun).toHaveBeenCalledWith("project-1", { freshDraft: true }));
+    expect(await screen.findByText("准备生成")).toBeInTheDocument();
+    expect(screen.getByText("GENERATION RUN / run-2")).toBeInTheDocument();
+  });
+
   it("requires confirmation before advancing a large generation budget", async () => {
     const user = userEvent.setup();
     const budgeted = run({
