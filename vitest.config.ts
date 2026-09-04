@@ -7,6 +7,8 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./src/test/setup-dom.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", "**/e2e/**"],
+    pool: "forks",
+    maxWorkers: 4,
   },
   resolve: {
     alias: {

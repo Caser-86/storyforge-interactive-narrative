@@ -1,5 +1,7 @@
 # 项目完工路线图
 
+> **归档说明：** 本文件记录 2026-05 旧版架构，包含已退役的 PostgreSQL、Redis、图片和旧 API 描述，不代表当前实现。当前文档入口见 `README.md`、`docs/README.md` 和 `docs/release/authoring-verification.md`。
+
 生成日期：2026-05-18  
 项目路径：`D:\Files\基于LLM的全自动独立游戏互动游戏叙事生成器\narrative-game`
 

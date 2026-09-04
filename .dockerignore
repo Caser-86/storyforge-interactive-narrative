@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-playwright
 .git
 .env.local
 .env*.local
@@ -11,3 +12,13 @@ coverage
 .idea
 e2e
 playwright.config.ts
+
+# local author data and generated evidence
+/data/
+/output/
+/.superpowers/
+/.agents/
+*.log
+*.tsbuildinfo
+/playwright-report/
+/test-results/

@@ -47,4 +47,16 @@ describe("Windows distribution contract", () => {
     expect(packageJson.scripts.build).toContain("next build");
     expect(packageJson.dependencies["better-sqlite3"]).toBeTruthy();
   });
+
+  it("keeps local author data out of Docker context and preserves the public asset contract", () => {
+    const dockerignore = fs.readFileSync(path.join(root, ".dockerignore"), "utf8");
+    const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
+
+    for (const pattern of ["/data/", "/output/", "/.superpowers/", "/.agents/", "*.log", "*.tsbuildinfo", ".next-playwright", "/playwright-report/", "/test-results/"]) {
+      expect(dockerignore).toContain(pattern);
+    }
+
+    expect(fs.existsSync(path.join(root, "public", ".gitkeep"))).toBe(true);
+    expect(dockerfile).toContain("COPY --from=builder /app/public ./public");
+  });
 });
