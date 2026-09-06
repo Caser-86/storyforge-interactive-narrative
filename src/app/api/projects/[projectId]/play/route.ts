@@ -1,7 +1,9 @@
 import { errorResponse, json } from "@/lib/authoring/api-contracts";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { createInteractiveRepository } from "@/lib/interactive/repository";
+import { interactiveGenerationFailureMessage } from "@/lib/interactive/failure";
 import { createInteractiveState, generateInteractiveScene } from "@/lib/interactive/generator";
+import { generateWithInteractiveRetry } from "@/lib/interactive/retry";
 import { InteractiveSessionResponseSchema } from "@/lib/interactive/api-contracts";
 
 type ProjectRouteContext = { params: Promise<{ projectId: string }> };
@@ -18,11 +20,11 @@ async function generateOpeningInBackground(projectId: string, sessionId: string)
     const session = await interactive.getSession(projectId, sessionId);
     if (session.status !== "generating" || session.turn !== 0) return;
 
-    const generated = await generateInteractiveScene({ project, state: session.state });
+    const generated = await generateWithInteractiveRetry(() => generateInteractiveScene({ project, state: session.state }));
     await interactive.saveInitialScene(sessionId, generated.scene, generated.state);
   } catch (error) {
     try {
-      await interactive.failInitialGeneration(sessionId, error instanceof Error ? error.message : "generation failed");
+      await interactive.failInitialGeneration(sessionId, interactiveGenerationFailureMessage(error, "opening"));
     } catch (failureError) {
       console.error("[interactive] opening generation state update failed", failureError instanceof Error ? failureError.message : String(failureError));
     }

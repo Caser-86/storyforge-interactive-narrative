@@ -1,9 +1,9 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAuthoringRepository, type AuthoringRepository } from "@/lib/authoring/repository";
-import { createInteractiveRepository, type InteractiveRepository } from "@/lib/interactive/repository";
+import { createInteractiveRepository, type InteractiveGenerationClaim, type InteractiveRepository } from "@/lib/interactive/repository";
 import type { InteractiveScene, InteractiveState } from "@/lib/interactive/schemas";
 
 let tempDir: string;
@@ -104,8 +104,82 @@ describe("interactive repository", () => {
 
     const recovered = await interactive.getSession(project.id, created.id);
     expect(recovered.status).toBe("active");
+    expect(recovered.lastError).toBe("上一幕生成已超时，当前选择已恢复，可以重新选择。");
     await expect(interactive.claimChoice(project.id, created.id, "choice_a")).resolves.toBeDefined();
     await interactive.releaseChoice(firstClaim);
+  });
+
+  it("persists a safe next-scene failure while releasing the choice for retry", async () => {
+    const project = await authoring.createProject({
+      title: "互动错误提示测试",
+      premise: state.seedPrompt,
+      genre: "mystery",
+      tone: "suspenseful",
+      pointOfView: "third person",
+      rating: "PG-13",
+      size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+    });
+
+    const created = await interactive.createSession(project.id, state);
+    await interactive.saveInitialScene(created.id, opening, state);
+    const claim = await interactive.claimChoice(project.id, created.id, "choice_a");
+    const releaseChoice = interactive.releaseChoice.bind(interactive) as unknown as (claim: InteractiveGenerationClaim, message: string) => Promise<void>;
+
+    await releaseChoice(claim, "下一幕生成超时，当前选择已恢复，可以重新选择。");
+
+    await expect(interactive.getSession(project.id, created.id)).resolves.toMatchObject({
+      status: "active",
+      lastError: "下一幕生成超时，当前选择已恢复，可以重新选择。",
+    });
+    await expect(interactive.claimChoice(project.id, created.id, "choice_a")).resolves.toBeDefined();
+  });
+
+  it("does not recover a generation before the long-request safety window", async () => {
+    const project = await authoring.createProject({
+      title: "互动长请求恢复测试",
+      premise: state.seedPrompt,
+      genre: "mystery",
+      tone: "suspenseful",
+      pointOfView: "third person",
+      rating: "PG-13",
+      size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+    });
+
+    const created = await interactive.createSession(project.id, state);
+    const createdAt = Date.parse(created.updatedAt);
+    vi.setSystemTime(new Date(createdAt + 120_001));
+    try {
+      await interactive.recoverStaleGeneration(created.id);
+      expect((await interactive.getSession(project.id, created.id)).status).toBe("generating");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a session alive while all bounded provider attempts may still be running", async () => {
+    const previousTimeout = process.env.OPENAI_TIMEOUT_MS;
+    process.env.OPENAI_TIMEOUT_MS = "180000";
+    const project = await authoring.createProject({
+      title: "互动重试窗口测试",
+      premise: state.seedPrompt,
+      genre: "mystery",
+      tone: "suspenseful",
+      pointOfView: "third person",
+      rating: "PG-13",
+      size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+    });
+
+    const created = await interactive.createSession(project.id, state);
+    const createdAt = Date.parse(created.updatedAt);
+    vi.setSystemTime(new Date(createdAt + 300_001));
+    try {
+      await interactive.recoverStaleGeneration(created.id);
+      expect((await interactive.getSession(project.id, created.id)).status).toBe("generating");
+    } finally {
+      vi.useRealTimers();
+      if (previousTimeout === undefined) delete process.env.OPENAI_TIMEOUT_MS;
+      else process.env.OPENAI_TIMEOUT_MS = previousTimeout;
+    }
   });
 
   it("ignores a late save and release from an invalidated generation attempt", async () => {

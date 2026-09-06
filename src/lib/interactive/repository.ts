@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { initializeAuthoringDatabase } from "@/lib/authoring/database";
 import { AuthoringError } from "@/lib/authoring/errors";
+import { readIntEnv } from "@/lib/env";
 import type { AuthoringDatabaseOptions } from "@/lib/authoring/database";
 import {
   InteractiveSceneSchema,
@@ -14,6 +15,7 @@ import {
   InteractiveTurnRecordSchema,
   type InteractiveTurnRecord,
 } from "./schemas";
+import { INTERACTIVE_GENERATION_MAX_ATTEMPTS } from "./retry";
 
 type SessionRow = {
   id: string;
@@ -49,7 +51,7 @@ export interface InteractiveRepository {
   saveInitialScene(sessionId: string, scene: InteractiveScene, state: InteractiveState): Promise<InteractiveSession>;
   claimChoice(projectId: string, sessionId: string, choiceId: string): Promise<InteractiveGenerationClaim & { session: InteractiveSession; choice: InteractiveChoice; scene: InteractiveScene }>;
   saveNextScene(sessionId: string, claim: InteractiveGenerationClaim, scene: InteractiveScene, state: InteractiveState): Promise<InteractiveSession>;
-  releaseChoice(claim: InteractiveGenerationClaim): Promise<void>;
+  releaseChoice(claim: InteractiveGenerationClaim, errorMessage?: string): Promise<void>;
   recoverStaleGeneration(sessionId: string, staleAfterMs?: number): Promise<void>;
   failInitialGeneration(sessionId: string, message: string): Promise<void>;
   close(): void;
@@ -64,6 +66,11 @@ export type InteractiveGenerationClaim = {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function defaultStaleGenerationMs(): number {
+  const timeoutMs = readIntEnv("OPENAI_TIMEOUT_MS", 180_000, { min: 1 });
+  return timeoutMs * INTERACTIVE_GENERATION_MAX_ATTEMPTS + 60_000;
 }
 
 function parseState(value: string): InteractiveState {
@@ -83,6 +90,7 @@ function toSession(row: SessionRow, scene: InteractiveScene | null): Interactive
     targetTurns: row.target_turns,
     state: parseState(row.state_json),
     scene,
+    lastError: row.last_error,
     materializedVersionId: row.materialized_version_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -239,7 +247,7 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
     return this.readSession(this.requireSession(sessionId));
   }
 
-  public async releaseChoice(claim: InteractiveGenerationClaim): Promise<void> {
+  public async releaseChoice(claim: InteractiveGenerationClaim, errorMessage?: string): Promise<void> {
     const timestamp = nowIso();
     this.db.transaction(() => {
       const session = this.requireSession(claim.sessionId);
@@ -249,12 +257,12 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
         .run(claim.turnId, claim.choiceId);
       if (turnUpdate.changes !== 1) return;
       this.db
-        .prepare("UPDATE interactive_sessions SET status = 'active', generation_token = NULL, last_error = NULL, updated_at = ? WHERE id = ? AND status = 'generating' AND current_turn_id = ? AND generation_token = ?")
-        .run(timestamp, claim.sessionId, claim.turnId, claim.generationToken);
+        .prepare("UPDATE interactive_sessions SET status = 'active', generation_token = NULL, last_error = ?, updated_at = ? WHERE id = ? AND status = 'generating' AND current_turn_id = ? AND generation_token = ?")
+        .run(errorMessage ?? null, timestamp, claim.sessionId, claim.turnId, claim.generationToken);
     })();
   }
 
-  public async recoverStaleGeneration(sessionId: string, staleAfterMs = 120_000): Promise<void> {
+  public async recoverStaleGeneration(sessionId: string, staleAfterMs = defaultStaleGenerationMs()): Promise<void> {
     const recover = this.db.transaction(() => {
       const session = this.requireSession(sessionId);
       if (session.status !== "generating") return;
@@ -284,8 +292,8 @@ export class BetterSqliteInteractiveRepository implements InteractiveRepository 
         .prepare("UPDATE interactive_turns SET selected_choice_id = NULL, selected_at = NULL WHERE id = ?")
         .run(turn.id);
       this.db
-        .prepare("UPDATE interactive_sessions SET status = 'active', generation_token = NULL, last_error = NULL, updated_at = ? WHERE id = ?")
-        .run(timestamp, sessionId);
+        .prepare("UPDATE interactive_sessions SET status = 'active', generation_token = NULL, last_error = ?, updated_at = ? WHERE id = ?")
+        .run("上一幕生成已超时，当前选择已恢复，可以重新选择。", timestamp, sessionId);
     });
     recover();
   }

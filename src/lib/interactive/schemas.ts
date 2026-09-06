@@ -53,6 +53,7 @@ export const InteractiveSessionSchema = z
     targetTurns: z.number().int().min(2).max(40),
     state: InteractiveStateSchema,
     scene: InteractiveSceneSchema.nullable(),
+    lastError: z.string().min(1).nullable(),
     materializedVersionId: z.string().min(1).nullable(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),

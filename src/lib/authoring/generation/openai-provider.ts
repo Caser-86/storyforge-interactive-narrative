@@ -64,7 +64,13 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
 
     try {
       const baseURL = this.options.baseURL ?? process.env.OPENAI_BASE_URL ?? "https://api.deepseek.com";
-      const isDeepSeek = model.toLowerCase().startsWith("deepseek-") || baseURL.toLowerCase().includes("deepseek.com");
+      const normalizedModel = model.toLowerCase();
+      const normalizedBaseURL = baseURL.toLowerCase();
+      const disableThinking = normalizedModel.startsWith("deepseek-")
+        || normalizedModel.startsWith("doubao-")
+        || normalizedBaseURL.includes("deepseek.com")
+        || normalizedBaseURL.includes("volces.com")
+        || normalizedBaseURL.includes("volcengineapi.com");
       const response = (await this.getClient().chat.completions.create({
         model,
         messages: [
@@ -72,7 +78,7 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
           { role: "user", content: request.userPrompt },
         ],
         response_format: { type: "json_object" },
-        ...(isDeepSeek ? { thinking: { type: "disabled" as const } } : {}),
+        ...(disableThinking ? { thinking: { type: "disabled" as const } } : {}),
         temperature: request.temperature,
         max_tokens: request.maxTokens,
       })) as ChatCompletionResponse;
@@ -120,7 +126,7 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
       const client = new OpenAI({
         apiKey: this.options.apiKey ?? process.env.OPENAI_API_KEY,
         baseURL: this.options.baseURL ?? process.env.OPENAI_BASE_URL ?? "https://api.deepseek.com",
-        timeout: this.options.timeoutMs ?? readIntEnv("OPENAI_TIMEOUT_MS", 60_000, { min: 1 }),
+        timeout: this.options.timeoutMs ?? readIntEnv("OPENAI_TIMEOUT_MS", 180_000, { min: 1 }),
         maxRetries: 0,
       });
       this.client = client as unknown as ChatCompletionClient;

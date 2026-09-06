@@ -82,6 +82,34 @@ describe("interactive scene generation", () => {
     expect(generate.mock.calls[0]?.[0].userPrompt).not.toContain("This is the final planned turn.");
   });
 
+  it("states the author's selected direction explicitly for the next scene", async () => {
+    const generate = vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate").mockResolvedValue({
+      data: {
+        scene: {
+          title: "门后",
+          body: "门后亮起一排档案柜。",
+          summary: "新的线索出现了。",
+          choices: [
+            { id: "choice_a", label: "查看档案", intent: "寻找记录", risk: "low", consequencePreview: "你会获得线索。" },
+            { id: "choice_b", label: "离开房间", intent: "暂时撤退", risk: "medium", consequencePreview: "你会失去部分时间。" },
+          ],
+          isEnding: false,
+          endingSummary: null,
+        },
+        statePatch: {},
+      },
+      rawResponse: "{}",
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: 0,
+      model: "deepseek-v4-flash",
+    });
+
+    await generateInteractiveScene({ project, state, previousScene, selectedChoice }, new OpenAICompatibleGenerationProvider());
+
+    expect(generate.mock.calls[0]?.[0].userPrompt).toContain("Author selected direction: 推门进入");
+  });
+
   it("rejects an active model scene without enough choices", async () => {
     vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate").mockResolvedValue({
       data: {

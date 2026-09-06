@@ -52,7 +52,13 @@ export function classifyProviderError(error: unknown): ProviderError {
     return new ProviderError("RATE_LIMIT", message, true, { status, cause: error });
   }
 
-  if (status === 408 || name === "TIMEOUT" || code === "ETIMEDOUT" || code === "ABORT_ERR") {
+  if (
+    status === 408
+    || name === "TIMEOUT"
+    || code === "ETIMEDOUT"
+    || code === "ABORT_ERR"
+    || /timed?\s*out|timeout|deadline\s+exceeded/i.test(message)
+  ) {
     return new ProviderError("TIMEOUT", message, true, { status, cause: error });
   }
 

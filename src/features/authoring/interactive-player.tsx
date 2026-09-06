@@ -6,8 +6,9 @@ import type { InteractiveSession } from "@/lib/interactive/schemas";
 
 type InteractivePlayerProps = { projectId: string; projectTitle: string };
 
-function sessionStatusLabel(status: InteractiveSession["status"], materializedVersionId: string | null): string {
+function sessionStatusLabel(status: InteractiveSession["status"], materializedVersionId: string | null, lastError: string | null): string {
   if (materializedVersionId) return "已落稿";
+  if (status === "active" && lastError) return "需重试";
   return status === "ended" ? "已结束" : status === "active" ? "进行中" : status === "generating" ? "生成中" : "失败";
 }
 
@@ -42,7 +43,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
           throw new Error(payload.error?.message ?? "互动进度恢复失败");
         }
         if (!canceled) {
-          setError(null);
+          setError(payload.session.lastError);
           setSession(payload.session);
         }
       })
@@ -77,7 +78,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
         }
         if (!response.ok || !payload.session) throw new Error(payload.error?.message ?? "互动进度恢复失败");
         if (canceled) return;
-        setError(null);
+        setError(payload.session.lastError);
         setSession(payload.session);
         if (payload.session.status === "generating") timer = setTimeout(() => void poll(), 1000);
       } catch (pollError) {
@@ -129,6 +130,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
 
   function activateSession(nextSession: InteractiveSession): void {
     setSession(nextSession);
+    setError(nextSession.lastError);
     window.localStorage.setItem(storageKey, nextSession.id);
   }
 
@@ -233,11 +235,11 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
       <header className="interactive-header">
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">SF</span>
-          <div><p className="eyebrow">BRANCH WRITING / CONFIGURED MODEL</p><p className="brand-name">{projectTitle}</p></div>
+          <div><p className="eyebrow">BRANCH WRITING / AUTHORING</p><p className="brand-name">{projectTitle}</p></div>
         </div>
         <div className="interactive-header-actions">
           <Link className="text-link" href={`/projects/${projectId}/edit`}>返回编辑器</Link>
-          <span className="preview-readonly">作者选择推进</span>
+          <Link className="text-link" href={`/projects/${projectId}/generate/structured`}>一次性结构化生成</Link>
         </div>
       </header>
 
@@ -282,7 +284,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
           <div className="interactive-history-heading">
             <div>
               <p className="eyebrow">LOCAL WRITING SESSIONS</p>
-              <h2 id="interactive-history-title">分支写作记录</h2>
+              <h2 id="interactive-history-title">作者分支写作记录</h2>
             </div>
             <span>{history.length} 条</span>
           </div>
@@ -290,7 +292,7 @@ export function InteractivePlayer({ projectId, projectTitle }: InteractivePlayer
             {history.map((item) => (
               <article className="interactive-history-item" key={item.id}>
                 <div>
-                  <span className="interactive-history-status">{sessionStatusLabel(item.status, item.materializedVersionId)}</span>
+                  <span className="interactive-history-status">{sessionStatusLabel(item.status, item.materializedVersionId, item.lastError)}</span>
                   <strong>{projectTitle}</strong>
                   <small>第 {item.turn} / {item.targetTurns} 幕</small>
                 </div>

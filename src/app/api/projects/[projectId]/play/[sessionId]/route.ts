@@ -3,6 +3,8 @@ import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { AuthoringError } from "@/lib/authoring/errors";
 import { createInteractiveRepository, type InteractiveGenerationClaim } from "@/lib/interactive/repository";
 import { generateInteractiveScene } from "@/lib/interactive/generator";
+import { interactiveGenerationFailureMessage } from "@/lib/interactive/failure";
+import { generateWithInteractiveRetry } from "@/lib/interactive/retry";
 import { InteractiveChoiceInputSchema, InteractiveSessionResponseSchema } from "@/lib/interactive/api-contracts";
 import type { InteractiveChoice, InteractiveScene, InteractiveState } from "@/lib/interactive/schemas";
 
@@ -21,14 +23,14 @@ async function generateNextSceneInBackground(
 
   try {
     const project = await authoring.getProject(projectId);
-    const generated = await generateInteractiveScene({ project, state: claim.session.state, previousScene: claim.scene, selectedChoice: claim.choice });
+    const generated = await generateWithInteractiveRetry(() => generateInteractiveScene({ project, state: claim.session.state, previousScene: claim.scene, selectedChoice: claim.choice }));
     await interactive.saveNextScene(sessionId, claim, generated.scene, generated.state);
   } catch (error) {
     if (!(error instanceof AuthoringError)) {
       console.error("[interactive] next scene generation failed", error instanceof Error ? error.message : String(error));
     }
     try {
-      await interactive.releaseChoice(claim);
+      await interactive.releaseChoice(claim, interactiveGenerationFailureMessage(error, "next"));
     } catch (releaseError) {
       console.error("[interactive] next scene recovery failed", releaseError instanceof Error ? releaseError.message : String(releaseError));
     }

@@ -11,6 +11,7 @@ const session = {
   status: "active" as const,
   turn: 1,
   targetTurns: 8,
+  lastError: null,
   state: {
     seedPrompt: "一名档案员发现一扇不该存在的门。",
     turn: 1,
@@ -105,6 +106,29 @@ describe("InteractivePlayer", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("shows a retryable error when the next scene generation is released", async () => {
+    localStorage.setItem("storyforge:interactive-session:project-1", session.id);
+    const failedGeneration = {
+      ...session,
+      lastError: "下一幕生成超时，当前选择已恢复，可以重新选择。",
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      return Promise.resolve(new Response(
+        url.endsWith("/play/sessions")
+          ? JSON.stringify({ sessions: [failedGeneration] })
+          : JSON.stringify({ session: failedGeneration }),
+        { status: 200 },
+      ));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("下一幕生成超时，当前选择已恢复，可以重新选择。");
+    expect(screen.getByRole("button", { name: /推门进入/ })).toBeInTheDocument();
   });
 
   it("shows persisted history and removes a deleted session", async () => {

@@ -30,7 +30,7 @@ test.describe("interactive authoring flow", () => {
     expect(projectResponse.ok()).toBe(true);
     const project = (await projectResponse.json()).project as { id: string };
 
-    await page.goto(`/projects/${project.id}/play`);
+    await page.goto(`/projects/${project.id}/generate`);
     await page.getByRole("button", { name: "开始分支写作" }).click();
     await expect(page.getByRole("heading", { name: "第 1 幕" })).toBeVisible();
     const stage = page.locator(".interactive-stage");
@@ -90,7 +90,7 @@ test.describe("interactive authoring flow", () => {
     expect(projectResponse.ok()).toBe(true);
     const project = (await projectResponse.json()).project as { id: string };
 
-    await page.goto(`/projects/${project.id}/play`);
+    await page.goto(`/projects/${project.id}/generate`);
     await page.getByRole("button", { name: "开始分支写作" }).click();
     await expect(page.getByRole("heading", { name: "第 1 幕" })).toBeVisible();
     for (let turn = 1; turn < 8; turn += 1) {

@@ -1,10 +1,12 @@
 # StoryForge
 
-StoryForge 是一个私人本地互动叙事创作工作台。主流程是：项目库 -> 有限生成 -> 图谱编辑 -> 质量校验 -> 快照 -> 离线 HTML 导出。
+StoryForge 是一个私人本地互动叙事创作工作台。默认主流程是：项目库 -> 作者选择分支 -> 模型逐幕生成 -> 模型收尾 -> 图谱编辑 -> 质量校验 -> 快照 -> 离线 HTML 导出。
 
 当前开发候选版本：`v0.1.7`。标签指向 `codex/branch-writing-v0.1.5` 的本轮审查候选提交；尚未合并到 `master`，不应视为正式 GitHub Release。
 
 当前产品只聚焦文字创作，不需要登录，不提供公开分享，不依赖 Redis、PostgreSQL 或图片 worker。默认服务只绑定 `127.0.0.1`。
+
+文档总入口见 [`docs/README.md`](docs/README.md)。其中“当前文档”描述现行实现，“历史归档”仅用于追溯早期方案，不作为安装、开发或发布依据。
 
 ## 快速开始
 
@@ -29,6 +31,8 @@ npm ci
 OPENAI_API_KEY=your-ark-api-key
 OPENAI_BASE_URL=https://ark.cn-beijing.volces.com/api/plan/v3
 OPENAI_MODEL=doubao-seed-evolving
+# 可选：单次模型请求超时，默认 180 秒
+OPENAI_TIMEOUT_MS=180000
 # 可选：达到该输出 token 上限时暂停当前生成
 STORYFORGE_MAX_OUTPUT_TOKENS=250000
 # 可选：用于界面估算输出成本，不参与实际扣费
@@ -48,18 +52,19 @@ npm run dev
 ## 正式创作闭环
 
 1. 在项目库创建项目并填写 brief。
-2. 选择有限规模，启动分阶段生成。
-3. 在编辑器修改节点和选择，人工内容不会被 AI 直接覆盖。
-4. 运行结构、规则和可选 AI continuity review。
-5. 解决阻断问题，确认当前修订通过发布检查。
-6. 创建不可变快照，预览并导出独立 HTML。
-7. 使用项目备份恢复到新项目 ID，或按需替换已有项目。
+2. 默认进入分支写作：模型生成开场和 3 个选择，作者每轮选一个方向，模型只生成被选中的下一幕，并在有限回合后收尾。
+3. 需要一次性生成完整结构时，进入项目内的“高级：一次性结构化生成”。
+4. 在编辑器修改节点和选择，人工内容不会被 AI 直接覆盖。
+5. 运行结构、规则和可选 AI continuity review。
+6. 解决阻断问题，确认当前修订通过发布检查。
+7. 创建不可变快照，预览并导出独立 HTML。
+8. 使用项目备份恢复到新项目 ID，或按需替换已有项目。
 
 发布检查是快照和导出的唯一授权边界。导出的 HTML 不需要服务端，支持 `file://` 离线播放，并排除 API key、raw prompt、raw response、lease 和内部错误细节。
 
 ## 分支写作
 
-编辑器中的“分支写作”是作者实际走一次创作路径，而不是播放预先生成的故事：系统先生成当前场景和 2-3 个选择，作者选择后才根据该选择生成下一幕，直到模型生成收束场景。未选择的分支不会被预先生成或伪造。
+默认 `/projects/:projectId/generate` 中的“分支写作”是作者实际走一次创作路径，而不是播放预先生成的故事：系统先生成当前场景和 3 个选择，作者选择后才根据该选择生成下一幕，直到模型生成收束场景。未选择的分支不会被预先生成或伪造。旧 `/play` 地址继续兼容；批量管线位于 `/projects/:projectId/generate/structured`。
 
 到达结局后，作者可以点击“保存为正式故事草稿”。系统会创建新的 `review_required` 草稿版本，保留原草稿并把作者实际选择的线性主线路径写入 StoryGraph；进入编辑器后可以继续补充分支和作者结局，并完成质量校验，才能创建可发布快照。
 
@@ -73,7 +78,7 @@ npm run dev
 | `npm run build` | Next 生产构建 |
 | `npm run start` | loopback 生产启动 |
 | `npm run verify` | typecheck、lint、Vitest、生产构建 |
-| `npm run test:e2e:authoring` | 生产构建下的 12 项完整 authoring E2E |
+| `npm run test:e2e:authoring` | 生产构建下的 14 项完整 authoring E2E |
 | `npm run db:authoring:smoke` | SQLite authoring 生命周期 smoke |
 | `npm run db:authoring:backup` | 迁移前 SQLite 备份、完整性和 SHA-256 检查 |
 | `npm run db:authoring:checkpoint` | 日常 SQLite checkpoint、manifest 和保留策略 |

@@ -144,6 +144,9 @@ function buildPrompt(input: InteractiveGenerationInput, language: string): strin
     `State memory: ${JSON.stringify(input.state)}`,
     `Previous scene: ${JSON.stringify(input.previousScene ?? null)}`,
     `Player choice: ${JSON.stringify(input.selectedChoice ?? null)}`,
+    input.selectedChoice
+      ? `Author selected direction: ${input.selectedChoice.label}. Honor this direction and show its direct consequence before presenting new choices.`
+      : "Author has not selected a direction yet; establish the opening situation before presenting choices.",
     `If a player choice is present, the new scene must show its direct consequence and move the story forward. Make the next choices materially different, with different risks and consequences.`,
     nextTurn >= input.state.targetTurns
       ? "This is the final planned turn. Resolve the main conflict, set isEnding to true, and return an empty choices array."

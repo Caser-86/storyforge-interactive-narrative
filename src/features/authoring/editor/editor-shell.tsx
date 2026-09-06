@@ -50,8 +50,8 @@ export function EditorShell({ project, graph, draftRevision: initialDraftRevisio
         </div>
         <div className="editor-top-actions">
           <span className="editor-save-state">本地草稿 · 修订 {project.activeDraftVersionId ? "可追踪" : "未初始化"}</span>
-          <Link className="button button-small button-quiet" href={`/projects/${project.id}/generate`}>生成流程</Link>
-          <Link className="button button-small button-quiet" href={`/projects/${project.id}/play`}>分支写作</Link>
+          <Link className="button button-small button-quiet" href={`/projects/${project.id}/generate`}>分支写作</Link>
+          <Link className="button button-small button-quiet" href={`/projects/${project.id}/generate/structured`}>一次性结构化生成</Link>
           <Link className="button button-small button-primary" href={`/projects/${project.id}/preview`}>预览</Link>
         </div>
       </header>
@@ -62,7 +62,17 @@ export function EditorShell({ project, graph, draftRevision: initialDraftRevisio
         </aside>
         <section className="editor-main-panel" aria-label="节点编辑区域">
           {graphSaveNotice ? <p className="editor-graph-save-notice" role="status">{graphSaveNotice}</p> : null}
-          {selectedNode ? (
+          {draftGraph.nodes.length === 0 ? (
+            <section className="editor-empty-state" aria-labelledby="editor-empty-title">
+              <p className="eyebrow">NO STORY NODES</p>
+              <h2 id="editor-empty-title">这个草稿还没有可编辑的节点</h2>
+              <p>当前图谱为空，无法从节点开始编辑。先进入分支写作，按你的选择逐幕生成故事。</p>
+              <div className="editor-empty-actions">
+                <Link className="button button-primary" href={`/projects/${project.id}/generate`}>开始分支写作</Link>
+                <Link className="button button-quiet" href={`/projects/${project.id}/generate/structured`}>重试一次性结构化生成</Link>
+              </div>
+            </section>
+          ) : selectedNode ? (
             <NodeCanvas
               projectId={project.id}
               node={selectedNode}
