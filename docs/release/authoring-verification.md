@@ -125,7 +125,7 @@
 - The follow-up run for `de8191f` passed `verify` but exposed a Windows runner contract mismatch: `RUNNER_TEMP` is a trusted CI temporary root but is not required to equal PowerShell's default `GetTempPath()`.
 - `fd76beb` fixes the package smoke scope to accept `RUNNER_TEMP` only when `GITHUB_ACTIONS=true`, while keeping the disposable root nested and rejecting the trusted temporary root itself. The cleanup path now uses the same verified roots instead of the removed `$tempRoot` variable.
 - Local regression evidence: the CI-equivalent generator suite passed `11/11`; the distribution contract suite passed `8/8`; a runner-temp lifecycle smoke passed clean install, health, upgrade, deliberately failed upgrade, rollback, and uninstall-preserves-data, then removed its disposable root.
-- GitHub Actions run `34418237947` for PR `#3` and commit `fd76beb` passed `verify`, `e2e-authoring`, `docker-build`, and `standalone-windows`. GitHub's Node.js 20 action-runtime deprecation annotation remains informational.
+- GitHub Actions run `34418237947` for PR `#3` and commit `fd76beb` passed `verify`, `e2e-authoring`, `docker-build`, and `standalone-windows`; the final documentation commit `fad001a` was independently rechecked by run `34418692175` with the same four jobs green. GitHub's Node.js 20 action-runtime deprecation annotation remains informational.
 - This is feature-branch CI evidence only. The candidate is not merged into `master`, and no new tag or GitHub Release was created. Human semantic scoring, real screen-reader/mobile acceptance, clean Windows account evidence, and author release approval remain open.
 
 ## v0.1.6 Author-Branch Editing Candidate (Historical)

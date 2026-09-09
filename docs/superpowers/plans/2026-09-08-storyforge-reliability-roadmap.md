@@ -184,7 +184,7 @@ flowchart TD
 
 - [x] CI `verify` job 已纳入 `npm run interactive:evaluate -- --provider fake`，离线互动 6/8/16 幕契约会随 CI 一起执行。
 - [x] `.github/workflows/ci.yml` 明确面向 `master` 的功能分支 PR 和 `workflow_dispatch` 手动验证入口；不依赖把每个临时工作树 push 到远程。
-- [x] 已记录提交并推送候选的精确 SHA 与远程 CI 结果：修复后提交 `fd76beb` 对应 GitHub Actions run `34418237947`，`verify`、`e2e-authoring`、`docker-build`、`standalone-windows` 全部通过；此前失败原因与修复记录见发布验证文档。
+- [x] 已记录提交并推送候选的精确 SHA 与远程 CI 结果：代码修复提交 `fd76beb` 对应 run `34418237947`，最终文档同步提交 `fad001a` 对应 run `34418692175`；两次的 `verify`、`e2e-authoring`、`docker-build`、`standalone-windows` 均通过。此前失败原因与修复记录见发布验证文档。
 - [x] `.github/workflows/ci.yml` 已声明 PowerShell 7.x 运行时检查、Windows runner 的 standalone/native SQLite 生命周期和 Linux Docker build/health smoke，二者分别构建，不共用原生二进制。
 - [x] 已取得提交后的真实远程结果：Windows standalone/native SQLite、Linux Docker build/health 和作者端 E2E 均通过；Node.js 20 action-runtime 弃用提示为非阻塞告警。
 - [x] 安装、升级失败、回滚、保留数据卸载、旧库恢复演练均使用隔离目录；本轮 package smoke、checkpoint restore-check 和 release evidence 均输出脱敏证据与校验和。
