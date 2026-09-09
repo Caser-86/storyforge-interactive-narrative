@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-import { initializeAuthoringDatabase } from "../database";
+import { acquireAuthoringDatabase } from "../database";
 import type { AuthoringDatabaseOptions } from "../database";
 import { AuthoringError } from "../errors";
 import type { JsonValue } from "../schemas";
@@ -83,7 +83,7 @@ export interface GenerationRepository {
   listSteps(runId: string): Promise<GenerationStep[]>;
   listCandidates(projectId: string, nodeId?: string): Promise<GenerationCandidate[]>;
   createCandidate(input: CreateGenerationCandidateInput): Promise<GenerationCandidate>;
-  applyCandidate(projectId: string, candidateId: string, expectedRevision: number): Promise<{ candidate: GenerationCandidate; node: StoryNode }>;
+  applyCandidate(projectId: string, candidateId: string, expectedRevision: number): Promise<{ candidate: GenerationCandidate; node: StoryNode; draftRevision: number }>;
   rejectCandidate(projectId: string, candidateId: string): Promise<GenerationCandidate>;
   getStep(stepId: string): Promise<GenerationStep>;
   leaseNextSteps(runId: string, now: Date, limit: number): Promise<GenerationStep[]>;
@@ -364,9 +364,11 @@ function ensureStepOrder(steps: GenerationStepDescriptor[]): GenerationStepDescr
 
 export class BetterSqliteGenerationRepository implements GenerationRepository {
   private readonly db: Database.Database;
+  private readonly databaseLease: ReturnType<typeof acquireAuthoringDatabase>;
 
   constructor(options: AuthoringDatabaseOptions = {}) {
-    this.db = initializeAuthoringDatabase(options);
+    this.databaseLease = acquireAuthoringDatabase(options);
+    this.db = this.databaseLease.database;
   }
 
   public async createRun(
@@ -567,10 +569,21 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
     }
   }
 
-  public async applyCandidate(projectId: string, candidateId: string, expectedRevision: number): Promise<{ candidate: GenerationCandidate; node: StoryNode }> {
+  public async applyCandidate(projectId: string, candidateId: string, expectedRevision: number): Promise<{ candidate: GenerationCandidate; node: StoryNode; draftRevision: number }> {
     try {
       const apply = this.db.transaction(() => {
         const candidate = this.requireCandidate(projectId, candidateId);
+        const project = this.db
+          .prepare("SELECT active_draft_version_id FROM projects WHERE id = ?")
+          .get(projectId) as { active_draft_version_id: string | null } | undefined;
+        if (!project) throw new AuthoringError("NOT_FOUND", "Project not found", { projectId });
+        if (project.active_draft_version_id !== candidate.versionId) {
+          throw new AuthoringError("CONFLICT", "Candidate belongs to an inactive draft version", {
+            candidateId,
+            candidateVersionId: candidate.versionId,
+            activeDraftVersionId: project.active_draft_version_id,
+          });
+        }
         if (candidate.status !== "pending") {
           throw new AuthoringError("VALIDATION", "Only pending candidates can be applied", { candidateId, status: candidate.status });
         }
@@ -603,11 +616,14 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
           .run(timestamp, candidateId);
         this.db.prepare("UPDATE story_versions SET draft_revision = draft_revision + 1 WHERE id = ?").run(candidate.versionId);
         this.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run(timestamp, projectId);
+        const draft = this.db
+          .prepare("SELECT draft_revision FROM story_versions WHERE id = ?")
+          .get(candidate.versionId) as { draft_revision: number };
 
         const updatedNode = this.db
           .prepare("SELECT * FROM story_nodes WHERE version_id = ? AND id = ?")
           .get(candidate.versionId, candidate.nodeId) as GenerationNodeRow;
-        return { candidate: this.requireCandidate(projectId, candidateId), node: toCandidateNode(updatedNode) };
+        return { candidate: this.requireCandidate(projectId, candidateId), node: toCandidateNode(updatedNode), draftRevision: draft.draft_revision };
       });
       return apply();
     } catch (error) {
@@ -1119,7 +1135,7 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
   }
 
   public close(): void {
-    this.db.close();
+    this.databaseLease.release();
   }
 
   private refreshRunAfterStepChange(

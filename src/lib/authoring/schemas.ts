@@ -130,7 +130,33 @@ export const StoryGraphSchema = z
     nodes: z.array(StoryNodeSchema),
     edges: z.array(StoryEdgeSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((graph, context) => {
+    const checkUnique = (collectionName: string, values: readonly string[], field: string): void => {
+      const seen = new Set<string>();
+
+      values.forEach((value, index) => {
+        if (seen.has(value)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [collectionName, index, field],
+            message: `Duplicate ${collectionName} ${field}: ${value}.`,
+          });
+        }
+        seen.add(value);
+      });
+    };
+
+    checkUnique("chapters", graph.chapters.map((chapter) => chapter.id), "id");
+    checkUnique("nodes", graph.nodes.map((node) => node.id), "id");
+    checkUnique("nodes", graph.nodes.map((node) => node.nodeKey), "nodeKey");
+    checkUnique("edges", graph.edges.map((edge) => edge.id), "id");
+    checkUnique(
+      "edges",
+      graph.edges.map((edge) => `${edge.sourceNodeId}\u0000${edge.targetNodeId}\u0000${edge.label}`),
+      "relation",
+    );
+  });
 
 export const ProjectSchema = z
   .object({

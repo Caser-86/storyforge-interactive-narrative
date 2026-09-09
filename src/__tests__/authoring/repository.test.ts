@@ -180,6 +180,27 @@ describe("authoring repository", () => {
     expect(versions).toEqual([{ kind: "draft", project_id: project.id }]);
   });
 
+  it("creates an isolated active draft for a fresh generation", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(fixtureBrief());
+    const sourceVersionId = project.activeDraftVersionId!;
+    const sourceGraph = await repo.replaceDraftGraph(project.id, populatedGraph(sourceVersionId), 0);
+
+    const fresh = await repo.createGenerationDraft(project.id);
+    const freshGraph = await repo.getProjectGraph(project.id, fresh.version.id);
+
+    expect(fresh.project.activeDraftVersionId).toBe(fresh.version.id);
+    expect(fresh.version.id).not.toBe(sourceVersionId);
+    expect(fresh.version.sourceVersionId).toBe(sourceVersionId);
+    const sourceNodesByKey = new Map(sourceGraph.nodes.map((item) => [item.nodeKey, item]));
+    const sourceNodeKeys = sourceGraph.nodes.map((item) => item.nodeKey).sort();
+    const freshNodeKeys = freshGraph.nodes.map((item) => item.nodeKey).sort();
+    expect(freshNodeKeys).toEqual(sourceNodeKeys);
+    expect(freshNodeKeys.map((key) => sourceNodesByKey.get(key)?.body)).toEqual(freshNodeKeys.map((key) => freshGraph.nodes.find((item) => item.nodeKey === key)?.body));
+    expect(freshGraph.nodes.map((item) => item.id).sort()).not.toEqual(sourceGraph.nodes.map((item) => item.id).sort());
+    await expect(repo.getProjectGraph(project.id, sourceVersionId)).resolves.toEqual(sourceGraph);
+  });
+
   it("rolls back an invalid graph replacement", async () => {
     const repo = createRepo();
     const project = await repo.createProject(fixtureBrief());
@@ -262,7 +283,8 @@ describe("authoring repository", () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('projects', 'story_versions')")
         .all();
 
-      expect(migrations).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }]);
+      expect(migrations).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 }, { version: 13 }]);
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_interactive_sessions_project_updated_id'").get()).toEqual({ name: "idx_interactive_sessions_project_updated_id" });
       expect(projectTables).toEqual([{ name: "projects" }, { name: "story_versions" }]);
     } finally {
       db.close();
@@ -445,5 +467,39 @@ describe("authoring repository", () => {
       title: "Clockwork Orchard",
       size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
     });
+  });
+
+  it("counts blocking issues using each project's graph limits", async () => {
+    const repo = createRepo();
+    const project = await repo.createProject(fixtureBrief({
+      size: { preset: "custom", targetNodes: 8, targetEndings: 2 },
+    }));
+    const graph = populatedGraph(project.activeDraftVersionId!);
+    const leftDetail = graph.nodes.find((item) => item.nodeKey === "left-detail")!;
+    const leftToDetail = graph.edges.find((item) => item.targetNodeId === leftDetail.id)!;
+    const extraNode = {
+      ...leftDetail,
+      id: `${graph.versionId}-node-extra`,
+      nodeKey: "extra",
+      title: "Extra scene",
+      body: "The courier finds another route.",
+      topologicalRank: leftDetail.topologicalRank,
+    };
+    const extraEdge = {
+      ...leftToDetail,
+      id: `${graph.versionId}-edge-extra-detail`,
+      sourceNodeId: extraNode.id,
+      targetNodeId: leftDetail.id,
+      label: "Continue through the gallery",
+    };
+
+    await repo.replaceDraftGraph(project.id, {
+      ...graph,
+      nodes: [...graph.nodes, extraNode],
+      edges: graph.edges.map((item) => item.id === leftToDetail.id ? { ...item, targetNodeId: extraNode.id } : item).concat(extraEdge),
+    }, 0);
+
+    const listedProject = (await repo.listProjects()).find((item) => item.id === project.id);
+    expect(listedProject?.blockingIssueCount).toBe(1);
   });
 });

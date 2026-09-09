@@ -50,7 +50,12 @@ test.describe("authoring accessibility", () => {
 
     await page.goto("/projects/" + project.id + "/generate");
     await expect(page.locator("main")).toBeVisible();
+    await expect(page.getByRole("button", { name: "开始分支写作" })).toBeVisible();
     await expectAccessible(page, "generation");
+
+    await page.goto("/projects/" + project.id + "/generate/structured");
+    await expect(page.locator("main")).toBeVisible();
+    await expectAccessible(page, "structured generation");
 
     await page.goto("/projects/" + project.id + "/edit");
     await expect(page.locator("main")).toBeVisible();

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { readIntEnv } from "../../env";
 import { AuthoringError } from "../errors";
 import type { ProjectSize } from "../schemas";
+import { DEFAULT_OPENAI_MODEL } from "./defaults";
 import { STAGE_MAX_TOKENS } from "./prompts";
 
 const MAX_RETRY_ATTEMPTS = 3;
@@ -9,7 +10,7 @@ const CONFIRMATION_CALL_THRESHOLD = 60;
 const CONFIRMATION_OUTPUT_THRESHOLD = 150_000;
 const DEFAULT_OUTPUT_PRICE_ENV = "STORYFORGE_OUTPUT_PRICE_PER_MILLION";
 
-export const DEFAULT_GENERATION_MODEL = "deepseek-v4-flash";
+export const DEFAULT_GENERATION_MODEL = DEFAULT_OPENAI_MODEL;
 
 export const GenerationBudgetSchema = z
   .object({

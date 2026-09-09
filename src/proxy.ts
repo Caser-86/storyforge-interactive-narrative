@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { errorResponse } from "@/lib/authoring/api-contracts";
+import { assertLocalWriteRequest } from "@/lib/authoring/request-security";
 
 function contentSecurityPolicy(nonce: string, isDevelopment: boolean): string {
   return [
@@ -19,9 +21,15 @@ function contentSecurityPolicy(nonce: string, isDevelopment: boolean): string {
 
 export default async function proxy(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  let response: Response;
+  try {
+    assertLocalWriteRequest(request);
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-nonce", nonce);
+    response = NextResponse.next({ request: { headers: requestHeaders } });
+  } catch (error) {
+    response = errorResponse(error);
+  }
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");

@@ -1,4 +1,5 @@
 import { createAuthoringRepository } from "@/lib/authoring/repository";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { createGenerationRepository } from "@/lib/authoring/generation/repository";
 import { createValidationRepository } from "@/lib/authoring/validation/repository";
 import {
@@ -25,9 +26,10 @@ export async function POST(request: Request, { params }: ProjectRouteContext): P
     return errorResponse(error);
   }
 
-  const authoringRepository = createAuthoringRepository();
-  const validationRepository = createValidationRepository();
-  const generationRepository = createGenerationRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoringRepository = createAuthoringRepository(databaseScope.options);
+  const validationRepository = createValidationRepository(databaseScope.options);
+  const generationRepository = createGenerationRepository(databaseScope.options);
   try {
     const service = createValidationService({ authoringRepository, validationRepository, generationRepository });
     const result = await service.validateDraft(projectId, input.sources ?? DEFAULT_VALIDATION_SOURCES);
@@ -38,13 +40,15 @@ export async function POST(request: Request, { params }: ProjectRouteContext): P
     authoringRepository.close();
     validationRepository.close();
     generationRepository.close();
+    databaseScope.close();
   }
 }
 
 export async function GET(_request: Request, { params }: ProjectRouteContext): Promise<Response> {
-  const authoringRepository = createAuthoringRepository();
-  const validationRepository = createValidationRepository();
-  const generationRepository = createGenerationRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoringRepository = createAuthoringRepository(databaseScope.options);
+  const validationRepository = createValidationRepository(databaseScope.options);
+  const generationRepository = createGenerationRepository(databaseScope.options);
   try {
     const { projectId } = await params;
     const service = createValidationService({ authoringRepository, validationRepository, generationRepository });
@@ -55,5 +59,6 @@ export async function GET(_request: Request, { params }: ProjectRouteContext): P
     authoringRepository.close();
     validationRepository.close();
     generationRepository.close();
+    databaseScope.close();
   }
 }

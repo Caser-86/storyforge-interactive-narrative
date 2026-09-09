@@ -1,19 +1,19 @@
 import type Database from "better-sqlite3";
 import { createHash, randomUUID } from "crypto";
-import { initializeAuthoringDatabase } from "../database";
+import { acquireAuthoringDatabase } from "../database";
+import type { AuthoringDatabaseOptions } from "../database";
 import { AuthoringError } from "../errors";
 import { JsonValueSchema } from "../schemas";
 import {
   ValidationIssueInputSchema,
   ValidationIssueRecordSchema,
   ValidationRunSchema,
+  ValidationRunStatusSchema,
+  ValidationSourceSchema,
 } from "./schemas";
 import type { ValidationIssueInput, ValidationIssueRecord, ValidationRun, ValidationSource, ValidationSeverity } from "./schemas";
 
-export interface ValidationRepositoryOptions {
-  dbPath?: string;
-  backupDir?: string;
-}
+export type ValidationRepositoryOptions = AuthoringDatabaseOptions;
 
 export interface ValidationRepository {
   createRun(projectId: string, versionId: string, draftRevision: number, sources: ValidationSource[]): Promise<ValidationRun>;
@@ -118,21 +118,27 @@ function fingerprintFor(issue: ValidationIssueInput): string {
 
 export class BetterSqliteValidationRepository implements ValidationRepository {
   private readonly db: Database.Database;
+  private readonly databaseLease: ReturnType<typeof acquireAuthoringDatabase>;
 
   constructor(options: ValidationRepositoryOptions = {}) {
-    this.db = initializeAuthoringDatabase(options);
+    this.databaseLease = acquireAuthoringDatabase(options);
+    this.db = this.databaseLease.database;
   }
 
   public async createRun(projectId: string, versionId: string, draftRevision: number, sources: ValidationSource[]): Promise<ValidationRun> {
     try {
-      const row = this.db
-        .prepare("SELECT 1 FROM story_versions WHERE project_id = ? AND id = ?")
-        .get(projectId, versionId);
-      if (!row) throw new AuthoringError("NOT_FOUND", "Validation version not found", { projectId, versionId });
-      const id = randomUUID();
-      const createdAt = nowIso();
-      this.db.prepare("INSERT INTO validation_runs (id, project_id, version_id, draft_revision, sources_json, status, created_at) VALUES (?, ?, ?, ?, ?, 'running', ?)").run(id, projectId, versionId, draftRevision, JSON.stringify(sources), createdAt);
-      return this.getRun(id);
+      const validatedSources = ValidationSourceSchema.array().parse(sources);
+      const create = this.db.transaction(() => {
+        const row = this.db
+          .prepare("SELECT 1 FROM story_versions WHERE project_id = ? AND id = ?")
+          .get(projectId, versionId);
+        if (!row) throw new AuthoringError("NOT_FOUND", "Validation version not found", { projectId, versionId });
+        const id = randomUUID();
+        const createdAt = nowIso();
+        this.db.prepare("INSERT INTO validation_runs (id, project_id, version_id, draft_revision, sources_json, status, created_at) VALUES (?, ?, ?, ?, ?, 'running', ?)").run(id, projectId, versionId, draftRevision, JSON.stringify(validatedSources), createdAt);
+        return this.getRun(id);
+      });
+      return create();
     } catch (error) {
       throw storageError(error, "Failed to create validation run");
     }
@@ -140,10 +146,14 @@ export class BetterSqliteValidationRepository implements ValidationRepository {
 
   public async completeRun(runId: string, status: "completed" | "failed" = "completed", errorMessage?: string): Promise<ValidationRun> {
     try {
-      const completedAt = nowIso();
-      const result = this.db.prepare("UPDATE validation_runs SET status = ?, error_message = ?, completed_at = ? WHERE id = ?").run(status, errorMessage ?? null, completedAt, runId);
-      if (result.changes !== 1) throw new AuthoringError("NOT_FOUND", "Validation run not found", { runId });
-      return this.getRun(runId);
+      const validatedStatus = ValidationRunStatusSchema.parse(status);
+      const complete = this.db.transaction(() => {
+        const completedAt = nowIso();
+        const result = this.db.prepare("UPDATE validation_runs SET status = ?, error_message = ?, completed_at = ? WHERE id = ?").run(validatedStatus, errorMessage ?? null, completedAt, runId);
+        if (result.changes !== 1) throw new AuthoringError("NOT_FOUND", "Validation run not found", { runId });
+        return this.getRun(runId);
+      });
+      return complete();
     } catch (error) {
       throw storageError(error, "Failed to complete validation run");
     }
@@ -221,8 +231,6 @@ export class BetterSqliteValidationRepository implements ValidationRepository {
 
   public async dismissWarning(issueId: string): Promise<ValidationIssueRecord> {
     try {
-      const issue = this.getIssue(issueId);
-      if (issue.severity === "blocking") throw new AuthoringError("VALIDATION", "Blocking validation issues cannot be dismissed", { issueId });
       return this.updateIssue(issueId, "dismissed");
     } catch (error) {
       throw storageError(error, "Failed to dismiss validation warning");
@@ -230,7 +238,7 @@ export class BetterSqliteValidationRepository implements ValidationRepository {
   }
 
   public close(): void {
-    this.db.close();
+    this.databaseLease.release();
   }
 
   private getRun(runId: string): ValidationRun {
@@ -246,10 +254,16 @@ export class BetterSqliteValidationRepository implements ValidationRepository {
   }
 
   private updateIssue(issueId: string, status: "resolved" | "dismissed"): ValidationIssueRecord {
-    this.getIssue(issueId);
-    const resolvedAt = nowIso();
-    this.db.prepare("UPDATE validation_issues SET status = ?, resolved_at = ? WHERE id = ?").run(status, resolvedAt, issueId);
-    return this.getIssue(issueId);
+    const update = this.db.transaction(() => {
+      const issue = this.getIssue(issueId);
+      if (status === "dismissed" && issue.severity === "blocking") {
+        throw new AuthoringError("VALIDATION", "Blocking validation issues cannot be dismissed", { issueId });
+      }
+      const resolvedAt = nowIso();
+      this.db.prepare("UPDATE validation_issues SET status = ?, resolved_at = ? WHERE id = ?").run(status, resolvedAt, issueId);
+      return this.getIssue(issueId);
+    });
+    return update();
   }
 
   private listIssueRows(projectId: string, versionId?: string, draftRevision?: number, source?: ValidationSource): IssueRow[] {

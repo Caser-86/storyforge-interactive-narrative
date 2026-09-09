@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+
 export type ProviderErrorCode = "AUTH" | "RATE_LIMIT" | "TIMEOUT" | "NETWORK" | "EMPTY" | "SCHEMA" | "UNKNOWN";
 
 export class ProviderError extends Error {
@@ -38,6 +40,13 @@ export function classifyProviderError(error: unknown): ProviderError {
     return error;
   }
 
+  if (error instanceof ZodError) {
+    return new ProviderError("SCHEMA", "Provider response failed schema validation", false, {
+      details: { issueCount: error.issues.length },
+      cause: error,
+    });
+  }
+
   const source = asErrorLike(error);
   const status = source.status ?? source.response?.status;
   const code = source.code?.toUpperCase();
@@ -52,7 +61,13 @@ export function classifyProviderError(error: unknown): ProviderError {
     return new ProviderError("RATE_LIMIT", message, true, { status, cause: error });
   }
 
-  if (status === 408 || name === "TIMEOUT" || code === "ETIMEDOUT" || code === "ABORT_ERR") {
+  if (
+    status === 408
+    || name === "TIMEOUT"
+    || code === "ETIMEDOUT"
+    || code === "ABORT_ERR"
+    || /timed?\s*out|timeout|deadline\s+exceeded/i.test(message)
+  ) {
     return new ProviderError("TIMEOUT", message, true, { status, cause: error });
   }
 

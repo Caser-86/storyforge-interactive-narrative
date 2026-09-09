@@ -16,7 +16,7 @@ test.describe("generation cancellation", () => {
     expect(projectResponse.ok()).toBe(true);
     const project = (await projectResponse.json()).project as { id: string };
 
-    await page.goto(`/projects/${project.id}/generate`);
+    await page.goto(`/projects/${project.id}/generate/structured`);
     await expect(page.getByText("准备生成")).toBeVisible();
     await page.getByRole("button", { name: "取消流程" }).click();
 

@@ -4,6 +4,7 @@ import { ValidationIssueActionSchema } from "@/lib/authoring/validation/service"
 import { ValidationIssueRecordSchema } from "@/lib/authoring/validation/schemas";
 import { AuthoringError } from "@/lib/authoring/errors";
 import { errorResponse, json, readJsonBody } from "@/lib/authoring/api-contracts";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { z } from "zod";
 
 type IssueRouteContext = { params: Promise<{ projectId: string; issueId: string }> };
@@ -20,8 +21,9 @@ export async function PATCH(request: Request, { params }: IssueRouteContext): Pr
     return errorResponse(error);
   }
 
-  const authoringRepository = createAuthoringRepository();
-  const validationRepository = createValidationRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoringRepository = createAuthoringRepository(databaseScope.options);
+  const validationRepository = createValidationRepository(databaseScope.options);
   try {
     const issue = (await validationRepository.listIssues(projectId)).find((candidate) => candidate.id === issueId);
     if (!issue) {
@@ -36,5 +38,6 @@ export async function PATCH(request: Request, { params }: IssueRouteContext): Pr
   } finally {
     authoringRepository.close();
     validationRepository.close();
+    databaseScope.close();
   }
 }

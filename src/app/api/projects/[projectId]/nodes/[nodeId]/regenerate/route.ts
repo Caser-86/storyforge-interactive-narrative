@@ -5,6 +5,7 @@ import type { NodeRegenerateInput } from "@/lib/authoring/generation/api-contrac
 import { OpenAICompatibleGenerationProvider } from "@/lib/authoring/generation/openai-provider";
 import { FakeGenerationProvider } from "@/lib/authoring/generation/fake-provider";
 import { createGenerationRepository } from "@/lib/authoring/generation/repository";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { executeNodeBatch } from "@/lib/authoring/generation/stages/nodes";
 import type { GenerationProjectContext } from "@/lib/authoring/generation/prompts";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
@@ -22,8 +23,9 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
     return errorResponse(error);
   }
 
-  const authoring = createAuthoringRepository();
-  const generation = createGenerationRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoring = createAuthoringRepository(databaseScope.options);
+  const generation = createGenerationRepository(databaseScope.options);
   try {
     const { projectId, nodeId } = await params;
     const project = await authoring.getProject(projectId);
@@ -79,5 +81,6 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
   } finally {
     generation.close();
     authoring.close();
+    databaseScope.close();
   }
 }

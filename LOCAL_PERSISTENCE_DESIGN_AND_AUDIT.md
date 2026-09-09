@@ -1,5 +1,7 @@
 # StoryForge 本地持久化设计与项目问题审查报告
 
+> **归档说明：** 本文件记录 2026-05 旧版 PostgreSQL/Redis 持久化方案审查，当前实现已迁移到本地 SQLite authoring。当前文档入口见 `README.md`、`docs/README.md` 和 `docs/release/authoring-verification.md`。
+
 生成日期：2026-05-20  
 项目路径：`D:\Files\基于LLM的全自动独立游戏互动游戏叙事生成器\narrative-game`
 

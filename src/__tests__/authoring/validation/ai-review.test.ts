@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { FakeGenerationProvider } from "@/lib/authoring/generation/fake-provider";
+import type { StructuredGenerationRequest } from "@/lib/authoring/generation/provider";
 import { AiReviewOutputSchema } from "@/lib/authoring/validation/ai-review-schema";
+import type { AiReviewOutput } from "@/lib/authoring/validation/ai-review-schema";
 import { runAiContinuityReview, type AiReviewInput } from "@/lib/authoring/validation/ai-review";
 
 function input(provider: FakeGenerationProvider): AiReviewInput {
@@ -36,6 +38,14 @@ const warningIssue = {
 };
 
 describe("AI continuity review", () => {
+  it("exposes the transformed schema as a provider output schema", () => {
+    const request: Pick<StructuredGenerationRequest<AiReviewOutput>, "outputSchema"> = {
+      outputSchema: AiReviewOutputSchema,
+    };
+
+    expect(request.outputSchema).toBe(AiReviewOutputSchema);
+  });
+
   it("rejects unknown automatic edit fields and unsupported issue codes", () => {
     expect(AiReviewOutputSchema.safeParse({
       passed: false,
@@ -46,6 +56,13 @@ describe("AI continuity review", () => {
       passed: false,
       issues: [{ ...warningIssue, code: "REWRITE_NODE" }],
     }).success).toBe(false);
+  });
+
+  it("normalizes a model's warning-shaped review output to the canonical issue contract", () => {
+    expect(AiReviewOutputSchema.parse({ warnings: [warningIssue] })).toEqual({
+      passed: false,
+      issues: [warningIssue],
+    });
   });
 
   it("reviews each chapter and then globally, coercing every AI finding to a warning", async () => {

@@ -1,5 +1,7 @@
 # StoryForge 项目深度审核与整改执行清单
 
+> **归档说明：** 本文件记录 2026-05 旧版整改清单，部分接口和基础设施已退役，不代表当前实现。当前文档入口见 `README.md`、`docs/README.md` 和 `docs/release/authoring-verification.md`。
+
 生成日期：2026-05-18  
 项目路径：`D:\Files\基于LLM的全自动独立游戏互动游戏叙事生成器\narrative-game`  
 当前产品方向：先做稳定的对话剧情推进和分支选择生成；场景图为附属功能，默认关闭，后续可按局开启。

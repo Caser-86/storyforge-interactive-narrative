@@ -35,7 +35,7 @@ test.describe("authoring generation pipeline", () => {
     expect(createRun.status()).toBe(201);
     const run = (await createRun.json()).run as { id: string };
 
-    const firstNext = await request.post(`/api/projects/${project.id}/generation/${run.id}/next`);
+    const firstNext = await request.post(`/api/projects/${project.id}/generation/${run.id}/next`, { headers: { "x-storyforge-cli": "1" } });
     expect(firstNext.ok()).toBe(true);
     expect((await firstNext.json()).leasedSteps.length).toBeLessThanOrEqual(2);
 
@@ -46,7 +46,7 @@ test.describe("authoring generation pipeline", () => {
 
     let finalRun: { status: string; progressCurrent: number; progressTotal: number } | undefined;
     for (let attempt = 0; attempt < 30; attempt += 1) {
-      const next = await request.post(`/api/projects/${project.id}/generation/${run.id}/next`);
+      const next = await request.post(`/api/projects/${project.id}/generation/${run.id}/next`, { headers: { "x-storyforge-cli": "1" } });
       expect(next.ok()).toBe(true);
       const payload = await next.json();
       finalRun = payload.run;

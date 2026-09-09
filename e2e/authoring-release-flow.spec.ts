@@ -33,7 +33,7 @@ test.describe("authoring release gate", () => {
     const run = (await runResponse.json()).run as { id: string };
     let finalRun: { status: string } | undefined;
     for (let attempt = 0; attempt < 30; attempt += 1) {
-      const next = await request.post(`/api/projects/${project.id}/generation/${run.id}/next`);
+      const next = await request.post(`/api/projects/${project.id}/generation/${run.id}/next`, { headers: { "x-storyforge-cli": "1" } });
       expect(next.ok()).toBe(true);
       finalRun = (await next.json()).run;
       if (finalRun?.status === "completed") break;
@@ -80,7 +80,7 @@ test.describe("authoring release gate", () => {
     expect(decision.ok()).toBe(true);
     expect((await decision.json()).allowed).toBe(true);
 
-    const snapshot = await request.post(`/api/projects/${targetProjectId}/snapshots`);
+    const snapshot = await request.post(`/api/projects/${targetProjectId}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshot.status()).toBe(201);
     const snapshotId = (await snapshot.json()).snapshot.id as string;
     const html = await request.get(`/api/projects/${targetProjectId}/export/html?snapshotId=${snapshotId}`);
@@ -90,7 +90,7 @@ test.describe("authoring release gate", () => {
     const backupResponse = await request.get(`/api/projects/${targetProjectId}/backup`);
     expect(backupResponse.ok()).toBe(true);
     const backup = await backupResponse.json();
-    const deleted = await request.delete(`/api/projects/${targetProjectId}`);
+    const deleted = await request.delete(`/api/projects/${targetProjectId}`, { headers: { "x-storyforge-cli": "1" } });
     expect(deleted.status()).toBe(204);
 
     const imported = await request.post("/api/projects/import", { data: { backup, mode: "new-id" } });

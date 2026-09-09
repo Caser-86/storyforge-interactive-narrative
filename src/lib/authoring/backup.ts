@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { z } from "zod";
+import { redactSensitiveText } from "@/lib/errors";
 import { AuthoringError } from "./errors";
 import { getAuthoringDbPath, initializeAuthoringDatabase } from "./database";
 import {
@@ -132,6 +133,7 @@ const BackupInteractiveSessionSchema = z
     targetTurns: z.number().int().min(2).max(40),
     state: InteractiveStateSchema,
     currentTurnId: z.string().min(1).nullable(),
+    materializedVersionId: z.string().min(1).nullable().default(null),
     lastError: z.string().min(1).nullable(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
@@ -211,10 +213,7 @@ function parseJson(text: string): JsonValue {
 
 function safeMessage(value: string | null): string | null {
   if (!value) return null;
-  return value
-    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
-    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-[redacted]")
-    .replace(/https?:\/\/[^\s/]+:[^\s/@]+@/gi, "[redacted]@");
+  return redactSensitiveText(value);
 }
 
 function storageError(error: unknown, message: string): AuthoringError {
@@ -422,6 +421,7 @@ function readProjectBackup(db: Database.Database, projectId: string): ProjectBac
       targetTurns: row.target_turns,
       state: InteractiveStateSchema.parse(JSON.parse(String(row.state_json))),
       currentTurnId: row.current_turn_id,
+      materializedVersionId: (row.materialized_version_id as string | null | undefined) ?? null,
       lastError: safeMessage(row.last_error as string | null),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -570,16 +570,41 @@ function mapIds(backup: ProjectBackup, remap: boolean): {
     })),
   };
   const mappedInteractive = {
-    sessions: interactive.sessions.map((session) => ({
-      ...session,
-      id: interactiveSessionIds.get(session.id)!,
-      projectId,
-      currentTurnId: session.currentTurnId ? interactiveTurnIds.get(session.currentTurnId) ?? null : null,
-    })),
+    sessions: interactive.sessions.map((session) => {
+      const currentTurnId = session.currentTurnId ? interactiveTurnIds.get(session.currentTurnId) ?? null : null;
+      if (session.status !== "generating") {
+        return {
+          ...session,
+          id: interactiveSessionIds.get(session.id)!,
+          projectId,
+          currentTurnId,
+          materializedVersionId: session.materializedVersionId ? versionIds.get(session.materializedVersionId) ?? null : null,
+        };
+      }
+
+      const hasCurrentScene = currentTurnId !== null && interactive.turns.some((turn) => turn.id === session.currentTurnId);
+      return {
+        ...session,
+        id: interactiveSessionIds.get(session.id)!,
+        projectId,
+        status: hasCurrentScene ? "active" as const : "failed" as const,
+        currentTurnId,
+        lastError: hasCurrentScene
+          ? "项目 JSON 备份未包含进行中的生成任务，当前选择已恢复，请重新选择。"
+          : "项目 JSON 备份未包含进行中的开场任务，请重新生成开场。",
+        materializedVersionId: session.materializedVersionId ? versionIds.get(session.materializedVersionId) ?? null : null,
+      };
+    }),
     turns: interactive.turns.map((turn) => ({
       ...turn,
       id: interactiveTurnIds.get(turn.id)!,
       sessionId: interactiveSessionIds.get(turn.sessionId)!,
+      selectedChoiceId: interactive.sessions.find((session) => session.id === turn.sessionId && session.status === "generating" && session.currentTurnId === turn.id)
+        ? null
+        : turn.selectedChoiceId,
+      selectedAt: interactive.sessions.find((session) => session.id === turn.sessionId && session.status === "generating" && session.currentTurnId === turn.id)
+        ? null
+        : turn.selectedAt,
     })),
   };
 
@@ -608,7 +633,7 @@ function assertRelations(backup: ProjectBackup): void {
   for (const candidate of backup.generation.candidates) if (candidate.projectId !== backup.project.id || !versionIds.has(candidate.versionId) || !nodeIds.has(candidate.nodeId) || (candidate.runId && !runIds.has(candidate.runId)) || (candidate.stepId && !stepIds.has(candidate.stepId))) throw new Error("generation candidate relation is invalid");
   for (const run of backup.validation.runs) if (run.projectId !== backup.project.id || !versionIds.has(run.versionId)) throw new Error("validation run relation is invalid");
   for (const issue of backup.validation.issues) if (issue.projectId !== backup.project.id || !versionIds.has(issue.versionId) || (issue.runId && !validationRunIds.has(issue.runId)) || (issue.nodeId && !nodeIds.has(issue.nodeId))) throw new Error("validation issue relation is invalid");
-  for (const session of interactive.sessions) if (session.projectId !== backup.project.id || (session.currentTurnId && !interactiveTurnIds.has(session.currentTurnId))) throw new Error("interactive session relation is invalid");
+  for (const session of interactive.sessions) if (session.projectId !== backup.project.id || (session.currentTurnId && !interactiveTurnIds.has(session.currentTurnId)) || (session.materializedVersionId && !versionIds.has(session.materializedVersionId))) throw new Error("interactive session relation is invalid");
   for (const turn of interactive.turns) if (!interactiveSessionIds.has(turn.sessionId) || (turn.selectedChoiceId && !turn.scene.choices.some((choice) => choice.id === turn.selectedChoiceId))) throw new Error("interactive turn relation is invalid");
 }
 
@@ -639,8 +664,8 @@ function insertBackup(db: Database.Database, backup: ProjectBackup, mode: "new-i
   for (const run of mapped.validation.runs) insertValidationRun.run(run.id, run.projectId, run.versionId, run.draftRevision, JSON.stringify(run.sources), run.status, run.errorMessage, run.createdAt, run.completedAt);
   const insertValidationIssue = db.prepare("INSERT INTO validation_issues (id, project_id, version_id, run_id, draft_revision, source, severity, code, message, node_id, edge_id, details_json, fingerprint, status, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const issue of mapped.validation.issues) insertValidationIssue.run(issue.id, issue.projectId, issue.versionId, issue.runId, issue.draftRevision, issue.source, issue.severity, issue.code, issue.message, issue.nodeId, issue.edgeId, JSON.stringify(issue.detailsJson), issue.fingerprint, issue.status, issue.createdAt, issue.resolvedAt);
-  const insertInteractiveSession = db.prepare("INSERT INTO interactive_sessions (id, project_id, status, turn, target_turns, state_json, current_turn_id, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  for (const session of mapped.interactive.sessions) insertInteractiveSession.run(session.id, session.projectId, session.status, session.turn, session.targetTurns, JSON.stringify(session.state), session.currentTurnId, session.lastError, session.createdAt, session.updatedAt);
+  const insertInteractiveSession = db.prepare("INSERT INTO interactive_sessions (id, project_id, status, turn, target_turns, state_json, current_turn_id, last_error, materialized_version_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  for (const session of mapped.interactive.sessions) insertInteractiveSession.run(session.id, session.projectId, session.status, session.turn, session.targetTurns, JSON.stringify(session.state), session.currentTurnId, session.lastError, session.materializedVersionId, session.createdAt, session.updatedAt);
   const insertInteractiveTurn = db.prepare("INSERT INTO interactive_turns (id, session_id, turn, scene_json, selected_choice_id, selected_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
   for (const turn of mapped.interactive.turns) insertInteractiveTurn.run(turn.id, turn.sessionId, turn.turn, JSON.stringify(turn.scene), turn.selectedChoiceId, turn.selectedAt, turn.createdAt);
   return mapped.project;

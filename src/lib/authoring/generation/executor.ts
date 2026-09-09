@@ -1,5 +1,6 @@
 import type { JsonValue } from "../schemas";
 import { AuthoringError } from "../errors";
+import { redactSensitiveText } from "@/lib/errors";
 import type { GenerationRepository } from "./repository";
 import type { GenerationRun, GenerationStage, GenerationStep } from "./schemas";
 import type { GenerationStepDescriptor } from "./schemas";
@@ -7,11 +8,14 @@ import { ProviderError } from "./provider-errors";
 import { retryDecision } from "./retry";
 
 function storedGenerationErrorMessage(error: ProviderError): string {
+  let message: string;
   if (error.code === "SCHEMA" && error.details !== undefined && typeof error.details === "object") {
-    return `${error.message}: ${JSON.stringify(error.details)}`;
+    message = `${error.message}: ${JSON.stringify(error.details)}`;
+  } else {
+    message = error.message;
   }
 
-  return error.message;
+  return redactSensitiveText(message).slice(0, 500);
 }
 
 function exceedsHardOutputCap(run: GenerationRun, additionalOutputTokens = 0): boolean {

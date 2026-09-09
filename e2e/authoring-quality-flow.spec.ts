@@ -85,7 +85,7 @@ test.describe("authoring quality loop", () => {
     const revalidated = await request.post(`/api/projects/${project.id}/validate`, { data: { sources: ["structural", "rule"] } });
     const revalidatedPayload = await revalidated.json();
     expect(revalidatedPayload.allowed).toBe(true);
-    const snapshot = await request.post(`/api/projects/${project.id}/snapshots`);
+    const snapshot = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshot.status()).toBe(201);
 
     await page.goto(`/projects/${project.id}/preview`);

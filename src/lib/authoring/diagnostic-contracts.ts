@@ -9,6 +9,7 @@ export const DiagnosticReportSchema = z
       .object({
         status: z.enum(["ok", "error"]),
         migrationVersion: z.number().int().min(0).nullable(),
+        pendingMigrations: z.boolean(),
         integrity: z.enum(["ok", "error", "unknown"]),
         writable: z.boolean(),
       })

@@ -6,6 +6,7 @@ import {
   NodePatchInputSchema,
   NodePatchResponseSchema,
   StoryGraphResponseSchema,
+  MAX_GRAPH_WRITE_BYTES,
   errorResponse,
   json,
   parseVersionIdFromRequest,
@@ -43,7 +44,7 @@ export async function PUT(request: Request, { params }: ProjectRouteContext): Pr
 
   try {
     ({ projectId } = await params);
-    input = await readJsonBody(request, GraphWriteInputSchema);
+    input = await readJsonBody(request, GraphWriteInputSchema, MAX_GRAPH_WRITE_BYTES);
   } catch (error) {
     return errorResponse(error);
   }

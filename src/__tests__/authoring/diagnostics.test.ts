@@ -55,7 +55,8 @@ describe("authoring diagnostics", () => {
     });
 
     expect(DiagnosticReportSchema.parse(report)).toEqual(report);
-    expect(report.database.migrationVersion).toBe(8);
+    expect(report.database.migrationVersion).toBe(13);
+    expect(report.database.pendingMigrations).toBe(false);
     expect(report.database.integrity).toBe("ok");
     expect(report.database.writable).toBe(true);
     expect(report.backup.freshness).toBe("missing");

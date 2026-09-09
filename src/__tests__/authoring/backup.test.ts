@@ -243,6 +243,30 @@ describe("authoring project backup", () => {
     expect((await repo().getProject(project.id)).title).toBe("潮汐档案");
   });
 
+  it("does not restore an in-flight JSON session into a permanently generating state", async () => {
+    const project = await createProjectWithGraph();
+    const database = new Database(dbPath);
+    try {
+      database.prepare("UPDATE interactive_sessions SET status = 'generating', generation_token = 'in-flight-token', last_error = NULL WHERE id = ?").run("interactive-session-1");
+      database.prepare("UPDATE interactive_turns SET selected_choice_id = 'choice_a', selected_at = ? WHERE id = ?").run("2026-08-21T00:00:03.000Z", "interactive-turn-2");
+    } finally {
+      database.close();
+    }
+
+    const backup = await exportProjectBackup(project.id, { dbPath, backupDir });
+    const imported = await importProjectBackup(backup, "new-id", { dbPath, backupDir });
+    const restored = new Database(dbPath, { readonly: true });
+    try {
+      expect(restored.prepare("SELECT status, last_error FROM interactive_sessions WHERE project_id = ?").get(imported.id)).toMatchObject({
+        status: "active",
+        last_error: "项目 JSON 备份未包含进行中的生成任务，当前选择已恢复，请重新选择。",
+      });
+      expect(restored.prepare("SELECT selected_choice_id, selected_at FROM interactive_turns WHERE session_id IN (SELECT id FROM interactive_sessions WHERE project_id = ?) AND turn = 2").get(imported.id)).toEqual({ selected_choice_id: null, selected_at: null });
+    } finally {
+      restored.close();
+    }
+  });
+
   it("imports legacy V1 backups with empty interactive history", async () => {
     const project = await createProjectWithGraph();
     const current = await exportProjectBackup(project.id, { dbPath, backupDir });

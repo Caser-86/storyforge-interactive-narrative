@@ -60,4 +60,53 @@ describe("NodeEditor", () => {
     expect(screen.getByLabelText("摘要")).toHaveValue("本地新摘要");
     expect(screen.getByText("已保存")).toBeInTheDocument();
   });
+
+  it("uses the node content revision when a second edit follows an in-flight save", async () => {
+    vi.useFakeTimers();
+    let resolveFirstSave!: (value: { node: StoryNode; draftRevision: number }) => void;
+    const firstSave = new Promise<{ node: StoryNode; draftRevision: number }>((resolve) => { resolveFirstSave = resolve; });
+    api.patchNode
+      .mockReturnValueOnce(firstSave)
+      .mockResolvedValueOnce({ node: { ...node, body: "第二次正文", contentRevision: 6, authorModified: true, contentStatus: "author_edited" }, draftRevision: 2 });
+    render(<NodeEditor projectId="project-1" node={node} />);
+
+    fireEvent.change(screen.getByLabelText("正文"), { target: { value: "第一次正文" } });
+    await act(async () => { vi.advanceTimersByTime(500); await Promise.resolve(); });
+    fireEvent.change(screen.getByLabelText("正文"), { target: { value: "第二次正文" } });
+
+    resolveFirstSave({ node: { ...node, body: "第一次正文", contentRevision: 5, authorModified: true, contentStatus: "author_edited" }, draftRevision: 1 });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(api.patchNode).toHaveBeenNthCalledWith(1, "project-1", "node-1", { body: "第一次正文" }, 4);
+    expect(api.patchNode).toHaveBeenNthCalledWith(2, "project-1", "node-1", { body: "第二次正文" }, 5);
+  });
+
+  it("preserves newer text while an earlier save is still in flight", async () => {
+    vi.useFakeTimers();
+    let resolveFirstSave!: (value: { node: StoryNode; draftRevision: number }) => void;
+    let resolveSecondSave!: (value: { node: StoryNode; draftRevision: number }) => void;
+    const firstSave = new Promise<{ node: StoryNode; draftRevision: number }>((resolve) => { resolveFirstSave = resolve; });
+    const secondSave = new Promise<{ node: StoryNode; draftRevision: number }>((resolve) => { resolveSecondSave = resolve; });
+    api.patchNode.mockReturnValueOnce(firstSave).mockReturnValueOnce(secondSave);
+    render(<NodeEditor projectId="project-1" node={node} />);
+
+    fireEvent.change(screen.getByLabelText("正文"), { target: { value: "第一次正文" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); await Promise.resolve(); });
+    fireEvent.change(screen.getByLabelText("正文"), { target: { value: "第二次正文" } });
+
+    resolveFirstSave({ node: { ...node, body: "第一次正文", contentRevision: 5, authorModified: true, contentStatus: "author_edited" }, draftRevision: 1 });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.getByLabelText("正文")).toHaveValue("第二次正文");
+
+    resolveSecondSave({ node: { ...node, body: "第二次正文", contentRevision: 6, authorModified: true, contentStatus: "author_edited" }, draftRevision: 2 });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  });
 });

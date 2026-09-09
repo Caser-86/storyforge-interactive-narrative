@@ -1,5 +1,7 @@
 # StoryForge 后续任务总路线图
 
+> **归档说明：** 本文件记录 2026-05 旧版后续任务，部分接口和基础设施已退役，不代表当前实现。当前文档入口见 `README.md`、`docs/README.md` 和 `docs/release/authoring-verification.md`。
+
 生成日期：2026-05-19  
 项目路径：`D:\Files\基于LLM的全自动独立游戏互动游戏叙事生成器\narrative-game`  
 GitHub 仓库：`https://github.com/Caser-86/storyforge-interactive-narrative`  

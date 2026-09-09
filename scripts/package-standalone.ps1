@@ -31,12 +31,22 @@ if (Test-Path -LiteralPath (Join-Path $repoRoot "public")) {
   Copy-Item -LiteralPath (Join-Path $repoRoot "public") -Destination $packageRoot -Recurse -Force
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot "scripts\start-storyforge.ps1") -Destination $packageRoot -Force
+$scannerPath = Join-Path $PSScriptRoot "scan-package-secrets.ps1"
+$scanOutput = & pwsh -NoProfile -File $scannerPath -Root $packageRoot
+if ($LASTEXITCODE -ne 0) {
+  throw "Standalone package secret scan failed."
+}
+$scanSummary = ($scanOutput -join [Environment]::NewLine) | ConvertFrom-Json
+if ($scanSummary.status -ne "passed" -or $scanSummary.secretFindings -ne 0) {
+  throw "Standalone package secret scan returned an invalid result."
+}
+$secretsIncluded = [bool]$scanSummary.secretFindings
 @{
   version = $packageJson.version
   packageRoot = "."
   dataRoot = "%LOCALAPPDATA%\StoryForge\data"
   backupRoot = "%LOCALAPPDATA%\StoryForge\backups"
-  secretsIncluded = $false
+  secretsIncluded = $secretsIncluded
   signed = $false
 } | ConvertTo-Json | Set-Content (Join-Path $packageRoot "package-manifest.json") -Encoding utf8
 Write-Output ("Standalone package created at " + $packageRoot)

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { redactSensitiveText } from "@/lib/errors";
 import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "../graph";
 import type { AuthoringRepository } from "../repository";
 import { OpenAICompatibleGenerationProvider } from "../generation/openai-provider";
@@ -112,7 +113,7 @@ export class AuthoringValidationService {
       const completedRun = await this.validationRepository.completeRun(run.id);
       return this.resultForRevision(projectId, graph.versionId, revision, completedRun);
     } catch (error) {
-      await this.validationRepository.completeRun(run.id, "failed", error instanceof Error ? error.message : String(error));
+      await this.validationRepository.completeRun(run.id, "failed", redactSensitiveText(error instanceof Error ? error.message : String(error)).slice(0, 500));
       throw error;
     }
   }

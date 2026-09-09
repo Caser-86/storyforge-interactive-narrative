@@ -470,6 +470,7 @@ describe("authoring generation repository", () => {
       });
       const applied = await runs.applyCandidate(project.id, candidate.id, 0);
       expect(applied.node).toMatchObject({ body: "Candidate body", contentRevision: 1, authorModified: true });
+      expect(applied.draftRevision).toBe(1);
 
       const stale = await runs.createCandidate({
         projectId: project.id,
@@ -479,6 +480,53 @@ describe("authoring generation repository", () => {
         candidateBody: "Stale candidate",
       });
       await expect(runs.applyCandidate(project.id, stale.id, 0)).rejects.toMatchObject({ code: "CONFLICT" });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects applying a candidate after its draft version is no longer active", async () => {
+    const project = await createProject();
+    const runs = createRunsRepo();
+    const db = new Database(dbPath);
+    const chapterId = "inactive-candidate-chapter";
+    const nodeId = "inactive-candidate-node";
+    const oldVersionId = project.activeDraftVersionId!;
+    const newVersionId = "inactive-candidate-new-version";
+
+    try {
+      db.prepare(
+        `INSERT INTO chapters (id, version_id, ordinal, title, goal, summary, created_at, updated_at)
+         VALUES (?, ?, 0, 'Chapter', 'Goal', 'Summary', ?, ?)`,
+      ).run(chapterId, oldVersionId, date(0).toISOString(), date(0).toISOString());
+      db.prepare(
+        `INSERT INTO story_nodes (
+          id, version_id, chapter_id, node_key, kind, title, body, summary, objective,
+          topological_rank, content_status, author_modified, content_revision, created_at, updated_at
+        ) VALUES (?, ?, ?, 'inactive-candidate', 'scene', 'Title', 'Original', 'Summary', 'Objective', 0, 'generated', 0, 0, ?, ?)`,
+      ).run(nodeId, oldVersionId, chapterId, date(0).toISOString(), date(0).toISOString());
+
+      const candidate = await runs.createCandidate({
+        projectId: project.id,
+        versionId: oldVersionId,
+        nodeId,
+        baseContentRevision: 0,
+        candidateBody: "Candidate body",
+      });
+      db.prepare(
+        `INSERT INTO story_versions (
+          id, project_id, version_number, kind, source_version_id, status,
+          brief_json, story_bible_json, outline_json, canon_json, draft_revision,
+          created_at, sealed_at, validation_limits_json
+        ) SELECT ?, project_id, version_number + 1, 'draft', id, status,
+          brief_json, story_bible_json, outline_json, canon_json, 0,
+          ?, NULL, validation_limits_json
+          FROM story_versions WHERE id = ?`,
+      ).run(newVersionId, date(1).toISOString(), oldVersionId);
+      db.prepare("UPDATE projects SET active_draft_version_id = ? WHERE id = ?").run(newVersionId, project.id);
+
+      await expect(runs.applyCandidate(project.id, candidate.id, 0)).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(db.prepare("SELECT body FROM story_nodes WHERE id = ?").get(nodeId)).toEqual({ body: "Original" });
     } finally {
       db.close();
     }

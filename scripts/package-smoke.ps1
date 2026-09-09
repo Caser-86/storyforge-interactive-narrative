@@ -38,8 +38,15 @@ function Test-PathWithin([string]$ChildPath, [string]$ParentPath) {
 }
 
 $resolvedRoot = [System.IO.Path]::GetFullPath($Root)
-$tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
-if ($resolvedRoot.Equals($tempRoot, [System.StringComparison]::OrdinalIgnoreCase) -or -not (Test-PathWithin $resolvedRoot $tempRoot)) {
+$temporaryRoots = @([System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()))
+if ($env:GITHUB_ACTIONS -eq "true" -and -not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
+  $temporaryRoots += [System.IO.Path]::GetFullPath($env:RUNNER_TEMP)
+}
+$isScopedTemporaryRoot = @($temporaryRoots | Where-Object {
+  -not $resolvedRoot.Equals($_, [System.StringComparison]::OrdinalIgnoreCase) -and
+    (Test-PathWithin $resolvedRoot $_)
+})
+if ($isScopedTemporaryRoot.Count -eq 0) {
   throw "Local smoke root must be inside the system temporary directory."
 }
 
@@ -200,7 +207,10 @@ finally {
   foreach ($environmentName in $environmentNames) {
     [Environment]::SetEnvironmentVariable($environmentName, $originalEnvironment[$environmentName], "Process")
   }
-  if (Test-PathWithin $resolvedRoot $tempRoot -and -not $resolvedRoot.Equals($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-    Remove-Item -LiteralPath $resolvedRoot -Recurse -Force
+  foreach ($temporaryRoot in $temporaryRoots) {
+    if (-not $resolvedRoot.Equals($temporaryRoot, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-PathWithin $resolvedRoot $temporaryRoot)) {
+      Remove-Item -LiteralPath $resolvedRoot -Recurse -Force
+      break
+    }
   }
 }

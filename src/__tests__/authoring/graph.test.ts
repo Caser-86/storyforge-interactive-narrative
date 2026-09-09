@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AuthoringError } from "@/lib/authoring/errors";
 import {
   enumeratePaths,
+  getBlockingGraphIssues,
   topologicalSort,
   validateStoryGraph,
 } from "@/lib/authoring/graph";
@@ -77,6 +78,14 @@ describe("authoring graph validation", () => {
     expect(validateStoryGraph(validConvergingGraph(), testLimits({ minEndings: 2 })).map((issue) => issue.code)).toContain(
       "ENDING_MIN_LIMIT",
     );
+  });
+
+  it("derives the current blocking issues from the current graph", () => {
+    const graph = graphWithMultipleIssues();
+    const blockingIssues = getBlockingGraphIssues(graph, testLimits());
+
+    expect(blockingIssues).toEqual(validateStoryGraph(graph, testLimits()).filter((issue) => issue.severity === "blocking"));
+    expect(blockingIssues.every((issue) => issue.severity === "blocking")).toBe(true);
   });
 
   it("returns a deterministic topological order", () => {
