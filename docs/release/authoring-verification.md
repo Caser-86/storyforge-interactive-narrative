@@ -119,6 +119,15 @@
 - Docker smoke: Docker Desktop was started through the CLI after the initial engine-unavailable check. An isolated Compose build exited `0`; the container became healthy and `/api/health` returned `200` with SQLite persistence. No API key was injected, so the container reported `llm.status=not_configured`; this is container/storage evidence only, not live-model evidence. The isolated container, volume, network, and image were removed.
 - This recheck does not close the remaining human or remote gates: four-dimension semantic review, real screen-reader/mobile acceptance, clean Windows account evidence, post-push Windows/Linux CI, author release approval, and the later commit/tag/GitHub Release workflow.
 
+## 2026-09-10 Remote CI Recheck
+
+- The first post-push run for `be798b8` exposed five environment-coupled interactive generator tests because CI sets `GENERATION_PROVIDER=fake`; the tests were updated to inject the mocked OpenAI-compatible provider explicitly.
+- The follow-up run for `de8191f` passed `verify` but exposed a Windows runner contract mismatch: `RUNNER_TEMP` is a trusted CI temporary root but is not required to equal PowerShell's default `GetTempPath()`.
+- `fd76beb` fixes the package smoke scope to accept `RUNNER_TEMP` only when `GITHUB_ACTIONS=true`, while keeping the disposable root nested and rejecting the trusted temporary root itself. The cleanup path now uses the same verified roots instead of the removed `$tempRoot` variable.
+- Local regression evidence: the CI-equivalent generator suite passed `11/11`; the distribution contract suite passed `8/8`; a runner-temp lifecycle smoke passed clean install, health, upgrade, deliberately failed upgrade, rollback, and uninstall-preserves-data, then removed its disposable root.
+- GitHub Actions run `34418237947` for PR `#3` and commit `fd76beb` passed `verify`, `e2e-authoring`, `docker-build`, and `standalone-windows`. GitHub's Node.js 20 action-runtime deprecation annotation remains informational.
+- This is feature-branch CI evidence only. The candidate is not merged into `master`, and no new tag or GitHub Release was created. Human semantic scoring, real screen-reader/mobile acceptance, clean Windows account evidence, and author release approval remain open.
+
 ## v0.1.6 Author-Branch Editing Candidate (Historical)
 
 - Date: 2026-08-30

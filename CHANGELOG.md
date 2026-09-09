@@ -17,6 +17,7 @@ All notable changes to StoryForge are documented here.
 - 修复结构化记忆在 20 条不可变事实已占满容量时因 `slice(-0)` 误保留全部可变事实、导致长故事第 11 幕后置校验失败的问题。
 - 收紧互动提示词契约，明确只有最终计划幕允许结局，避免模型提前结束后被服务端拒绝；长故事记忆溢出时优先保留未解决的高优先级伏笔。
 - 修复 Docker Alpine 容器在 Windows Git checkout 后因 shell entrypoint 为 CRLF 而无法启动的问题，并用 `.gitattributes` 固定 shell 脚本使用 LF。
+- 修复远程 CI 中互动生成测试受 `GENERATION_PROVIDER=fake` 环境影响而绕过 mock 的问题；Windows package smoke 现在在 GitHub Actions 中安全使用受 runner 管理的 `RUNNER_TEMP`，并保持本地临时目录边界与清理校验。
 - 升级 Next.js 至 `16.3.4`、sharp 至 `0.35.4`，并将 Vitest 与 eslint-config-next 对齐到已验证版本；生产依赖和全量依赖审计均为 0 vulnerabilities。
 
 - 将分支写作的开场和续写改为 SQLite 持久化任务，支持有界并发、lease 恢复、取消、迟到结果保护和可见进度。

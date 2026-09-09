@@ -184,9 +184,9 @@ flowchart TD
 
 - [x] CI `verify` job 已纳入 `npm run interactive:evaluate -- --provider fake`，离线互动 6/8/16 幕契约会随 CI 一起执行。
 - [x] `.github/workflows/ci.yml` 明确面向 `master` 的功能分支 PR 和 `workflow_dispatch` 手动验证入口；不依赖把每个临时工作树 push 到远程。
-- [ ] 在提交并推送候选后，记录精确提交 SHA 与对应的远程 CI 运行结果；当前工作树尚未产生这份证据。
+- [x] 已记录提交并推送候选的精确 SHA 与远程 CI 结果：修复后提交 `fd76beb` 对应 GitHub Actions run `34418237947`，`verify`、`e2e-authoring`、`docker-build`、`standalone-windows` 全部通过；此前失败原因与修复记录见发布验证文档。
 - [x] `.github/workflows/ci.yml` 已声明 PowerShell 7.x 运行时检查、Windows runner 的 standalone/native SQLite 生命周期和 Linux Docker build/health smoke，二者分别构建，不共用原生二进制。
-- [ ] 在提交后取得 Windows runner 和 Linux/Docker job 的真实远程结果；本机 Docker smoke 已通过，但本地结果不能替代远程 CI。
+- [x] 已取得提交后的真实远程结果：Windows standalone/native SQLite、Linux Docker build/health 和作者端 E2E 均通过；Node.js 20 action-runtime 弃用提示为非阻塞告警。
 - [x] 安装、升级失败、回滚、保留数据卸载、旧库恢复演练均使用隔离目录；本轮 package smoke、checkpoint restore-check 和 release evidence 均输出脱敏证据与校验和。
 - [x] README、CHANGELOG、文档索引和发布清单已同步当前证据；未执行的环境门禁仍保持待验证。
 - [ ] 作者人工走完创作流程后确认发布，随后按授权提交、推送、标签及 Release 流程执行。
@@ -238,7 +238,7 @@ flowchart TD
 - `npm run package:smoke`：退出码 `0`；分发 dry-run 确认 Node 24、better-sqlite3、数据目录隔离和升级/回滚/保留数据卸载检查项，且 `destructive=false`；`npm ci --dry-run --ignore-scripts` 也退出码 `0`。
 - `pwsh -File scripts/package-smoke.ps1 -Mode Local -Root <系统临时目录> -Port 3111`：退出码 `0`；`clean-install`、`health`、`upgrade`、`failed-upgrade`、`rollback`、`uninstall-preserves-data` 全部通过，临时根已由脚本清理。这是本机隔离生命周期证据，不等同于干净 Windows 账户验收。
 - Docker Desktop Linux engine 在首次检查时不可连接，使用 `docker desktop start` 启动后完成隔离 Compose build/health smoke：镜像构建退出码 `0`，容器 healthy，`/api/health` 返回 `200`，SQLite 持久化正常；未注入 API key，容器 LLM 状态为 `not_configured`，不能作为 live 模型证据。隔离容器、卷、网络和镜像已清理。
-- 本次复核没有新增代码缺陷，也没有勾选人工或远程门禁。仍未完成：真实模型四维人工评分、真实读屏/手机验收、目标环境安装证据、提交后的 Windows/Linux 远程 CI、作者发布确认以及后续提交/推送/标签/Release。
+- 本次复核新增并修复了两个远程环境契约问题：互动生成测试显式注入 mock provider，Windows package smoke 支持受 GitHub runner 管理的 `RUNNER_TEMP` 并修正清理变量。修复后提交 `fd76beb` 的远程 CI run `34418237947` 已通过。仍未完成：真实模型四维人工评分、真实读屏/手机验收、目标环境安装证据、作者发布确认以及后续合并 master、标签和 GitHub Release。
 
 ## 追踪规则
 
