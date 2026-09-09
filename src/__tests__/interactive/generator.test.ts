@@ -127,7 +127,10 @@ describe("interactive scene generation", () => {
         model: "deepseek-v4-flash",
       });
 
-    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice });
+    const result = await generateInteractiveScene(
+      { project, state, previousScene, selectedChoice },
+      new OpenAICompatibleGenerationProvider(),
+    );
 
     expect(generate).toHaveBeenCalledTimes(2);
     expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:active-repair:7");
@@ -183,7 +186,10 @@ describe("interactive scene generation", () => {
         model: "deepseek-v4-flash",
       });
 
-    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice });
+    const result = await generateInteractiveScene(
+      { project, state, previousScene, selectedChoice },
+      new OpenAICompatibleGenerationProvider(),
+    );
 
     expect(generate).toHaveBeenCalledTimes(2);
     expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:choice-repair:7");
@@ -234,7 +240,10 @@ describe("interactive scene generation", () => {
         model: "deepseek-v4-flash",
       });
 
-    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice });
+    const result = await generateInteractiveScene(
+      { project, state, previousScene, selectedChoice },
+      new OpenAICompatibleGenerationProvider(),
+    );
 
     expect(generate).toHaveBeenCalledTimes(2);
     expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:choice-repair:7");
@@ -269,7 +278,10 @@ describe("interactive scene generation", () => {
       model: "deepseek-v4-flash",
     });
 
-    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice });
+    const result = await generateInteractiveScene(
+      { project, state, previousScene, selectedChoice },
+      new OpenAICompatibleGenerationProvider(),
+    );
 
     expect(result.state.knownFacts).toEqual([]);
     expect(result.state.openThreads).toEqual([]);
@@ -471,12 +483,15 @@ describe("interactive scene generation", () => {
         model: "deepseek-v4-flash",
       });
 
-    const result = await generateInteractiveScene({
-      project,
-      state: { ...state, turn: 7 },
-      previousScene,
-      selectedChoice,
-    });
+    const result = await generateInteractiveScene(
+      {
+        project,
+        state: { ...state, turn: 7 },
+        previousScene,
+        selectedChoice,
+      },
+      new OpenAICompatibleGenerationProvider(),
+    );
 
     expect(generate).toHaveBeenCalledTimes(2);
     expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:ending-repair:8");
