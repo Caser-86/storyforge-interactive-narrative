@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { getAuthoringDbPath, initializeAuthoringDatabase } from "./database";
+import { getAuthoringDbPath, openAuthoringDatabase } from "./database";
 import { listDatabaseCheckpointManifests } from "./database-backup";
+import { AUTHORING_MIGRATIONS } from "./migrations";
 import { DiagnosticReportSchema } from "./diagnostic-contracts";
 import type { DiagnosticReport } from "./diagnostic-contracts";
 
@@ -25,20 +26,24 @@ function isWritable(dbPath: string): boolean {
 }
 
 function readMigrationVersion(db: { prepare(sql: string): { get(): unknown } }): number {
+  const table = db.prepare("SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = 'authoring_migrations'").get() as { found: number } | undefined;
+  if (!table) return 0;
   const row = db.prepare("SELECT COALESCE(MAX(version), 0) AS version FROM authoring_migrations").get() as { version: number };
   return row.version;
 }
 
 function databaseCheck(dbPath: string): DiagnosticReport["database"] {
   const writable = isWritable(dbPath);
-  let database: ReturnType<typeof initializeAuthoringDatabase> | undefined;
+  let database: ReturnType<typeof openAuthoringDatabase> | undefined;
   try {
-    database = initializeAuthoringDatabase({ dbPath, backupBeforeMigration: false });
+    database = openAuthoringDatabase({ dbPath, readonly: true });
     const integrity = database.pragma("integrity_check", { simple: true });
     const migrationVersion = readMigrationVersion(database);
+    const pendingMigrations = AUTHORING_MIGRATIONS.some((migration) => migration.version > migrationVersion && migration.up.trim().length > 0);
     return {
       status: integrity === "ok" && writable ? "ok" : "error",
       migrationVersion,
+      pendingMigrations,
       integrity: integrity === "ok" ? "ok" : "error",
       writable,
     };
@@ -46,6 +51,7 @@ function databaseCheck(dbPath: string): DiagnosticReport["database"] {
     return {
       status: "error",
       migrationVersion: null,
+      pendingMigrations: false,
       integrity: "unknown",
       writable,
     };
@@ -80,7 +86,7 @@ export async function collectAuthoringDiagnostics(options: AuthoringDiagnosticsO
   const network = { binding: process.env.STORYFORGE_ALLOW_LAN === "true" ? "lan-override" as const : "loopback-only" as const };
   const provider = { status: process.env.OPENAI_API_KEY ? "configured" as const : "not-configured" as const };
   const hasError = database.status === "error" || backup.status === "error";
-  const hasWarning = backup.status === "warning" || network.binding === "lan-override" || provider.status === "not-configured";
+  const hasWarning = database.pendingMigrations || backup.status === "warning" || network.binding === "lan-override" || provider.status === "not-configured";
 
   return DiagnosticReportSchema.parse({
     schema: "storyforge-diagnostics@1",

@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-import { initializeAuthoringDatabase } from "../database";
+import { acquireAuthoringDatabase } from "../database";
 import type { AuthoringDatabaseOptions } from "../database";
 import { AuthoringError } from "../errors";
 import type { JsonValue } from "../schemas";
@@ -364,9 +364,11 @@ function ensureStepOrder(steps: GenerationStepDescriptor[]): GenerationStepDescr
 
 export class BetterSqliteGenerationRepository implements GenerationRepository {
   private readonly db: Database.Database;
+  private readonly databaseLease: ReturnType<typeof acquireAuthoringDatabase>;
 
   constructor(options: AuthoringDatabaseOptions = {}) {
-    this.db = initializeAuthoringDatabase(options);
+    this.databaseLease = acquireAuthoringDatabase(options);
+    this.db = this.databaseLease.database;
   }
 
   public async createRun(
@@ -1133,7 +1135,7 @@ export class BetterSqliteGenerationRepository implements GenerationRepository {
   }
 
   public close(): void {
-    this.db.close();
+    this.databaseLease.release();
   }
 
   private refreshRunAfterStepChange(

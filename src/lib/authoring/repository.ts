@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { AuthoringError } from "./errors";
-import { initializeAuthoringDatabase } from "./database";
+import { acquireAuthoringDatabase } from "./database";
 import type { AuthoringDatabaseOptions } from "./database";
 import { sealSnapshotInDatabase } from "./snapshots";
 import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "./graph";
@@ -272,11 +272,13 @@ function toStoryEdge(row: StoryEdgeRow): StoryEdge {
 
 export class BetterSqliteAuthoringRepository implements AuthoringRepository {
   private readonly db: Database.Database;
+  private readonly databaseLease: ReturnType<typeof acquireAuthoringDatabase>;
   private readonly databaseOptions: AuthoringDatabaseOptions;
 
   constructor(options: AuthoringDatabaseOptions = {}) {
     this.databaseOptions = options;
-    this.db = initializeAuthoringDatabase(options);
+    this.databaseLease = acquireAuthoringDatabase(options);
+    this.db = this.databaseLease.database;
   }
 
   public async createProject(input: CreateProjectInput): Promise<Project> {
@@ -901,7 +903,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
   }
 
   public close(): void {
-    this.db.close();
+    this.databaseLease.release();
   }
 
   private readProjectGraph(projectId: string, versionId?: string): StoryGraph {

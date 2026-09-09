@@ -1,4 +1,5 @@
 import { errorResponse, json } from "@/lib/authoring/api-contracts";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { AuthoringError } from "@/lib/authoring/errors";
 import { createInteractiveRepository } from "@/lib/interactive/repository";
@@ -11,8 +12,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(_request: Request, { params }: MaterializeRouteContext): Promise<Response> {
-  const authoring = createAuthoringRepository();
-  const interactive = createInteractiveRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoring = createAuthoringRepository(databaseScope.options);
+  const interactive = createInteractiveRepository(databaseScope.options);
   try {
     const { projectId, sessionId } = await params;
     const project = await authoring.getProject(projectId);
@@ -30,5 +32,6 @@ export async function POST(_request: Request, { params }: MaterializeRouteContex
   } finally {
     interactive.close();
     authoring.close();
+    databaseScope.close();
   }
 }

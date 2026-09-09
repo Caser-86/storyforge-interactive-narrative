@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository } from "@/lib/authoring/repository";
 import { getProjectGenerationMetrics } from "@/lib/authoring/metrics";
+import { createInteractiveRepository } from "@/lib/interactive/repository";
+import { createInteractiveJobRepository } from "@/lib/interactive/jobs";
+import { createInteractiveUsageRepository } from "@/lib/interactive/usage";
+import type { InteractiveState } from "@/lib/interactive/schemas";
 
 let tempDir: string;
 let dbPath: string;
@@ -71,5 +75,44 @@ describe("authoring generation metrics", () => {
     process.env.STORYFORGE_OUTPUT_PRICE_PER_MILLION = "4";
 
     expect((await getProjectGenerationMetrics(project.id)).estimatedCost).toBe(0);
+  });
+
+  it("includes interactive calls separately from structured generation", async () => {
+    const repo = createAuthoringRepository({ dbPath, backupDir });
+    repos.push(repo);
+    const project = await repo.createProject({ title: "Interactive metrics", premise: "Interactive metrics", genre: "test", tone: "clear", pointOfView: "first", rating: "PG", size: { preset: "micro", targetNodes: 8, targetEndings: 2 } });
+    const state: InteractiveState = {
+      seedPrompt: project.premise,
+      turn: 1,
+      targetTurns: 6,
+      knownFacts: [],
+      openThreads: [],
+      resolvedThreads: [],
+      lastChoiceImpact: "",
+      endingReadiness: 0,
+    };
+    const interactive = createInteractiveRepository({ dbPath, backupDir });
+    const jobs = createInteractiveJobRepository({ dbPath, backupDir });
+    const usage = createInteractiveUsageRepository({ dbPath, backupDir });
+    const session = await interactive.createSession(project.id, state);
+    const task = (await jobs.listForSession(project.id, session.id))[0]!;
+    const reservation = await usage.reserve({
+      projectId: project.id,
+      sessionId: session.id,
+      taskId: task.id,
+      taskAttempt: 1,
+      callIndex: 1,
+      kind: "scene",
+      model: "deepseek-v4-flash",
+      reservedOutputTokens: 3200,
+    });
+    await usage.complete(reservation, { requestId: "interactive-request", inputTokens: 10, outputTokens: 20, latencyMs: 30 });
+    usage.close();
+    jobs.close();
+    interactive.close();
+
+    const metrics = await getProjectGenerationMetrics(project.id);
+    expect(metrics).toMatchObject({ totalCalls: 1, totalInputTokens: 10, totalOutputTokens: 20 });
+    expect(metrics.interactiveUsage).toMatchObject({ totalCalls: 1, succeededCalls: 1, inputTokens: 10, outputTokens: 20 });
   });
 });

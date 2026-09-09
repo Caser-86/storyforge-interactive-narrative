@@ -1,5 +1,6 @@
 import { AuthoringError } from "@/lib/authoring/errors";
 import { errorResponse, json, readJsonBody } from "@/lib/authoring/api-contracts";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { GenerationCreateInputSchema, GenerationListResponseSchema, GenerationResponseSchema } from "@/lib/authoring/generation/api-contracts";
 import { createGenerationRepository } from "@/lib/authoring/generation/repository";
@@ -11,8 +12,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: ProjectRouteContext): Promise<Response> {
-  const authoring = createAuthoringRepository();
-  const generation = createGenerationRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoring = createAuthoringRepository(databaseScope.options);
+  const generation = createGenerationRepository(databaseScope.options);
   try {
     const { projectId } = await params;
     await authoring.getProject(projectId);
@@ -23,6 +25,7 @@ export async function GET(_request: Request, { params }: ProjectRouteContext): P
   } finally {
     generation.close();
     authoring.close();
+    databaseScope.close();
   }
 }
 
@@ -31,8 +34,9 @@ export async function POST(request: Request, { params }: ProjectRouteContext): P
   try {
     ({ projectId } = await params);
     const input = await readJsonBody(request, GenerationCreateInputSchema);
-    const authoring = createAuthoringRepository();
-    const generation = createGenerationRepository();
+    const databaseScope = createAuthoringDatabaseScope();
+    const authoring = createAuthoringRepository(databaseScope.options);
+    const generation = createGenerationRepository(databaseScope.options);
     try {
       const project = await authoring.getProject(projectId);
       if (input.freshDraft && input.versionId) {
@@ -55,6 +59,7 @@ export async function POST(request: Request, { params }: ProjectRouteContext): P
     } finally {
       generation.close();
       authoring.close();
+      databaseScope.close();
     }
   } catch (error) {
     return errorResponse(error);

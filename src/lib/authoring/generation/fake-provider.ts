@@ -1,3 +1,4 @@
+import { DEFAULT_OPENAI_MODEL } from "./defaults";
 import { ProviderError } from "./provider-errors";
 import type { GenerationProvider, ProviderResult, StructuredGenerationRequest } from "./provider";
 
@@ -64,7 +65,7 @@ export class FakeGenerationProvider implements GenerationProvider {
       inputTokens: fixture.inputTokens,
       outputTokens: fixture.outputTokens,
       latencyMs: 0,
-      model: request.model ?? process.env.OPENAI_MODEL ?? "deepseek-v4-flash",
+      model: request.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL,
     };
   }
 }

@@ -74,7 +74,7 @@ export async function runAiContinuityReview(input: AiReviewInput): Promise<AiRev
 }
 
 function buildChapterPrompt(input: AiReviewInput, chapter: AiReviewChapter): string {
-  return `Review this chapter for continuity only. Return warnings with evidence and node IDs. Never request edits or rewrite prose. Canon: ${JSON.stringify(input.canon)}. Character cards: ${JSON.stringify(input.characterCards)}. Ending summaries: ${JSON.stringify(input.endingSummaries)}. Chapter: ${JSON.stringify(chapter)}`;
+  return `Review this chapter for continuity only. Return exactly one JSON object with shape {"passed": boolean, "issues": [{"code": "CHARACTER_CONTRADICTION | TIMELINE_CONTRADICTION | SETTING_CONTRADICTION | ARC_UNRESOLVED | PACING | ENDING_QUALITY", "message": "string", "nodeIds": ["string"], "evidence": ["string"], "severity": "warning | blocking"}]}. Use an empty issues array when there are no findings. Never use a warnings or proseEdits field; never request edits or rewrite prose. Canon: ${JSON.stringify(input.canon)}. Character cards: ${JSON.stringify(input.characterCards)}. Ending summaries: ${JSON.stringify(input.endingSummaries)}. Chapter: ${JSON.stringify(chapter)}`;
 }
 
 function buildGlobalPrompt(input: AiReviewInput): string {
@@ -84,7 +84,7 @@ function buildGlobalPrompt(input: AiReviewInput): string {
     summary: chapter.summary,
     nodes: chapter.nodes.map((node) => ({ nodeId: node.nodeId, title: node.title, summary: node.summary })),
   }));
-  return `Review the complete story for continuity, unresolved arcs, pacing, and ending quality. Return warnings with evidence and node IDs. Never request edits or rewrite prose. Canon: ${JSON.stringify(input.canon)}. Character cards: ${JSON.stringify(input.characterCards)}. Ending summaries: ${JSON.stringify(input.endingSummaries)}. Chapters: ${JSON.stringify(chapterSummaries)}`;
+  return `Review the complete story for continuity, unresolved arcs, pacing, and ending quality. Return exactly one JSON object with shape {"passed": boolean, "issues": [{"code": "CHARACTER_CONTRADICTION | TIMELINE_CONTRADICTION | SETTING_CONTRADICTION | ARC_UNRESOLVED | PACING | ENDING_QUALITY", "message": "string", "nodeIds": ["string"], "evidence": ["string"], "severity": "warning | blocking"}]}. Use an empty issues array when there are no findings. Never use a warnings or proseEdits field; never request edits or rewrite prose. Canon: ${JSON.stringify(input.canon)}. Character cards: ${JSON.stringify(input.characterCards)}. Ending summaries: ${JSON.stringify(input.endingSummaries)}. Chapters: ${JSON.stringify(chapterSummaries)}`;
 }
 
 function toValidationIssues(output: AiReviewOutput, scope: string): ValidationIssueInput[] {

@@ -4,9 +4,18 @@ import { expect, test } from "@playwright/test";
 
 const SQLITE_E2E_PATH = path.join(process.cwd(), "output", "playwright", "authoring-e2e.sqlite");
 
-function cleanAuthoringDatabase(): void {
+async function cleanAuthoringDatabase(): Promise<void> {
   for (const suffix of ["", "-wal", "-shm"]) {
-    fs.rmSync(`${SQLITE_E2E_PATH}${suffix}`, { force: true });
+    const target = `${SQLITE_E2E_PATH}${suffix}`;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        fs.rmSync(target, { force: true });
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EPERM" || attempt === 9) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
   }
 }
 

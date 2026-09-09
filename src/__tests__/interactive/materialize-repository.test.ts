@@ -59,9 +59,9 @@ afterEach(() => {
 async function createEndedSession(projectId: string): Promise<string> {
   const created = await interactive.createSession(projectId, state);
   await interactive.saveInitialScene(created.id, activeScene, state);
-  const firstClaim = await interactive.claimChoice(projectId, created.id, "choice_a");
+  const firstClaim = await interactive.claimChoice(projectId, created.id, "choice_a", 1);
   await interactive.saveNextScene(created.id, firstClaim, { ...activeScene, title: "门后" }, { ...state, turn: 2 });
-  const secondClaim = await interactive.claimChoice(projectId, created.id, "choice_b");
+  const secondClaim = await interactive.claimChoice(projectId, created.id, "choice_b", 2);
   await interactive.saveNextScene(created.id, secondClaim, endingScene, { ...state, turn: 3 });
   return created.id;
 }

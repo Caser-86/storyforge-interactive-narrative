@@ -3,6 +3,7 @@ import { z } from "zod";
 import { FakeGenerationProvider } from "@/lib/authoring/generation/fake-provider";
 import { OpenAICompatibleGenerationProvider } from "@/lib/authoring/generation/openai-provider";
 import { classifyProviderError, ProviderError } from "@/lib/authoring/generation/provider-errors";
+import { redactSensitiveText } from "@/lib/errors";
 
 const OutputSchema = z.object({
   title: z.string(),
@@ -52,6 +53,16 @@ describe("generation provider errors", () => {
     const error = new ProviderError("AUTH", "invalid key", false);
     expect(classifyProviderError(error)).toBe(error);
   });
+
+  it("redacts OpenAI-compatible and Volcengine credential formats", () => {
+    const redacted = redactSensitiveText("Bearer ark-live-secret apiKey=sk-test-secret ark-another-secret");
+
+    expect(redacted).not.toContain("ark-live-secret");
+    expect(redacted).not.toContain("sk-test-secret");
+    expect(redacted).not.toContain("ark-another-secret");
+    expect(redacted).toContain("Bearer [redacted]");
+    expect(redacted).toContain("apiKey=[redacted]");
+  });
 });
 
 describe("fake generation provider", () => {
@@ -98,6 +109,26 @@ describe("OpenAI-compatible generation provider", () => {
     }));
   });
 
+  it("marks successful responses without token usage as unconfirmed", async () => {
+    const provider = new OpenAICompatibleGenerationProvider({
+      client: {
+        chat: {
+          completions: {
+            create: vi.fn().mockResolvedValue({
+              choices: [{ message: { content: JSON.stringify({ title: "The Orchard", summary: "A hidden route." }) } }],
+            }),
+          },
+        },
+      },
+    });
+
+    await expect(provider.generate(request)).resolves.toMatchObject({
+      inputTokens: 0,
+      outputTokens: 0,
+      usageConfirmed: false,
+    });
+  });
+
   it("disables extended thinking for Volcengine structured generation", async () => {
     const create = vi.fn().mockResolvedValue({
       choices: [{ message: { content: JSON.stringify({ title: "The Orchard", summary: "A hidden route." }) } }],
@@ -113,6 +144,20 @@ describe("OpenAI-compatible generation provider", () => {
       model: "doubao-seed-evolving",
       thinking: { type: "disabled" },
     }));
+  });
+
+  it("forwards an abort signal to the compatible client", async () => {
+    const create = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({ title: "The Orchard", summary: "A hidden route." }) } }],
+    });
+    const provider = new OpenAICompatibleGenerationProvider({
+      client: { chat: { completions: { create } } },
+    });
+    const controller = new AbortController();
+
+    await provider.generate({ ...request, signal: controller.signal });
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ signal: controller.signal }));
   });
 
   it("accepts JSON wrapped in a markdown fence or short provider preamble", async () => {

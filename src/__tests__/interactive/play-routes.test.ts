@@ -98,7 +98,7 @@ describe("interactive play routes", () => {
 
     const next = await sessionRoute.POST(new Request("http://local", {
       method: "POST",
-      body: JSON.stringify({ choiceId: active.scene?.choices[0]?.id }),
+      body: JSON.stringify({ choiceId: active.scene?.choices[0]?.id, expectedTurn: active.turn }),
     }), {
       params: Promise.resolve({ projectId: project.id, sessionId: active.id }),
     });
@@ -107,5 +107,52 @@ describe("interactive play routes", () => {
 
     const advanced = await waitForSession(sessionRoute, project.id, active.id, (status, turn) => status === "active" && turn === 2);
     expect(advanced.scene?.title).toBe("第 2 幕");
+  });
+
+  it("rejects a choice submitted from an older scene", async () => {
+    const projectResponse = await (await import("@/app/api/projects/route")).POST(new Request("http://local", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "过期选择测试",
+        premise: "一名档案员发现一扇不该存在的门。",
+        genre: "悬疑",
+        tone: "克制",
+        pointOfView: "第二人称",
+        rating: "PG-13",
+        size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+      }),
+    }));
+    const project = CreateProjectResponseSchema.parse(await projectResponse.json()).project;
+    const startRoute = await import("@/app/api/projects/[projectId]/play/route");
+    const sessionRoute = await import("@/app/api/projects/[projectId]/play/[sessionId]/route");
+
+    const start = await startRoute.POST(new Request("http://local", { method: "POST" }), {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    const started = InteractiveSessionResponseSchema.parse(await start.json()).session;
+    const active = await waitForSession(sessionRoute, project.id, started.id, (status) => status === "active");
+    const firstChoiceId = active.scene?.choices[0]?.id;
+    const firstNext = await sessionRoute.POST(new Request("http://local", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ choiceId: firstChoiceId, expectedTurn: active.turn }),
+    }), {
+      params: Promise.resolve({ projectId: project.id, sessionId: active.id }),
+    });
+    expect(firstNext.status).toBe(202);
+    await waitForSession(sessionRoute, project.id, active.id, (status, turn) => status === "active" && turn === 2);
+
+    const stale = await sessionRoute.POST(new Request("http://local", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ choiceId: firstChoiceId, expectedTurn: active.turn }),
+    }), {
+      params: Promise.resolve({ projectId: project.id, sessionId: active.id }),
+    });
+
+    expect(stale.status).toBe(409);
+    expect((await sessionRoute.GET(new Request("http://local"), {
+      params: Promise.resolve({ projectId: project.id, sessionId: active.id }),
+    })).status).toBe(200);
   });
 });

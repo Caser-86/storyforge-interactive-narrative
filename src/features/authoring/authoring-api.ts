@@ -13,6 +13,11 @@ import type { GenerationStatusResponse } from "@/lib/authoring/generation/api-co
 import type { GenerationRun } from "@/lib/authoring/generation/schemas";
 import { PreviewResponseSchema, SnapshotResponseSchema } from "@/lib/authoring/preview-contracts";
 import type { PreviewResponse } from "@/lib/authoring/preview-contracts";
+import {
+  AuthorEndingGenerationResponseSchema,
+  type AuthorEndingGenerationInput,
+  type AuthorEndingGenerationResponse,
+} from "@/lib/authoring/generation/api-contracts";
 
 async function responseError(response: Response): Promise<Error> {
   try {
@@ -103,6 +108,15 @@ export async function putGraph(projectId: string, graph: StoryGraph, expectedRev
   });
   const result = await parseJson(response, (value) => GraphWriteResponseSchema.parse(value));
   return { ...result, draftRevision: expectedRevision + 1 };
+}
+
+export async function generateAuthorEnding(projectId: string, input: AuthorEndingGenerationInput): Promise<AuthorEndingGenerationResponse> {
+  const response = await fetch(`/api/projects/${projectId}/endings/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response, (value) => AuthorEndingGenerationResponseSchema.parse(value));
 }
 
 export async function regenerateNode(projectId: string, nodeId: string, expectedRevision: number) {

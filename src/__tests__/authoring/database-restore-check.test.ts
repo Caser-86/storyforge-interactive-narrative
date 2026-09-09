@@ -43,7 +43,7 @@ describe("authoring database restore checks", () => {
 
     expect(result).toMatchObject({
       integrityCheck: "ok",
-      migrationVersion: 10,
+      migrationVersion: 13,
       projectCount: 1,
       graphReadable: true,
     });

@@ -9,7 +9,20 @@ export interface AuthoringDatabaseOptions {
   dbPath?: string;
   backupDir?: string;
   backupBeforeMigration?: boolean;
+  readonly?: boolean;
+  database?: Database.Database;
 }
+
+export type AuthoringDatabaseLease = {
+  database: Database.Database;
+  release(): void;
+};
+
+export type AuthoringDatabaseScope = {
+  database: Database.Database;
+  options: AuthoringDatabaseOptions;
+  close(): void;
+};
 
 export function getAuthoringDbPath(options: AuthoringDatabaseOptions = {}): string {
   return options.dbPath ?? process.env.SQLITE_DB_PATH ?? "./data/storyforge.sqlite";
@@ -58,6 +71,14 @@ function isExistingNonEmptyDatabase(dbPath: string): boolean {
 
 export function openAuthoringDatabase(options: AuthoringDatabaseOptions = {}): Database.Database {
   const dbPath = getAuthoringDbPath(options);
+  if (options.readonly) {
+    if (isInMemoryDatabase(dbPath)) throw new AuthoringError("VALIDATION", "Read-only authoring diagnostics require a file database.");
+    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    db.pragma("foreign_keys = ON");
+    db.pragma("busy_timeout = 5000");
+    return db;
+  }
+
   ensureParentDirectory(dbPath);
 
   const db = new Database(dbPath);
@@ -77,7 +98,7 @@ export function migrateAuthoringDatabase(
     (migration) => !appliedVersions.has(migration.version) && migration.up.trim().length > 0,
   );
 
-  if (hasPendingNonEmptyMigration && appliedVersions.size === 0 && options.backupBeforeMigration === true) {
+  if (hasPendingNonEmptyMigration && options.backupBeforeMigration === true) {
     try {
       backupOpenDatabaseBeforeMigration(db, getBackupDir(options), AUTHORING_MIGRATIONS[AUTHORING_MIGRATIONS.length - 1].version);
     } catch (error) {
@@ -138,4 +159,37 @@ export function initializeAuthoringDatabase(options: AuthoringDatabaseOptions = 
     db.close();
     throw error;
   }
+}
+
+export function acquireAuthoringDatabase(options: AuthoringDatabaseOptions = {}): AuthoringDatabaseLease {
+  if (options.database) {
+    return {
+      database: options.database,
+      release: () => undefined,
+    };
+  }
+
+  const database = initializeAuthoringDatabase(options);
+  let released = false;
+  return {
+    database,
+    release: () => {
+      if (released) return;
+      released = true;
+      if (database.open) database.close();
+    },
+  };
+}
+
+/**
+ * Own one database connection for a synchronous request or worker scope.
+ * Repositories created with `options` borrow the connection and never own it.
+ */
+export function createAuthoringDatabaseScope(options: AuthoringDatabaseOptions = {}): AuthoringDatabaseScope {
+  const lease = acquireAuthoringDatabase(options);
+  return {
+    database: lease.database,
+    options: { ...options, database: lease.database },
+    close: lease.release,
+  };
 }

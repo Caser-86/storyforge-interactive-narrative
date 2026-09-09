@@ -1,4 +1,5 @@
 import { AuthoringError } from "./errors";
+import { createAuthoringDatabaseScope } from "./database";
 import { createAuthoringRepository } from "./repository";
 import type { AuthoringDatabaseOptions } from "./database";
 import { createGenerationRepository } from "./generation/repository";
@@ -16,9 +17,11 @@ export interface ReleaseGateOptions {
 }
 
 export async function assertReleaseReady(projectId: string, expectedRevision: number, options: ReleaseGateOptions = {}): Promise<ReleaseDecision> {
-  const authoringRepository = createAuthoringRepository(options.databaseOptions);
-  const validationRepository = createValidationRepository(options.databaseOptions);
-  const generationRepository = createGenerationRepository(options.databaseOptions);
+  const databaseScope = createAuthoringDatabaseScope(options.databaseOptions);
+  const scopedDatabaseOptions = databaseScope.options;
+  const authoringRepository = createAuthoringRepository(scopedDatabaseOptions);
+  const validationRepository = createValidationRepository(scopedDatabaseOptions);
+  const generationRepository = createGenerationRepository(scopedDatabaseOptions);
 
   try {
     const service = createValidationService({ authoringRepository, validationRepository, generationRepository });
@@ -59,6 +62,7 @@ export async function assertReleaseReady(projectId: string, expectedRevision: nu
     authoringRepository.close();
     validationRepository.close();
     generationRepository.close();
+    databaseScope.close();
   }
 }
 

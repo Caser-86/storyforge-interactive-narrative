@@ -27,9 +27,11 @@ export function ProjectMetrics({ projectId }: ProjectMetricsProps) {
     <section className="project-metrics" aria-label="生成指标">
       <div className="quality-panel-heading"><div><p className="eyebrow">LOCAL METRICS</p><h3>生成指标</h3></div><span>{metrics.totalCalls} calls</span></div>
       <div className="release-checklist-stats">
+        <span>结构化 {metrics.totalCalls - metrics.interactiveUsage.totalCalls} · 分支 {metrics.interactiveUsage.totalCalls} calls</span>
         <span>输入 {metrics.totalInputTokens.toLocaleString()} tokens</span>
         <span>输出 {metrics.totalOutputTokens.toLocaleString()} tokens</span>
         <span>失败 {metrics.failedRuns} · 重试 {metrics.totalRetries}</span>
+        {metrics.interactiveUsage.unknownOutputTokens > 0 ? <span className="metric-warning">互动未知输出 {metrics.interactiveUsage.unknownOutputTokens.toLocaleString()} tokens，按保守预算计</span> : null}
         <span>节点耗时 P50/P95 {nodeLatency ? `${nodeLatency.p50}/${nodeLatency.p95} ms` : "暂无"}</span>
         <span>{metrics.estimatedCost === null ? "成本估算未配置价格" : `估算成本 $${metrics.estimatedCost.toFixed(4)}（非账单）`}</span>
       </div>

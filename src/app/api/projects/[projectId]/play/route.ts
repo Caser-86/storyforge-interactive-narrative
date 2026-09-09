@@ -1,9 +1,9 @@
 import { errorResponse, json } from "@/lib/authoring/api-contracts";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { createInteractiveRepository } from "@/lib/interactive/repository";
-import { interactiveGenerationFailureMessage } from "@/lib/interactive/failure";
-import { createInteractiveState, generateInteractiveScene } from "@/lib/interactive/generator";
-import { generateWithInteractiveRetry } from "@/lib/interactive/retry";
+import { createInteractiveState } from "@/lib/interactive/generator";
+import { runInteractiveGenerationForSession } from "@/lib/interactive/worker";
 import { InteractiveSessionResponseSchema } from "@/lib/interactive/api-contracts";
 
 type ProjectRouteContext = { params: Promise<{ projectId: string }> };
@@ -11,43 +11,22 @@ type ProjectRouteContext = { params: Promise<{ projectId: string }> };
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-async function generateOpeningInBackground(projectId: string, sessionId: string): Promise<void> {
-  const authoring = createAuthoringRepository();
-  const interactive = createInteractiveRepository();
-
-  try {
-    const project = await authoring.getProject(projectId);
-    const session = await interactive.getSession(projectId, sessionId);
-    if (session.status !== "generating" || session.turn !== 0) return;
-
-    const generated = await generateWithInteractiveRetry(() => generateInteractiveScene({ project, state: session.state }));
-    await interactive.saveInitialScene(sessionId, generated.scene, generated.state);
-  } catch (error) {
-    try {
-      await interactive.failInitialGeneration(sessionId, interactiveGenerationFailureMessage(error, "opening"));
-    } catch (failureError) {
-      console.error("[interactive] opening generation state update failed", failureError instanceof Error ? failureError.message : String(failureError));
-    }
-  } finally {
-    interactive.close();
-    authoring.close();
-  }
-}
-
 export async function POST(_request: Request, { params }: ProjectRouteContext): Promise<Response> {
-  const authoring = createAuthoringRepository();
-  const interactive = createInteractiveRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoring = createAuthoringRepository(databaseScope.options);
+  const interactive = createInteractiveRepository(databaseScope.options);
   try {
     const { projectId } = await params;
     const project = await authoring.getProject(projectId);
     const state = createInteractiveState(project, "");
     const created = await interactive.createSession(projectId, state);
-    void generateOpeningInBackground(projectId, created.id);
+    void runInteractiveGenerationForSession(projectId, created.id);
     return json(InteractiveSessionResponseSchema, { session: created }, { status: 202 });
   } catch (error) {
     return errorResponse(error);
   } finally {
     interactive.close();
     authoring.close();
+    databaseScope.close();
   }
 }

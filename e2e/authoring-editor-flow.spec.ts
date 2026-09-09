@@ -58,7 +58,7 @@ test.describe("authoring editor closed loop", () => {
     const staleApply = await request.post(`/api/projects/${project.id}/candidates/${candidate.id}`, { data: { expectedRevision: startNode.contentRevision + 1 } });
     expect(staleApply.status()).toBe(409);
 
-    const snapshotResponse = await request.post(`/api/projects/${project.id}/snapshots`);
+    const snapshotResponse = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshotResponse.status()).toBe(201);
     await page.goto(`/projects/${project.id}/preview`);
     await expect(page.getByRole("heading", { name: "Courtyard Gate" })).toBeVisible();

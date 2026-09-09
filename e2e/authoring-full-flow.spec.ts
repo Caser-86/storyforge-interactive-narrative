@@ -4,15 +4,24 @@ import { expect, test } from "@playwright/test";
 
 const SQLITE_E2E_PATH = path.join(process.cwd(), "output", "playwright", "authoring-e2e.sqlite");
 
-function cleanAuthoringDatabase(): void {
+async function cleanAuthoringDatabase(): Promise<void> {
   for (const suffix of ["", "-wal", "-shm"]) {
-    fs.rmSync(`${SQLITE_E2E_PATH}${suffix}`, { force: true });
+    const target = `${SQLITE_E2E_PATH}${suffix}`;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        fs.rmSync(target, { force: true });
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EPERM" || attempt === 9) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
   }
 }
 
 test.describe("full author-driven authoring flow", () => {
-  test.beforeEach(() => cleanAuthoringDatabase());
-  test.afterEach(() => cleanAuthoringDatabase());
+  test.beforeEach(cleanAuthoringDatabase);
+  test.afterEach(cleanAuthoringDatabase);
 
   test("creates, chooses, closes, materializes, validates, and snapshots one story", async ({ page, request }) => {
     const projectResponse = await request.post("/api/projects", {
@@ -72,6 +81,7 @@ test.describe("full author-driven authoring flow", () => {
     await expect(nodeButtons).toHaveCount(6);
     await nodeButtons.nth(4).click();
     const endingEditor = page.getByRole("region", { name: "新增作者结局" });
+    await endingEditor.getByText("手动填写（高级）").click();
     await endingEditor.getByLabel("结局选择文案", { exact: true }).fill("打开最后一盏灯");
     await endingEditor.getByLabel("结局标题", { exact: true }).fill("新的黎明");
     await endingEditor.getByLabel("结局正文", { exact: true }).fill("档案室迎来新的黎明。");
@@ -109,7 +119,7 @@ test.describe("full author-driven authoring flow", () => {
     expect(completedGraph.nodes.filter((node) => node.kind === "ending")).toHaveLength(2);
     expect(completedGraph.nodes.some((node) => node.title === "淹水长廊")).toBe(true);
     expect(completedGraph.edges.some((edge) => edge.label === "穿过淹水的长廊")).toBe(true);
-    const snapshot = await request.post(`/api/projects/${project.id}/snapshots`);
+    const snapshot = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshot.status()).toBe(201);
   });
 });

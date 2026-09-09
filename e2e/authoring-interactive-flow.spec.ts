@@ -108,26 +108,25 @@ test.describe("interactive authoring flow", () => {
     await nodeButtons.nth(6).click();
     const endingEditor = page.getByRole("region", { name: "新增作者结局" });
     await expect(endingEditor.getByRole("heading", { name: "新增作者结局" })).toBeVisible();
-    await endingEditor.getByLabel("结局选择文案", { exact: true }).fill("Open the final lantern");
-    await endingEditor.getByLabel("结局标题", { exact: true }).fill("A New Dawn");
-    await endingEditor.getByLabel("结局正文", { exact: true }).fill("The final lantern opens.");
-    await endingEditor.getByLabel("结局摘要", { exact: true }).fill("The archive finds a new future.");
-    await endingEditor.getByLabel("结局目标", { exact: true }).fill("Give the archive a future.");
+    await endingEditor.getByLabel("结局方向（可选）", { exact: true }).fill("公开真相，但保留一个有代价的希望。");
+    await endingEditor.getByRole("button", { name: "让大模型生成结局" }).click();
+    await expect(endingEditor.getByRole("article", { name: "结局预览" })).toBeVisible();
+    await expect(endingEditor.getByText("模型仅生成预览")).toBeVisible();
 
     const endingWrite = page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/graph`) && response.request().method() === "PUT");
-    await endingEditor.getByRole("button", { name: "保存作者结局" }).click();
+    await endingEditor.getByRole("button", { name: "采用并保存" }).click();
     expect((await endingWrite).ok()).toBe(true);
     await expect(page.getByText("已保存作者结局，已切换到新节点。")).toBeVisible();
 
     const persisted = (await (await request.get(`/api/projects/${project.id}/graph`)).json()).graph as { nodes: Array<{ kind: string; title: string }>; edges: Array<{ label: string }> };
     expect(persisted.nodes).toHaveLength(9);
     expect(persisted.nodes.filter((node) => node.kind === "ending")).toHaveLength(2);
-    expect(persisted.nodes.some((node) => node.title === "A New Dawn")).toBe(true);
-    expect(persisted.edges.some((edge) => edge.label === "Open the final lantern")).toBe(true);
+    expect(persisted.nodes.some((node) => node.title.endsWith("：最后的回声"))).toBe(true);
+    expect(persisted.edges.some((edge) => edge.label === "沿着潮声寻找最后的答案")).toBe(true);
 
     const validation = await request.post(`/api/projects/${project.id}/validate`, { data: { sources: ["structural", "rule"] } });
     expect(validation.ok()).toBe(true);
-    const snapshot = await request.post(`/api/projects/${project.id}/snapshots`);
+    const snapshot = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshot.status()).toBe(201);
   });
 });

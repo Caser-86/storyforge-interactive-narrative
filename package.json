@@ -20,8 +20,10 @@
     "db:authoring:backup": "tsx src/scripts/authoring-db-backup.ts",
     "db:authoring:checkpoint": "tsx src/scripts/authoring-db-checkpoint.ts",
     "db:authoring:restore-check": "tsx src/scripts/authoring-db-restore-check.ts",
+    "db:interactive:benchmark": "tsx src/scripts/interactive-history-benchmark.ts",
     "authoring:doctor": "tsx src/scripts/authoring-doctor.ts",
     "authoring:evaluate": "tsx src/scripts/authoring-evaluate.ts",
+    "interactive:evaluate": "tsx src/scripts/interactive-evaluate.ts",
     "package:smoke": "pwsh -File scripts/package-smoke.ps1 -Mode DryRun",
     "package:standalone": "pwsh -File scripts/package-standalone.ps1",
     "release:evidence": "pwsh -File scripts/release-evidence.ps1",
@@ -37,7 +39,7 @@
   "dependencies": {
     "better-sqlite3": "^12.10.0",
     "geist": "^1.7.0",
-    "next": "16.3.1",
+    "next": "16.3.4",
     "openai": "^4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -60,11 +62,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.1",
+    "eslint-config-next": "16.3.4",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "tsx": "^4",
     "typescript": "5.9.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.11"
   }
 }

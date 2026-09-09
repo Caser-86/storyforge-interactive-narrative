@@ -11,6 +11,8 @@ export default defineConfig({
     baseURL: "http://localhost:3105",
     channel: process.env.PLAYWRIGHT_CHROME_CHANNEL || undefined,
     headless: true,
+    // APIRequestContext has no browser Origin; mark it as the controlled local test client.
+    extraHTTPHeaders: { "x-storyforge-cli": "1" },
   },
   webServer: {
     command: "node .next-playwright/standalone/server.js",

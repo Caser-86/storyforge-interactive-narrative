@@ -10,6 +10,10 @@ StoryForge 是私人、本地、单作者、文字优先的互动故事创作工
 
 ## 产品与架构
 
+- [2026-09-08 深度审核](2026-09-08-deep-audit.md)：当前代码问题、隔离复现和证据边界。
+- [稳定性与创作质量优化计划](superpowers/plans/2026-09-08-storyforge-reliability-roadmap.md)：阶段 A–D、依赖图、任务清单、当前执行状态和验收门槛。
+- [事务边界](architecture/authoring-transaction-boundaries.md)：SQLite repository 的读写事务、lease 和连接 owner 约束。
+
 - [作者驱动生成规格](superpowers/specs/2026-09-06-author-driven-generation-flow.md)：当前“作者选择、模型续写、有限收尾”的行为契约。
 - [生产成熟度设计](superpowers/specs/2026-08-24-storyforge-production-maturity-design.md)：当前架构边界、风险和阶段目标。
 - [作者驱动生成计划](superpowers/plans/2026-09-06-author-driven-generation-flow.md)：本轮实现计划和验收项。
@@ -23,8 +27,10 @@ StoryForge 是私人、本地、单作者、文字优先的互动故事创作工
 ## 验证与发布
 
 - [作者驱动生成验证记录](2026-09-06-author-driven-generation-flow-verification.md)：默认分支写作入口、模型适配和本轮验证证据。
+- [结构化生成质量评测](quality/generation-evaluation.md)：fake 结构评测、live dry-run 和真实模型质量审阅边界。
 - [发布检查清单](release/authoring-release-checklist.md)：当前候选版本的发布门禁与未完成人工门槛。
 - [发布验证记录](release/authoring-verification.md)：命令结果、E2E 证据和历史发布记录。
+- [互动真实模型审阅表](release/interactive-evaluation-review.md)：付费调用审批、逐幕叙事评分和最终收尾质量门槛。
 - [依赖、SBOM 与签名策略](release/dependency-license-sbom-policy.md)：发布证据、依赖和签名要求。
 - [GitHub Release 流程](release/github-release-procedure.md)：从 canonical `master` 到正式 GitHub Release 的操作步骤。
 - [Windows 分发方案](architecture/windows-packaging-decision.md)：standalone 分发、安装和回滚边界。

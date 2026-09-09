@@ -472,4 +472,127 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
       ADD COLUMN generation_token TEXT;
     `,
   },
+  {
+    version: 11,
+    name: "interactive_persistent_generation_jobs",
+    up: `
+      CREATE TABLE IF NOT EXISTS interactive_generation_jobs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('opening', 'next')),
+        expected_turn INTEGER NOT NULL,
+        turn_id TEXT,
+        choice_id TEXT,
+        generation_token TEXT,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'canceled')),
+        attempt INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3 CHECK (max_attempts >= 1),
+        deadline_at TEXT NOT NULL,
+        lease_token TEXT,
+        lease_expires_at TEXT,
+        next_attempt_at TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        started_at TEXT,
+        completed_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (session_id) REFERENCES interactive_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (turn_id) REFERENCES interactive_turns(id) ON DELETE SET NULL
+      );
+
+      INSERT INTO interactive_generation_jobs (
+        id, project_id, session_id, kind, expected_turn, status, attempt, max_attempts,
+        deadline_at, created_at, updated_at
+      )
+      SELECT
+        'legacy-opening-' || s.id, s.project_id, s.id, 'opening', 0, 'queued', 0, 3,
+        datetime(s.updated_at, '+30 minutes'), s.created_at, s.updated_at
+      FROM interactive_sessions AS s
+      WHERE s.status = 'generating'
+        AND s.turn = 0
+        AND s.current_turn_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM interactive_generation_jobs AS existing WHERE existing.session_id = s.id);
+
+      INSERT INTO interactive_generation_jobs (
+        id, project_id, session_id, kind, expected_turn, turn_id, choice_id, generation_token,
+        status, attempt, max_attempts, deadline_at, created_at, updated_at
+      )
+      SELECT
+        'legacy-next-' || s.id, s.project_id, s.id, 'next', s.turn, t.id, t.selected_choice_id, s.generation_token,
+        'queued', 0, 3, datetime(s.updated_at, '+30 minutes'), s.created_at, s.updated_at
+      FROM interactive_sessions AS s
+      JOIN interactive_turns AS t ON t.id = s.current_turn_id
+      WHERE s.status = 'generating'
+        AND s.turn > 0
+        AND t.selected_choice_id IS NOT NULL
+        AND s.generation_token IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM interactive_generation_jobs AS existing WHERE existing.session_id = s.id);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_interactive_jobs_one_active_session
+        ON interactive_generation_jobs(session_id)
+        WHERE status IN ('queued', 'running');
+      CREATE INDEX IF NOT EXISTS idx_interactive_jobs_claim
+        ON interactive_generation_jobs(status, next_attempt_at, lease_expires_at, created_at);
+      CREATE INDEX IF NOT EXISTS idx_interactive_jobs_session
+        ON interactive_generation_jobs(project_id, session_id, created_at);
+    `,
+  },
+  {
+    version: 12,
+    name: "interactive_usage_ledger_and_budgets",
+    up: `
+      ALTER TABLE interactive_sessions
+      ADD COLUMN output_budget_limit INTEGER;
+
+      ALTER TABLE interactive_sessions
+      ADD COLUMN output_budget_reserved INTEGER NOT NULL DEFAULT 0;
+
+      ALTER TABLE interactive_sessions
+      ADD COLUMN output_budget_consumed INTEGER NOT NULL DEFAULT 0;
+
+      ALTER TABLE interactive_sessions
+      ADD COLUMN output_budget_unknown INTEGER NOT NULL DEFAULT 0;
+
+      CREATE TABLE IF NOT EXISTS interactive_generation_usage (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        task_attempt INTEGER NOT NULL,
+        call_index INTEGER NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('scene', 'ending-repair')),
+        model TEXT NOT NULL,
+        request_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('reserved', 'succeeded', 'unknown', 'canceled')),
+        reserved_output_tokens INTEGER NOT NULL CHECK (reserved_output_tokens >= 0),
+        input_tokens INTEGER CHECK (input_tokens IS NULL OR input_tokens >= 0),
+        output_tokens INTEGER CHECK (output_tokens IS NULL OR output_tokens >= 0),
+        latency_ms INTEGER CHECK (latency_ms IS NULL OR latency_ms >= 0),
+        error_code TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (session_id) REFERENCES interactive_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (task_id) REFERENCES interactive_generation_jobs(id) ON DELETE CASCADE,
+        UNIQUE (task_id, task_attempt, call_index)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_interactive_usage_project
+        ON interactive_generation_usage(project_id, created_at, status);
+      CREATE INDEX IF NOT EXISTS idx_interactive_usage_session
+        ON interactive_generation_usage(session_id, created_at, status);
+    `,
+  },
+  {
+    version: 13,
+    name: "interactive_session_summary_pagination_index",
+    up: `
+      CREATE INDEX IF NOT EXISTS idx_interactive_sessions_project_updated_id
+        ON interactive_sessions(project_id, updated_at DESC, id DESC);
+    `,
+  },
 ];

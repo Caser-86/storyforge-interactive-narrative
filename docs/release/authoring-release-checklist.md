@@ -17,7 +17,7 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] `npm ci` succeeds in a clean secondary directory.
 - [x] `npm run verify` succeeds.
 - [x] `npm run test:e2e:authoring` succeeds with `GENERATION_PROVIDER=fake`.
-- [x] Project filters and interactive session actions pass at desktop and 390 px browser widths.
+- [x] Project filters and interactive session actions pass at desktop and 390 px browser widths; a 1700-character unbroken interactive scene body also stays within the 390 px document width.
 - [x] `npm run db:authoring:smoke` succeeds.
 - [x] `npm run db:authoring:backup` succeeds and reports `Integrity: ok`.
 - [x] `npm run legacy:export -- --dry-run` succeeds without deleting source data.
@@ -28,15 +28,20 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] `npm run package:smoke` dry-run passes without touching author data.
 - [x] Local temporary-root package smoke passes clean install, standalone health, upgrade, deliberately failed upgrade, rollback, and uninstall-preserves-data; the temporary root is removed afterward.
 - [x] `npm run release:evidence` generates CycloneDX SBOM, standalone SHA-256 checksums, and a manifest with `secretsIncluded: false`.
+- [x] Production and full dependency audits pass with `0 vulnerabilities` after the Next.js, sharp, Vitest, and ESLint toolchain security updates.
+- [x] CI declares separate Windows standalone/native SQLite and Linux Docker build/health jobs; remote execution remains a post-push gate.
 - [ ] Clean Windows account install evidence is recorded.
 - [ ] Code signing and a user-facing installer are approved; standalone directory is not yet a signed installer.
 
 ## v0.1.7 Branch Candidate
 
 - [x] Authoring graph completion is implemented: an author-authored side scene can connect to an existing ending, and a new author-authored ending can be added from a non-ending node.
-- [x] The candidate source branch is `codex/branch-writing-v0.1.5`; reviewed audit fixes are included in the `v0.1.7` candidate tag.
+- [x] The candidate source branch is `codex/branch-writing-v0.1.5`; the current working tree contains the reviewed audit fixes.
+- [ ] A new candidate tag is created only after the working tree is committed, reviewed, and the exact commit is confirmed.
 - [x] Previous local candidate gate is recorded: 70 Vitest files / 291 tests, typecheck, lint, build, and 12/12 authoring E2E.
-- [x] Current audit gate is recorded separately: `npm run verify` passed with 72 Vitest files / 302 tests, and `npm run test:e2e:authoring` passed 12/12.
+- [x] Current audit gate is recorded separately: `npm run verify` passed with 84 Vitest files / 398 tests, and `npm run test:e2e:authoring` passed 16/16; isolated process recovery, short SQLite busy-lock, expired queued-job recovery, async focus, timeline refresh, screen-reader status, history status synchronization, explicit interactive-session deep links, cross-origin browser, 390 px long-text, offline interactive-evaluation, gated live-runner parameter checks, Docker data-directory permission, provider credential redaction, provider error-category diagnostics, fake-provider visibility, unknown token-usage budget protection, non-final prompt contract, high-priority thread retention, non-final ending repair, risk-choice repair, malformed active/ending repair, whitespace legacy-memory filtering, full immutable-memory capacity, and Zod schema error classification checks also passed.
+- [x] Docker production image and health smoke pass with an isolated Compose project; the shell entrypoint is enforced as LF to remain executable after Windows Git checkout.
+- [x] Current package evidence is recorded: standalone build, independent artifact credential scan, isolated lifecycle smoke, and `npm run release:evidence` passed with `secretsIncluded: false`; signing remains false.
 - [ ] Candidate is merged into the canonical `master` branch.
 - [ ] The exact canonical-branch commit has a green remote CI run.
 - [ ] A GitHub Release is created from the reviewed canonical-branch tag.
@@ -56,6 +61,8 @@ Use this checklist before treating a local build as a releasable private authori
 - [ ] A GitHub Release is created from the reviewed canonical-branch tag.
 
 ## Release Review
+
+- [x] The latest local verification after the interactive schema-drift retry, history status synchronization, provider error-category diagnostics, session deep-link, unknown token-usage budget, non-final prompt contract, high-priority thread retention, non-final ending repair, risk-choice repair, malformed active/ending repair, whitespace legacy-memory filtering, full immutable-memory capacity, and Zod schema classification fixes passed with 84 Vitest files / 398 tests; the controlled live structural runs passed for all three fixtures, while full manual multi-turn semantic review remains an explicit human gate.
 
 - [x] Backup restore uses a new project ID unless replacement is explicitly intended.
 - [x] Project backup is V2 with interactive history; V1 imports remain supported.
@@ -80,3 +87,5 @@ The following section is historical evidence for the published `v0.1.4` release.
 ## Operator Step Before Tagging
 
 - [x] Run `npm run authoring:llm:smoke` with the configured OpenAI-compatible provider credentials; the redacted result is recorded without exposing the key or raw response.
+- [ ] Complete [`interactive-evaluation-review.md`](interactive-evaluation-review.md) with the human 1–5 scores for each approved fixture; the controlled DeepSeek structural runs are recorded, but fake and structural-only results cannot satisfy this semantic gate.
+- [ ] The author manually completes one full branch-writing path, confirms the selected consequences and model ending, and records release approval.

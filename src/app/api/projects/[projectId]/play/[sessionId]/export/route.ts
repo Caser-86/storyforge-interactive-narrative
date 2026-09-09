@@ -1,4 +1,5 @@
 import { errorResponse } from "@/lib/authoring/api-contracts";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import { createInteractiveRepository } from "@/lib/interactive/repository";
 import { InteractiveExportSchema, renderInteractiveJson, renderInteractiveMarkdown } from "@/lib/interactive/export";
@@ -17,8 +18,9 @@ function filename(projectId: string, format: "json" | "markdown"): string {
 }
 
 export async function GET(request: Request, { params }: ExportRouteContext): Promise<Response> {
-  const authoring = createAuthoringRepository();
-  const interactive = createInteractiveRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoring = createAuthoringRepository(databaseScope.options);
+  const interactive = createInteractiveRepository(databaseScope.options);
   try {
     const { projectId, sessionId } = await params;
     const format = readFormat(request);
@@ -44,5 +46,6 @@ export async function GET(request: Request, { params }: ExportRouteContext): Pro
   } finally {
     interactive.close();
     authoring.close();
+    databaseScope.close();
   }
 }

@@ -55,7 +55,11 @@ describe("interactive session routes", () => {
     const context = { params: Promise.resolve({ projectId: project.id }) };
     const listed = await listRoute.GET(new Request("http://local"), context);
     expect(listed.status).toBe(200);
-    expect((await listed.json()).sessions[0].id).toBe(session.id);
+    const listedPayload = await listed.json();
+    expect(listedPayload.sessions[0].id).toBe(session.id);
+    expect(listedPayload.sessions[0]).not.toHaveProperty("state");
+    expect(listedPayload.sessions[0]).not.toHaveProperty("scene");
+    expect(listedPayload.nextCursor).toBeNull();
 
     const deleted = await deleteRoute.DELETE(new Request("http://local", { method: "DELETE" }), {
       params: Promise.resolve({ projectId: project.id, sessionId: session.id }),

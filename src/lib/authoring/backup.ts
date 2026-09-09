@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { z } from "zod";
+import { redactSensitiveText } from "@/lib/errors";
 import { AuthoringError } from "./errors";
 import { getAuthoringDbPath, initializeAuthoringDatabase } from "./database";
 import {
@@ -212,10 +213,7 @@ function parseJson(text: string): JsonValue {
 
 function safeMessage(value: string | null): string | null {
   if (!value) return null;
-  return value
-    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
-    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-[redacted]")
-    .replace(/https?:\/\/[^\s/]+:[^\s/@]+@/gi, "[redacted]@");
+  return redactSensitiveText(value);
 }
 
 function storageError(error: unknown, message: string): AuthoringError {
@@ -572,17 +570,41 @@ function mapIds(backup: ProjectBackup, remap: boolean): {
     })),
   };
   const mappedInteractive = {
-    sessions: interactive.sessions.map((session) => ({
-      ...session,
-      id: interactiveSessionIds.get(session.id)!,
-      projectId,
-      currentTurnId: session.currentTurnId ? interactiveTurnIds.get(session.currentTurnId) ?? null : null,
-      materializedVersionId: session.materializedVersionId ? versionIds.get(session.materializedVersionId) ?? null : null,
-    })),
+    sessions: interactive.sessions.map((session) => {
+      const currentTurnId = session.currentTurnId ? interactiveTurnIds.get(session.currentTurnId) ?? null : null;
+      if (session.status !== "generating") {
+        return {
+          ...session,
+          id: interactiveSessionIds.get(session.id)!,
+          projectId,
+          currentTurnId,
+          materializedVersionId: session.materializedVersionId ? versionIds.get(session.materializedVersionId) ?? null : null,
+        };
+      }
+
+      const hasCurrentScene = currentTurnId !== null && interactive.turns.some((turn) => turn.id === session.currentTurnId);
+      return {
+        ...session,
+        id: interactiveSessionIds.get(session.id)!,
+        projectId,
+        status: hasCurrentScene ? "active" as const : "failed" as const,
+        currentTurnId,
+        lastError: hasCurrentScene
+          ? "项目 JSON 备份未包含进行中的生成任务，当前选择已恢复，请重新选择。"
+          : "项目 JSON 备份未包含进行中的开场任务，请重新生成开场。",
+        materializedVersionId: session.materializedVersionId ? versionIds.get(session.materializedVersionId) ?? null : null,
+      };
+    }),
     turns: interactive.turns.map((turn) => ({
       ...turn,
       id: interactiveTurnIds.get(turn.id)!,
       sessionId: interactiveSessionIds.get(turn.sessionId)!,
+      selectedChoiceId: interactive.sessions.find((session) => session.id === turn.sessionId && session.status === "generating" && session.currentTurnId === turn.id)
+        ? null
+        : turn.selectedChoiceId,
+      selectedAt: interactive.sessions.find((session) => session.id === turn.sessionId && session.status === "generating" && session.currentTurnId === turn.id)
+        ? null
+        : turn.selectedAt,
     })),
   };
 

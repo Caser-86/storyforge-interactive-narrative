@@ -24,6 +24,44 @@ describe("deterministic quality rules", () => {
     expect(issue?.detailsJson).toHaveProperty("ngram");
   });
 
+  it("does not flag short shared Chinese phrases as repeated prose", () => {
+    const graph = validReleaseGraph();
+    graph.nodes[1] = {
+      ...graph.nodes[1]!,
+      body: "潮声穿过旧门，沈砚检查档案，微光落在桌面，时间正在逼近。",
+    };
+    graph.nodes[2] = {
+      ...graph.nodes[2]!,
+      body: "潮声穿过旧门，林小满守住入口，雨水打湿台阶，她等待回应。",
+    };
+
+    expect(runDeterministicRules(graph).some((issue) => issue.code === "REPEATED_PROSE")).toBe(false);
+  });
+
+  it("flags a long Chinese phrase with an eight-character measured n-gram", () => {
+    const graph = validReleaseGraph();
+    graph.nodes[1] = {
+      ...graph.nodes[1]!,
+      body: "沈砚沿着潮湿的长廊回到档案馆，发现墙上的标记仍在，门外的潮声渐远。",
+    };
+    graph.nodes[2] = {
+      ...graph.nodes[2]!,
+      body: "林小满沿着潮湿的长廊回到档案馆，发现墙上的标记仍在，门外的灯光渐暗。",
+    };
+
+    const issue = runDeterministicRules(graph).find((candidate) => candidate.code === "REPEATED_PROSE");
+    expect(issue?.detailsJson).toMatchObject({ ngramSize: 8 });
+  });
+
+  it("reports at most one repeated-prose warning for a node pair", () => {
+    const graph = validReleaseGraph();
+    const repeated = "The brass gate opens slowly while the courier listens for the hidden mechanism.";
+    graph.nodes[1] = { ...graph.nodes[1]!, body: `${repeated} The brass gate opens slowly again.` };
+    graph.nodes[2] = { ...graph.nodes[2]!, body: `${repeated} The brass gate opens slowly again.` };
+
+    expect(runDeterministicRules(graph).filter((issue) => issue.code === "REPEATED_PROSE")).toHaveLength(1);
+  });
+
   it("flags path depth imbalance, merge canon conflicts, and unresolved threads", () => {
     const graph = validReleaseGraph();
     graph.nodes[5] = { ...graph.nodes[5]!, title: "Lantern", body: "The lantern is blue at the merge.", summary: "The lantern changes color." };

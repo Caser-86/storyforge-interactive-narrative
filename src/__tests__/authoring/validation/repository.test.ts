@@ -65,4 +65,17 @@ describe("validation repository", () => {
     await expect(validation.dismissWarning(blocking.id)).rejects.toMatchObject({ code: "VALIDATION" });
     expect((await validation.resolveIssue(blocking.id)).status).toBe("resolved");
   });
+
+  it("does not leave a validation run when its persisted source contract is invalid", async () => {
+    const project = await authoring.createProject(brief);
+    await expect(validation.createRun(project.id, project.activeDraftVersionId!, 0, ["invalid" as never])).rejects.toMatchObject({ code: "STORAGE" });
+    expect(await validation.listRuns(project.id)).toEqual([]);
+  });
+
+  it("does not leave an invalid terminal status after completion validation fails", async () => {
+    const project = await authoring.createProject(brief);
+    const run = await validation.createRun(project.id, project.activeDraftVersionId!, 0, ["rule"]);
+    await expect(validation.completeRun(run.id, "invalid" as never)).rejects.toMatchObject({ code: "STORAGE" });
+    expect((await validation.listRuns(project.id))[0]?.status).toBe("running");
+  });
 });

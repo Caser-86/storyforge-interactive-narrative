@@ -2,6 +2,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildBriefPrompt, STAGE_MAX_TOKENS, STAGE_SYSTEM_PROMPT } from "../lib/authoring/generation/prompts";
 import { OpenAICompatibleGenerationProvider } from "../lib/authoring/generation/openai-provider";
+import { DEFAULT_OPENAI_MODEL } from "../lib/authoring/generation/defaults";
 import { buildSmokeReport } from "../lib/authoring/generation/smoke";
 import { BriefOutputSchema } from "../lib/authoring/generation/stages/types";
 import { loadAuthoringEnv } from "../lib/authoring/local-env";
@@ -9,7 +10,7 @@ import { getErrorMessage } from "../lib/errors";
 
 loadAuthoringEnv();
 const args = new Set(process.argv.slice(2));
-const model = process.env.OPENAI_MODEL || "deepseek-v4-flash";
+const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
 
 function smokeContext() {
   return {

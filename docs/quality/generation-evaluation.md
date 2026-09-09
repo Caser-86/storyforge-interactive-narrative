@@ -9,7 +9,7 @@ npm run authoring:evaluate -- --provider fake
 npm run authoring:evaluate -- --dry-run --provider live
 ```
 
-`fake` 模式不访问网络，验证评测器、结构契约和输出报告；报告只写入 `output/evaluations/latest.json`，该目录被 `.gitignore` 忽略。`live` 当前故意只支持 dry-run，先展示语料数量与最大输出 token 预算，避免误触发付费模型调用。未来启用真实评测时，必须增加明确的人工批准、硬预算和脱敏输出审核。
+`fake` 模式不访问网络，验证评测器、结构契约和输出报告；报告只写入 `output/evaluations/latest.json`，该目录被 `.gitignore` 忽略。结构化评测的 `live` 当前故意只支持 dry-run，先展示语料数量与最大输出 token 预算，避免误触发付费模型调用。互动分支写作另有受控的单样本 live runner，必须遵守 [`互动真实模型审阅表`](../release/interactive-evaluation-review.md) 的人工批准、硬预算和脱敏输出要求。
 
 ## 评分契约
 

@@ -10,6 +10,7 @@ export const GenerationStageSchema = z.enum([
   "structural_check",
   "nodes",
   "continuity_review",
+  "author_ending",
   "ready",
 ]);
 

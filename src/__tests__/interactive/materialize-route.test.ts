@@ -70,7 +70,7 @@ describe("interactive materialize route", () => {
     const interactive = createInteractiveRepository();
     const session = await interactive.createSession(project.id, state);
     await interactive.saveInitialScene(session.id, opening, state);
-    const claim = await interactive.claimChoice(project.id, session.id, "choice_a");
+    const claim = await interactive.claimChoice(project.id, session.id, "choice_a", 1);
     await interactive.saveNextScene(session.id, claim, ending, { ...state, turn: 2 });
     interactive.close();
 

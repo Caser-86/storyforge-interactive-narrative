@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+
 export type ProviderErrorCode = "AUTH" | "RATE_LIMIT" | "TIMEOUT" | "NETWORK" | "EMPTY" | "SCHEMA" | "UNKNOWN";
 
 export class ProviderError extends Error {
@@ -36,6 +38,13 @@ function asErrorLike(error: unknown): ErrorLike {
 export function classifyProviderError(error: unknown): ProviderError {
   if (error instanceof ProviderError) {
     return error;
+  }
+
+  if (error instanceof ZodError) {
+    return new ProviderError("SCHEMA", "Provider response failed schema validation", false, {
+      details: { issueCount: error.issues.length },
+      cause: error,
+    });
   }
 
   const source = asErrorLike(error);

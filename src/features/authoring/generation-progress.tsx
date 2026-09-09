@@ -28,6 +28,7 @@ const stageLabels: Record<GenerationRun["stage"], string> = {
   structural_check: "结构校验",
   nodes: "节点内容",
   continuity_review: "连续性审阅",
+  author_ending: "作者结局预览",
   ready: "准备完成",
 };
 

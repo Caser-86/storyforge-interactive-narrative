@@ -1,4 +1,5 @@
 import { errorResponse, json } from "@/lib/authoring/api-contracts";
+import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { createGenerationRepository } from "@/lib/authoring/generation/repository";
 import { GenerationNextResponseSchema } from "@/lib/authoring/generation/api-contracts";
 import { assertRunProject, summarizeStep } from "@/lib/authoring/generation/api-helpers";
@@ -11,8 +12,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(_request: Request, { params }: NextRouteContext): Promise<Response> {
-  const authoring = createAuthoringRepository();
-  const repository = createGenerationRepository();
+  const databaseScope = createAuthoringDatabaseScope();
+  const authoring = createAuthoringRepository(databaseScope.options);
+  const repository = createGenerationRepository(databaseScope.options);
   try {
     const { projectId, runId } = await params;
     const run = await repository.getRun(runId);
@@ -37,5 +39,6 @@ export async function POST(_request: Request, { params }: NextRouteContext): Pro
   } finally {
     repository.close();
     authoring.close();
+    databaseScope.close();
   }
 }
