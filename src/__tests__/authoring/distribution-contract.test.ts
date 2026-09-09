@@ -23,6 +23,9 @@ describe("Windows distribution contract", () => {
     expect(script).toMatch(/Mode.*DryRun/);
     expect(script).toMatch(/Local mode requires/);
     expect(script).toMatch(/system temporary directory/);
+    expect(script).toMatch(/temporaryRoots/);
+    expect(script).toMatch(/GITHUB_ACTIONS/);
+    expect(script).toMatch(/RUNNER_TEMP/);
     expect(script).toMatch(/Remove-Item -LiteralPath \$resolvedRoot/);
     expect(packageScript).toMatch(/Copy-Item -Path/);
     expect(packageScript).toMatch(/packageRoot = "\."/);
