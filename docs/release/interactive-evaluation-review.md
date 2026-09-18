@@ -8,6 +8,7 @@
 - 记录实际使用的 `OPENAI_MODEL`、Provider、样本版本、日期和脱敏后的用量摘要。
 - 当前仓库提供 fake runner、live dry-run 和受控的单样本 live runner；live dry-run 只检查计划，不发网络请求。真实模型评测必须在批准的受控环境中逐样本执行，不能用本地 fake 结果填表。
 - 每个样本只沿一条预先记录的风险路径走完，保存最终导出的文本和脱敏评测记录，不保存原始 prompt、完整响应或密钥。
+- 作者需要快速定位人工阅读重点时，可先看 [`interactive-evaluation-pre-review.md`](interactive-evaluation-pre-review.md)；该文件是 AI 辅助预审稿，不是正式评分，也不能替代本文件的四维人工门禁。
 
 ## 评测样本
 

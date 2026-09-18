@@ -349,3 +349,4 @@ The clean production route table contains only `/api/health`, `/api/projects/**`
 - 以 `doubao-seed-evolving` 和 `--save-review --expected-model doubao-seed-evolving` 执行三套 live 样本：`zh-contemporary-6` 为 `6/6`、`zh-fantasy-8` 为 `8/8`、`zh-suspense-16` 为 `16/16`；三者的 ending、choice contract、risk coverage、consequence 均通过，`issueCodes=[]`。
 - 最新 JSON 结果与当前 `OPENAI_MODEL` 一致；三份审阅 Markdown 的 `sk-`、`ark-`、Bearer、API key、原始 prompt 和原始响应标记扫描均为 `0`。
 - 该记录关闭模型一致性的自动化证据，但不代替四维人工语义评分，也不关闭作者确认、读屏/移动端、干净 Windows 账户安装和代码签名门禁。
+- 为降低作者逐幕审阅成本，新增 [`interactive-evaluation-pre-review.md`](interactive-evaluation-pre-review.md)。其中的建议分数和证据索引仅供作者确认，不改变正式评分表的未完成状态。
