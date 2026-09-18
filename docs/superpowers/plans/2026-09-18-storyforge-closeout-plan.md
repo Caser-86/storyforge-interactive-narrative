@@ -208,6 +208,7 @@ pwsh -File scripts/package-smoke.ps1 -Mode Local -Root $closeoutSmokeRoot
 - [x] 已基于 `f2fec8b` 创建并推送新的 annotated tag `v0.1.8`；既有 `v0.1.7` 未移动或覆盖。
 - [x] 已从 `v0.1.8` 创建 GitHub Release，附 standalone ZIP、ZIP SHA-256、SBOM、standalone 文件清单和 release evidence；标签 CI 的 evidence manifest 报告 `packageFileCount=2023`、`secretsIncluded=false`、`signed=false`。
 - [x] 已核对 Release 链接、tag 指向、下载文件、版本号、checksum 和标签 CI：PR https://github.com/Caser-86/storyforge-interactive-narrative/pull/3，CI https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35365455851，Release https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8。
+- [x] 收尾文档继续同步：PR https://github.com/Caser-86/storyforge-interactive-narrative/pull/8 已合并为 `06deca9`，合并后 CI https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35378189219 的 verify、作者流程 E2E、Docker 和 Windows standalone 均通过；新增 AI 辅助预审稿，但未代填正式四维人工评分。
 
 **交付标准：** 可以从 GitHub 下载一个与标签和验证记录一致的版本；发布状态由远程可观察结果证明。
 
@@ -246,3 +247,4 @@ pwsh -File scripts/package-smoke.ps1 -Mode Local -Root $closeoutSmokeRoot
 - 真实模型复评：以进程级 `OPENAI_MODEL=deepseek-v4-flash` 重新执行三套受控 live 样本，最终为 `6/6`、`8/8`、`16/16`，结构、结局、选择契约、风险覆盖和直接后果检查均通过且 `issueCodes=[]`；16 幕样本首次在 `14/16` 出现 `GENERATION_SCHEMA`/`RISK_SEQUENCE`，有界重试后恢复，已作为稳定性风险记录而不是隐藏失败。
 - 最终配置模型复评：直接读取 `.env.local` 的 `doubao-seed-evolving` 执行 provider smoke 和三套受控 live 样本，最终为 `6/6`、`8/8`、`16/16`，结构检查均通过且 `issueCodes=[]`；最新审阅材料与当前 `OPENAI_MODEL` 一致并通过敏感信息标记扫描。人工四维语义评分仍未代填。
 - 残余人工门禁：真实模型语义评分尚未代填，代码签名和干净 Windows 账户安装仍未完成；它们不被本地自动化或当前 Release 记录冒充为已通过。
+- 预审补充：三套当前配置模型材料已有证据幕号和建议起始分；`zh-suspense-16` 的“明晚 23:47”被明确列为作者需要确认的结局意图，不自动视为已收束或失败。
