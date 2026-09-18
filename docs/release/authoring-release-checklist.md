@@ -45,11 +45,12 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] Standalone package, SBOM, SHA-256 checksums, secret scan, package smoke dry-run, and isolated Windows lifecycle smoke passed for `0.1.8`; signing remains false. The final tag CI evidence manifest reports `packageFileCount=2023` and `secretsIncluded=false`.
 - [x] Local health check returned HTTP 200, version `0.1.8`, persistent SQLite, and configured LLM.
 - [x] The author has reported that the current manual project test completed without an issue; no project ID, exact model, or per-turn semantic scores are inferred from that feedback.
-- [ ] Real-model semantic scoring for the final release model is complete and matches `OPENAI_MODEL`.
+- [ ] Real-model semantic scoring for the final release model is complete and matches `OPENAI_MODEL`; the AI-assisted pre-review is available, but the four scores and the `zh-suspense-16` ending-intent decision are still author actions.
 - [x] Candidate commit `ff24399` was pushed, PR #3 was merged into canonical `master` as `f2fec8b`, and the exact candidate commit passed remote CI.
 - [x] Annotated `v0.1.8` and GitHub Release were created from canonical commit `f2fec8b`; tag CI run `35365455851` passed all jobs including release evidence.
 - [x] Release links are recorded: [PR #3](https://github.com/Caser-86/storyforge-interactive-narrative/pull/3), [tag CI](https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35365455851), [GitHub Release](https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8).
 - [x] Post-release evidence documentation was synchronized through [PR #5](https://github.com/Caser-86/storyforge-interactive-narrative/pull/5), merged to `master` as `144180c`; merge CI run [35372119006](https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35372119006) passed.
+- [x] The AI-assisted semantic pre-review was synchronized through [PR #8](https://github.com/Caser-86/storyforge-interactive-narrative/pull/8), merged to `master` as `06deca9`; post-merge CI run [35378189219](https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35378189219) passed. This does not replace the formal author score.
 
 ## v0.1.7 Branch Candidate
 
