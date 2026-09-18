@@ -1,6 +1,6 @@
-import { CreateProjectResponseSchema, EdgePatchResponseSchema, NodePatchResponseSchema } from "@/lib/authoring/api-contracts";
+import { CreateProjectResponseSchema, EdgePatchResponseSchema, GraphWriteResponseSchema, NodePatchResponseSchema } from "@/lib/authoring/api-contracts";
 import type { CreateProjectInputPayload } from "@/lib/authoring/api-contracts";
-import type { Project, StoryEdgePatch, StoryNodePatch } from "@/lib/authoring/schemas";
+import type { Project, StoryEdgePatch, StoryGraph, StoryNodePatch } from "@/lib/authoring/schemas";
 import {
   GenerationListResponseSchema,
   GenerationNextResponseSchema,
@@ -13,6 +13,11 @@ import type { GenerationStatusResponse } from "@/lib/authoring/generation/api-co
 import type { GenerationRun } from "@/lib/authoring/generation/schemas";
 import { PreviewResponseSchema, SnapshotResponseSchema } from "@/lib/authoring/preview-contracts";
 import type { PreviewResponse } from "@/lib/authoring/preview-contracts";
+import {
+  AuthorEndingGenerationResponseSchema,
+  type AuthorEndingGenerationInput,
+  type AuthorEndingGenerationResponse,
+} from "@/lib/authoring/generation/api-contracts";
 
 async function responseError(response: Response): Promise<Error> {
   try {
@@ -45,11 +50,11 @@ export async function listGenerationRuns(projectId: string): Promise<GenerationR
   return parseJson(response, (value) => GenerationListResponseSchema.parse(value).runs);
 }
 
-export async function createGenerationRun(projectId: string): Promise<GenerationRun> {
+export async function createGenerationRun(projectId: string, options: { freshDraft?: boolean } = {}): Promise<GenerationRun> {
   const response = await fetch(`/api/projects/${projectId}/generation`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(options),
   });
   return parseJson(response, (value) => GenerationResponseSchema.parse(value).run);
 }
@@ -93,6 +98,25 @@ export async function patchEdge(projectId: string, edgeId: string, patch: StoryE
     body: JSON.stringify({ edgeId, patch, expectedRevision }),
   });
   return parseJson(response, (value) => EdgePatchResponseSchema.parse(value));
+}
+
+export async function putGraph(projectId: string, graph: StoryGraph, expectedRevision: number) {
+  const response = await fetch(`/api/projects/${projectId}/graph`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ graph, expectedRevision }),
+  });
+  const result = await parseJson(response, (value) => GraphWriteResponseSchema.parse(value));
+  return { ...result, draftRevision: expectedRevision + 1 };
+}
+
+export async function generateAuthorEnding(projectId: string, input: AuthorEndingGenerationInput): Promise<AuthorEndingGenerationResponse> {
+  const response = await fetch(`/api/projects/${projectId}/endings/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response, (value) => AuthorEndingGenerationResponseSchema.parse(value));
 }
 
 export async function regenerateNode(projectId: string, nodeId: string, expectedRevision: number) {

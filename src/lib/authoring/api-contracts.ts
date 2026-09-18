@@ -55,6 +55,10 @@ export const PatchProjectInputSchema = z
     }
   });
 
+// Eight megabytes keeps the graph endpoint bounded while covering the documented
+// 80-node and 12,000-character node-body limits when content is UTF-8 Chinese text.
+export const MAX_GRAPH_WRITE_BYTES = 8_000_000;
+
 export const GraphWriteInputSchema = z
   .object({
     graph: StoryGraphSchema,
@@ -278,6 +282,8 @@ function authoringErrorResponse(error: AuthoringError): Response {
 
 function statusForAuthoringCode(code: AuthoringError["code"]): number {
   switch (code) {
+    case "FORBIDDEN":
+      return 403;
     case "VALIDATION":
       return 400;
     case "NOT_FOUND":

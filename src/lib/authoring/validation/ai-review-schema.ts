@@ -19,13 +19,33 @@ export const AiReviewIssueSchema = z
   })
   .strict();
 
-export const AiReviewOutputSchema = z
+const AiReviewEnvelopeSchema = z
   .object({
-    passed: z.boolean(),
-    issues: z.array(AiReviewIssueSchema),
+    passed: z.boolean().optional(),
+    issues: z.array(AiReviewIssueSchema).optional(),
+    warnings: z.array(AiReviewIssueSchema).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.issues === undefined && value.warnings === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["issues"],
+        message: "A continuity review must include issues or warnings.",
+      });
+    }
+  })
+  .transform((value) => {
+    const issues = value.issues ?? value.warnings ?? [];
+    return {
+      passed: value.passed ?? issues.length === 0,
+      issues,
+    };
+  });
+
+export type AiReviewOutput = z.output<typeof AiReviewEnvelopeSchema>;
+
+export const AiReviewOutputSchema: z.ZodType<AiReviewOutput, z.ZodTypeDef, unknown> = AiReviewEnvelopeSchema;
 
 export type AiReviewCode = z.infer<typeof AiReviewCodeSchema>;
 export type AiReviewIssue = z.infer<typeof AiReviewIssueSchema>;
-export type AiReviewOutput = z.infer<typeof AiReviewOutputSchema>;

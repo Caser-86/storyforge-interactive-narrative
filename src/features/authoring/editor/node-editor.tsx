@@ -12,6 +12,7 @@ type NodeEditorProps = {
 };
 
 type DraftValues = Pick<StoryNode, "title" | "body" | "summary" | "objective">;
+const draftFields = ["title", "body", "summary", "objective"] as const;
 
 const stateLabels: Record<AutosaveState, string> = {
   idle: "有未保存更改",
@@ -30,9 +31,10 @@ export function NodeEditor({ projectId, node, onSaved }: NodeEditorProps) {
       save: async (change, expectedRevision) => {
         const result = await patchNode(projectId, node.id, change, expectedRevision);
         setRevision(result.node.contentRevision);
-        setDraft(valuesFromNode(result.node));
+        setDraft((current) => mergeSavedNode(current, change, result.node));
         setSaveError(null);
         onSaved?.(result.node, result.draftRevision);
+        return { nextRevision: result.node.contentRevision };
       },
       onStateChange: (state, error) => {
         setSaveState(state);
@@ -72,4 +74,14 @@ export function NodeEditor({ projectId, node, onSaved }: NodeEditorProps) {
 
 function valuesFromNode(node: StoryNode): DraftValues {
   return { title: node.title, body: node.body, summary: node.summary, objective: node.objective };
+}
+
+function mergeSavedNode(draft: DraftValues, change: Record<string, string>, node: StoryNode): DraftValues {
+  const nextDraft = { ...draft };
+  for (const field of draftFields) {
+    if (change[field] !== undefined && draft[field] === change[field]) {
+      nextDraft[field] = node[field];
+    }
+  }
+  return nextDraft;
 }

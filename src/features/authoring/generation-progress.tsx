@@ -28,6 +28,7 @@ const stageLabels: Record<GenerationRun["stage"], string> = {
   structural_check: "结构校验",
   nodes: "节点内容",
   continuity_review: "连续性审阅",
+  author_ending: "作者结局预览",
   ready: "准备完成",
 };
 
@@ -169,6 +170,21 @@ export function GenerationProgress({ projectId, projectTitle }: GenerationProgre
     }
   }
 
+  async function handleNewRun() {
+    if (isActionPending) return;
+    setIsActionPending(true);
+    setError(null);
+    try {
+      const nextRun = await createGenerationRun(projectId, { freshDraft: true });
+      setConfirmedBudgetRunId(null);
+      await syncStatus(nextRun);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "无法创建新的生成流程");
+    } finally {
+      setIsActionPending(false);
+    }
+  }
+
   function confirmBudget() {
     if (!run?.budget?.requiresConfirmation) return;
     setConfirmedBudgetRunId(run.id);
@@ -290,6 +306,9 @@ export function GenerationProgress({ projectId, projectTitle }: GenerationProgre
       <div className="generation-controls">
         {run.status === "completed" ? (
           <button className="button button-primary" type="button" onClick={() => router.push(`/projects/${projectId}/edit`)}>进入编辑器 <span aria-hidden="true">→</span></button>
+        ) : null}
+        {run.status === "completed" || run.status === "canceled" ? (
+          <button className="button button-quiet" type="button" disabled={isActionPending} onClick={() => void handleNewRun()}>新建生成</button>
         ) : null}
         {needsBudgetConfirmation ? (
           <button className="button button-primary" type="button" disabled={isActionPending} onClick={confirmBudget}>确认预算并开始生成</button>

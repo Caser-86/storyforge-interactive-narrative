@@ -82,9 +82,13 @@ export function PreviewPlayer({ projectId, projectTitle, initialSnapshotId }: Pr
         <div className="preview-empty">
           <p className="eyebrow">RELEASE PREVIEW</p>
           <h2>还没有可运行的发布快照</h2>
-          <p>预览只运行通过结构校验的不可变快照。封存当前草稿后，所有分支选择都会在本地闭环到结局。</p>
+          <p>预览只运行通过结构校验的不可变快照。封存当前草稿后，只能运行快照中已经存在的分支。</p>
+          <div className="preview-mode-notice" role="note">
+            <strong>这是只读预览</strong>
+            <span>这里不会调用模型，也不会生成新的剧情分支。</span>
+          </div>
           {error ? <p className="preview-error" role="alert">{error}</p> : null}
-          <div className="preview-actions"><button className="button button-primary" type="button" disabled={isBusy} onClick={() => void publishAndPreview()}>{isBusy ? "封存中…" : "封存当前草稿并预览"}</button><Link className="button button-small button-quiet" href={`/projects/${projectId}/edit`}>返回编辑器</Link></div>
+          <div className="preview-actions"><button className="button button-primary" type="button" disabled={isBusy} onClick={() => void publishAndPreview()}>{isBusy ? "封存中…" : "封存当前草稿并预览"}</button><Link className="button button-small button-quiet" href={`/projects/${projectId}/generate`}>进入分支写作</Link><Link className="button button-small button-quiet" href={`/projects/${projectId}/edit`}>返回编辑器</Link></div>
         </div>
       </PreviewFrame>
     );
@@ -97,10 +101,15 @@ export function PreviewPlayer({ projectId, projectTitle, initialSnapshotId }: Pr
   return (
     <PreviewFrame projectTitle={projectTitle}>
       <div className="preview-reader-topline"><span className="eyebrow">SNAPSHOT V{preview.snapshot.versionNumber}</span><span>{runtime.nodePath.length} 次选择</span></div>
+      <div className="preview-mode-notice" role="note">
+        <strong>只读预览</strong>
+        <span>当前运行的是已封存快照；选择只会跳转到已有节点，不会调用模型生成新剧情。</span>
+        <Link className="text-link" href={`/projects/${projectId}/generate`}>进入分支写作</Link>
+      </div>
       <PreviewNode node={node} isEnding={runtime.isEnding} />
       {error ? <p className="preview-error" role="alert">{error}</p> : null}
-      {runtime.isEnding ? <div className="preview-ending"><strong>故事到达结局</strong><button className="button button-small button-quiet" type="button" onClick={() => setRuntime(createRuntime(preview.graph))}>重新开始</button></div> : <div className="preview-choices"><p className="eyebrow">选择下一步</p>{choices.map((edge) => <button className="preview-choice" key={edge.id} type="button" onClick={() => choose(edge.id)}><strong>{edge.label}</strong><span>{preview.graph.nodes.find((candidate) => candidate.id === edge.targetNodeId)?.title ?? "继续"}</span></button>)}</div>}
-      <div className="preview-footer-actions"><Link className="text-link" href={`/projects/${projectId}/edit`}>返回编辑器</Link><button className="icon-button" type="button" disabled={isBusy} onClick={() => void publishAndPreview()}>封存新版本</button><a className="text-link" href={`/api/projects/${projectId}/export/html?snapshotId=${preview.snapshot.id}`}>导出 HTML</a></div>
+      {runtime.isEnding ? <div className="preview-ending"><strong>故事到达结局</strong><button className="button button-small button-quiet" type="button" onClick={() => setRuntime(createRuntime(preview.graph))}>重新开始</button></div> : <div className="preview-choices"><p className="eyebrow">选择下一步</p><p className="preview-choice-note">以下选项只会跳转到快照中已经生成的节点，不会生成新的剧情。</p>{choices.map((edge) => <button className="preview-choice" key={edge.id} type="button" onClick={() => choose(edge.id)}><strong>{edge.label}</strong><span>{edge.branchType === "side" ? "作者分支 · " : ""}{preview.graph.nodes.find((candidate) => candidate.id === edge.targetNodeId)?.title ?? "继续"}</span></button>)}</div>}
+      <div className="preview-footer-actions"><Link className="text-link" href={`/projects/${projectId}/edit`}>返回编辑器</Link><Link className="button button-small button-primary" href={`/projects/${projectId}/generate`}>继续分支写作</Link><button className="icon-button" type="button" disabled={isBusy} onClick={() => void publishAndPreview()}>封存新版本</button><a className="text-link" href={`/api/projects/${projectId}/export/html?snapshotId=${preview.snapshot.id}`}>导出 HTML</a></div>
     </PreviewFrame>
   );
 }

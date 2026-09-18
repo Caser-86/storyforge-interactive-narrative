@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { readIntEnv } from "../../env";
+import { DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_MODEL } from "./defaults";
 import type { GenerationProvider, ProviderResult, StructuredGenerationRequest } from "./provider";
 import { classifyProviderError, ProviderError } from "./provider-errors";
 
@@ -13,6 +14,7 @@ interface ChatCompletionClient {
         thinking?: { type: "enabled" | "disabled" };
         temperature?: number;
         max_tokens?: number;
+        signal?: AbortSignal;
       }): Promise<unknown>;
     };
   };
@@ -31,6 +33,18 @@ type ChatCompletionResponse = {
   choices?: Array<{ message?: { content?: string | null } }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 };
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function readUsageToken(value: unknown): number {
+  return isNonNegativeInteger(value) ? value : 0;
+}
+
+function hasConfirmedUsage(usage: ChatCompletionResponse["usage"]): boolean {
+  return isNonNegativeInteger(usage?.prompt_tokens) && isNonNegativeInteger(usage?.completion_tokens);
+}
 
 function parseStructuredContent(content: string): unknown {
   try {
@@ -60,11 +74,17 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
 
   public async generate<T>(request: StructuredGenerationRequest<T>): Promise<ProviderResult<T>> {
     const start = Date.now();
-    const model = request.model ?? this.options.defaultModel ?? process.env.OPENAI_MODEL ?? "deepseek-v4-flash";
+    const model = request.model ?? this.options.defaultModel ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
 
     try {
-      const baseURL = this.options.baseURL ?? process.env.OPENAI_BASE_URL ?? "https://api.deepseek.com";
-      const isDeepSeek = model.toLowerCase().startsWith("deepseek-") || baseURL.toLowerCase().includes("deepseek.com");
+      const baseURL = this.options.baseURL ?? process.env.OPENAI_BASE_URL ?? DEFAULT_OPENAI_BASE_URL;
+      const normalizedModel = model.toLowerCase();
+      const normalizedBaseURL = baseURL.toLowerCase();
+      const disableThinking = normalizedModel.startsWith("deepseek-")
+        || normalizedModel.startsWith("doubao-")
+        || normalizedBaseURL.includes("deepseek.com")
+        || normalizedBaseURL.includes("volces.com")
+        || normalizedBaseURL.includes("volcengineapi.com");
       const response = (await this.getClient().chat.completions.create({
         model,
         messages: [
@@ -72,9 +92,10 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
           { role: "user", content: request.userPrompt },
         ],
         response_format: { type: "json_object" },
-        ...(isDeepSeek ? { thinking: { type: "disabled" as const } } : {}),
+        ...(disableThinking ? { thinking: { type: "disabled" as const } } : {}),
         temperature: request.temperature,
         max_tokens: request.maxTokens,
+        signal: request.signal,
       })) as ChatCompletionResponse;
       const rawResponse = JSON.stringify(response) ?? String(response);
       const content = response.choices?.[0]?.message?.content?.trim();
@@ -100,8 +121,9 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
       return {
         data: validated.data,
         rawResponse,
-        inputTokens: response.usage?.prompt_tokens ?? 0,
-        outputTokens: response.usage?.completion_tokens ?? 0,
+        inputTokens: readUsageToken(response.usage?.prompt_tokens),
+        outputTokens: readUsageToken(response.usage?.completion_tokens),
+        usageConfirmed: hasConfirmedUsage(response.usage),
         latencyMs: Date.now() - start,
         model,
         requestId: response.id,
@@ -119,8 +141,8 @@ export class OpenAICompatibleGenerationProvider implements GenerationProvider {
     if (!this.client) {
       const client = new OpenAI({
         apiKey: this.options.apiKey ?? process.env.OPENAI_API_KEY,
-        baseURL: this.options.baseURL ?? process.env.OPENAI_BASE_URL ?? "https://api.deepseek.com",
-        timeout: this.options.timeoutMs ?? readIntEnv("OPENAI_TIMEOUT_MS", 60_000, { min: 1 }),
+        baseURL: this.options.baseURL ?? process.env.OPENAI_BASE_URL ?? DEFAULT_OPENAI_BASE_URL,
+        timeout: this.options.timeoutMs ?? readIntEnv("OPENAI_TIMEOUT_MS", 180_000, { min: 1 }),
         maxRetries: 0,
       });
       this.client = client as unknown as ChatCompletionClient;

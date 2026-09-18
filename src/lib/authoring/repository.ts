@@ -1,11 +1,13 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { AuthoringError } from "./errors";
-import { initializeAuthoringDatabase } from "./database";
+import { acquireAuthoringDatabase } from "./database";
 import type { AuthoringDatabaseOptions } from "./database";
 import { sealSnapshotInDatabase } from "./snapshots";
-import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "./graph";
+import { validateStoryGraph } from "./graph";
+import { parseStoredReleasePolicy, resolveReleaseLimits, serializeReleasePolicy, type ReleaseProfile } from "./release-policy";
 import { findAffectedNodes } from "./impact";
+import { StoryGraphSchema } from "./schemas";
 import type {
   Chapter,
   JsonValue,
@@ -51,12 +53,27 @@ export type ProjectSummary = Project & {
   blockingIssueCount: number;
 };
 
+export type MaterializedDraft = {
+  project: Project;
+  version: StoryVersion;
+  graph: StoryGraph;
+  created: boolean;
+};
+
+export type GenerationDraft = {
+  project: Project;
+  version: StoryVersion;
+};
+
 export interface AuthoringRepository {
   createProject(input: CreateProjectInput): Promise<Project>;
   getProject(projectId: string): Promise<Project>;
   listProjects(): Promise<ProjectSummary[]>;
   updateProject(projectId: string, input: UpdateProjectInput): Promise<Project>;
   getProjectGraph(projectId: string, versionId?: string): Promise<StoryGraph>;
+  getReleaseProfile(projectId: string, versionId?: string): Promise<ReleaseProfile>;
+  createGenerationDraft(projectId: string): Promise<GenerationDraft>;
+  materializeInteractiveDraft(projectId: string, sessionId: string, graph: StoryGraph): Promise<MaterializedDraft>;
   replaceDraftGraph(projectId: string, graph: StoryGraph, expectedRevision: number): Promise<StoryGraph>;
   patchDraftNode(projectId: string, nodeId: string, patch: StoryNodePatch, expectedRevision: number): Promise<{ node: StoryNode; draftRevision: number }>;
   patchDraftEdge(projectId: string, edgeId: string, patch: StoryEdgePatch, expectedRevision: number): Promise<{ edge: StoryEdge; draftRevision: number }>;
@@ -257,11 +274,13 @@ function toStoryEdge(row: StoryEdgeRow): StoryEdge {
 
 export class BetterSqliteAuthoringRepository implements AuthoringRepository {
   private readonly db: Database.Database;
+  private readonly databaseLease: ReturnType<typeof acquireAuthoringDatabase>;
   private readonly databaseOptions: AuthoringDatabaseOptions;
 
   constructor(options: AuthoringDatabaseOptions = {}) {
     this.databaseOptions = options;
-    this.db = initializeAuthoringDatabase(options);
+    this.databaseLease = acquireAuthoringDatabase(options);
+    this.db = this.databaseLease.database;
   }
 
   public async createProject(input: CreateProjectInput): Promise<Project> {
@@ -353,12 +372,19 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
 
       return rows.map((row) => {
         const graph = this.readProjectGraph(row.id);
-        const blockingIssueCount = validateStoryGraph(graph, RELEASE_GRAPH_LIMITS).filter(
+        const project = toProject(row);
+        const activeVersion = row.active_draft_version_id ? this.findVersion(row.id, row.active_draft_version_id) : undefined;
+        const releaseProfile = activeVersion
+          ? parseStoredReleasePolicy(activeVersion.validation_limits_json).releaseProfile
+          : "branching_graph";
+        const blockingIssueCount = validateStoryGraph(graph, {
+          ...resolveReleaseLimits(releaseProfile, project),
+        }).filter(
           (issue) => issue.severity === "blocking",
         ).length;
 
         return {
-          ...toProject(row),
+          ...project,
           draftRevision: row.draft_revision,
           versionCount: row.version_count,
           snapshotCount: row.snapshot_count ?? 0,
@@ -434,6 +460,130 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
       return this.readProjectGraph(projectId, versionId);
     } catch (error) {
       throw storageError(error, "Failed to read authoring project graph");
+    }
+  }
+
+  public async getReleaseProfile(projectId: string, versionId?: string): Promise<ReleaseProfile> {
+    try {
+      const project = this.requireProject(projectId);
+      const version = this.requireVersion(projectId, versionId ?? project.activeDraftVersionId ?? "");
+      return parseStoredReleasePolicy(version.validation_limits_json).releaseProfile;
+    } catch (error) {
+      throw storageError(error, "Failed to read authoring release profile");
+    }
+  }
+
+  public async createGenerationDraft(projectId: string): Promise<GenerationDraft> {
+    try {
+      const create = this.db.transaction(() => {
+        const project = this.requireProject(projectId);
+        if (!project.activeDraftVersionId) {
+          throw new AuthoringError("NOT_FOUND", "Project has no active draft version", { projectId });
+        }
+        const activeRun = this.db
+          .prepare("SELECT id FROM generation_runs WHERE project_id = ? AND status IN ('queued', 'running', 'paused') LIMIT 1")
+          .get(projectId) as { id: string } | undefined;
+        if (activeRun) {
+          throw new AuthoringError("CONFLICT", "Cannot create a fresh draft while generation is active", { projectId, runId: activeRun.id });
+        }
+
+        const source = this.requireVersion(projectId, project.activeDraftVersionId);
+        const version = this.createVersionCopy(projectId, source, "draft", source.id, null, "generating");
+        this.copyVersionGraph(source.id, version.id);
+        this.db
+          .prepare("UPDATE projects SET active_draft_version_id = ?, updated_at = ? WHERE id = ? AND active_draft_version_id = ?")
+          .run(version.id, nowIso(), projectId, source.id);
+
+        return {
+          project: this.requireProject(projectId),
+          version: toStoryVersion(this.requireVersion(projectId, version.id)),
+        };
+      });
+
+      return create();
+    } catch (error) {
+      throw storageError(error, "Failed to create isolated generation draft");
+    }
+  }
+
+  public async materializeInteractiveDraft(projectId: string, sessionId: string, graph: StoryGraph): Promise<MaterializedDraft> {
+    try {
+      const requestedGraph = StoryGraphSchema.parse(graph);
+      const materialize = this.db.transaction(() => {
+        const project = this.requireProject(projectId);
+        const session = this.db
+          .prepare("SELECT project_id, status, materialized_version_id FROM interactive_sessions WHERE id = ? AND project_id = ?")
+          .get(sessionId, projectId) as { project_id: string; status: "generating" | "active" | "ended" | "failed"; materialized_version_id: string | null } | undefined;
+
+        if (!session) {
+          throw new AuthoringError("NOT_FOUND", "Interactive session not found", { projectId, sessionId });
+        }
+        if (session.status !== "ended") {
+          throw new AuthoringError("CONFLICT", "Only an ended interactive session can become a formal draft", { projectId, sessionId, status: session.status });
+        }
+
+        if (session.materialized_version_id) {
+          const version = this.requireVersion(projectId, session.materialized_version_id);
+          return {
+            project: this.requireProject(projectId),
+            version: toStoryVersion(version),
+            graph: this.readProjectGraph(projectId, version.id),
+            created: false,
+          };
+        }
+
+        if (!project.activeDraftVersionId) {
+          throw new AuthoringError("NOT_FOUND", "Project has no active draft version", { projectId });
+        }
+
+        const endingCount = requestedGraph.nodes.filter((node) => node.kind === "ending").length;
+        if (requestedGraph.nodes.length > project.targetNodeCount) {
+          throw new AuthoringError("CONFLICT", "The selected path no longer fits the project's current size limits", {
+            projectId,
+            nodeCount: requestedGraph.nodes.length,
+            targetNodeCount: project.targetNodeCount,
+            endingCount,
+            targetEndingCount: project.targetEndingCount,
+          });
+        }
+
+        const source = this.requireVersion(projectId, project.activeDraftVersionId);
+        const version = this.createVersionCopy(
+          projectId,
+          source,
+          "draft",
+          source.id,
+          null,
+          "review_required",
+          serializeReleasePolicy("selected_path", resolveReleaseLimits("selected_path", project)),
+        );
+        const versionedGraph: StoryGraph = {
+          ...requestedGraph,
+          versionId: version.id,
+          chapters: requestedGraph.chapters.map((chapter) => ({ ...chapter, versionId: version.id })),
+          nodes: requestedGraph.nodes.map((node) => ({ ...node, versionId: version.id })),
+          edges: requestedGraph.edges.map((edge) => ({ ...edge, versionId: version.id })),
+        };
+        this.replaceVersionGraphRows(version.id, versionedGraph);
+
+        this.db
+          .prepare("UPDATE interactive_sessions SET materialized_version_id = ?, updated_at = ? WHERE id = ? AND project_id = ? AND materialized_version_id IS NULL")
+          .run(version.id, nowIso(), sessionId, projectId);
+        this.db
+          .prepare("UPDATE projects SET active_draft_version_id = ?, updated_at = ? WHERE id = ?")
+          .run(version.id, nowIso(), projectId);
+
+        return {
+          project: this.requireProject(projectId),
+          version: toStoryVersion(this.requireVersion(projectId, version.id)),
+          graph: this.readProjectGraph(projectId, version.id),
+          created: true,
+        };
+      });
+
+      return materialize();
+    } catch (error) {
+      throw storageError(error, "Failed to materialize interactive draft");
     }
   }
 
@@ -774,7 +924,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
   }
 
   public close(): void {
-    this.db.close();
+    this.databaseLease.release();
   }
 
   private readProjectGraph(projectId: string, versionId?: string): StoryGraph {
@@ -949,6 +1099,8 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
     kind: StoryVersion["kind"],
     sourceVersionId: string | null,
     sealedAt: string | null,
+    status: StoryVersion["status"] = sourceVersion.status,
+    validationLimitsJson = sourceVersion.validation_limits_json,
   ): StoryVersion {
     const id = randomUUID();
     const nextVersionNumber = this.nextVersionNumber(projectId);
@@ -971,14 +1123,14 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         nextVersionNumber,
         kind,
         sourceVersionId,
-        sourceVersion.status,
+        status,
         sourceVersion.brief_json,
         sourceVersion.story_bible_json,
         sourceVersion.outline_json,
         sourceVersion.canon_json,
         createdAt,
         sealedAt,
-        sourceVersion.validation_limits_json,
+        validationLimitsJson,
       );
 
     return toStoryVersion(this.requireVersion(projectId, id));

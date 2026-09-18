@@ -1,5 +1,7 @@
 # StoryForge 项目深度审查与后续整改路线图
 
+> **归档说明：** 本文件记录 2026-05 旧版审查结果，部分接口和基础设施已退役，不代表当前实现。当前文档入口见 `README.md`、`docs/README.md` 和 `docs/release/authoring-verification.md`。
+
 审查日期：2026-05-19  
 项目路径：`D:\Files\基于LLM的全自动独立游戏互动游戏叙事生成器\narrative-game`
 

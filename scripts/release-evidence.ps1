@@ -18,6 +18,15 @@ $packageManifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 if ($packageManifest.version -ne $version) {
   throw "Standalone package version does not match package.json."
 }
+$scannerPath = Join-Path $PSScriptRoot "scan-package-secrets.ps1"
+$scanOutput = & pwsh -NoProfile -File $scannerPath -Root $packageRoot
+if ($LASTEXITCODE -ne 0) {
+  throw "Release package secret scan failed."
+}
+$scanSummary = ($scanOutput -join [Environment]::NewLine) | ConvertFrom-Json
+if ($scanSummary.status -ne "passed" -or $scanSummary.secretFindings -ne 0) {
+  throw "Release package secret scan returned an invalid result."
+}
 if ($packageManifest.secretsIncluded -ne $false) {
   throw "Refusing to generate release evidence for a package that includes secrets."
 }

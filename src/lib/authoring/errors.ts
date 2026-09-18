@@ -1,4 +1,5 @@
 export type AuthoringErrorCode =
+  | "FORBIDDEN"
   | "NOT_FOUND"
   | "VALIDATION"
   | "CONFLICT"

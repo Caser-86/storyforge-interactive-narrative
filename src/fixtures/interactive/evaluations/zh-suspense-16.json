@@ -1,0 +1,13 @@
+{
+  "id": "zh-suspense-16",
+  "title": "第七码头",
+  "premise": "记者在第七码头收到一段来自未来的录音，必须逐步判断它是在预警还是诱导。",
+  "genre": "都市惊悚",
+  "tone": "压迫悬疑",
+  "pointOfView": "第三人称",
+  "rating": "PG-13",
+  "language": "zh-CN",
+  "sizePreset": "medium",
+  "targetTurns": 16,
+  "riskSequence": ["medium", "high", "low", "medium", "high", "low", "medium", "high", "low", "medium", "high", "low", "medium", "high", "low"]
+}

@@ -26,4 +26,62 @@ describe("createAutosaveController", () => {
     await controller.flush();
     expect(save).toHaveBeenCalledTimes(2);
   });
+
+  it("uses the revision returned by an in-flight save for newer changes", async () => {
+    let resolveFirstSave!: (value: { nextRevision: number }) => void;
+    const firstSave = new Promise<{ nextRevision: number }>((resolve) => { resolveFirstSave = resolve; });
+    const save = vi.fn()
+      .mockReturnValueOnce(firstSave)
+      .mockResolvedValueOnce({ nextRevision: 2 });
+    const controller = createAutosaveController({ save });
+
+    controller.schedule({ body: "first" }, 0);
+    const firstFlush = controller.flush();
+    await Promise.resolve();
+    controller.schedule({ summary: "second" }, 0);
+    resolveFirstSave({ nextRevision: 1 });
+
+    await firstFlush;
+    await controller.flush();
+
+    expect(save).toHaveBeenNthCalledWith(1, { body: "first" }, 0);
+    expect(save).toHaveBeenNthCalledWith(2, { summary: "second" }, 1);
+  });
+
+  it("serializes an explicit flush that arrives while another save is pending", async () => {
+    let resolveFirstSave!: (value: { nextRevision: number }) => void;
+    const firstSave = new Promise<{ nextRevision: number }>((resolve) => { resolveFirstSave = resolve; });
+    const save = vi.fn()
+      .mockReturnValueOnce(firstSave)
+      .mockResolvedValueOnce({ nextRevision: 2 });
+    const controller = createAutosaveController({ save });
+
+    controller.schedule({ body: "first" }, 0);
+    const firstFlush = controller.flush();
+    await Promise.resolve();
+    controller.schedule({ summary: "second" }, 0);
+    const secondFlush = controller.flush();
+
+    expect(save).toHaveBeenCalledTimes(1);
+    resolveFirstSave({ nextRevision: 1 });
+    await Promise.all([firstFlush, secondFlush]);
+
+    expect(save).toHaveBeenNthCalledWith(1, { body: "first" }, 0);
+    expect(save).toHaveBeenNthCalledWith(2, { summary: "second" }, 1);
+  });
+
+  it("uses a newer parent revision after the controller has already saved once", async () => {
+    const save = vi.fn()
+      .mockResolvedValueOnce({ nextRevision: 1 })
+      .mockResolvedValueOnce({ nextRevision: 3 });
+    const controller = createAutosaveController({ save });
+
+    controller.schedule({ body: "first" }, 0);
+    await controller.flush();
+    controller.schedule({ summary: "second" }, 2);
+    await controller.flush();
+
+    expect(save).toHaveBeenNthCalledWith(1, { body: "first" }, 0);
+    expect(save).toHaveBeenNthCalledWith(2, { summary: "second" }, 2);
+  });
 });

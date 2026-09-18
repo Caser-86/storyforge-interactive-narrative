@@ -1,6 +1,6 @@
 # 改进清单（按优先级）
 
-> **⚠️ 历史任务清单，多数已完成。当前执行请以 `PROJECT_ROADMAP.md` 为准。**
+> **⚠️ 历史任务清单，多数已完成。当前执行请以 `README.md`、`docs/README.md` 和发布验证文档为准。**
 
 日期：2026-05-16  
 项目：`narrative-game`（Next.js 16 + React 19 + PostgreSQL + Redis/BullMQ 思路）

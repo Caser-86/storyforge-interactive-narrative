@@ -17,6 +17,10 @@ describe("release governance", () => {
     expect(workflow).toMatch(/workflow_dispatch:\s*\n/);
   });
 
+  it("runs the offline interactive evaluation in the verification job", () => {
+    expect(readRepositoryFile(".github/workflows/ci.yml")).toContain("npm run interactive:evaluate -- --provider fake");
+  });
+
   it("generates release evidence only from version tags", () => {
     const workflow = readRepositoryFile(".github/workflows/ci.yml");
 
@@ -25,6 +29,19 @@ describe("release governance", () => {
     expect(workflow).toContain("npm run package:standalone");
     expect(workflow).toContain("npm run release:evidence");
     expect(workflow).toContain("output/release/");
+  });
+
+  it("keeps Windows standalone and Docker target checks explicit", () => {
+    const workflow = readRepositoryFile(".github/workflows/ci.yml");
+
+    expect(workflow).toContain("standalone-windows:");
+    expect(workflow).toContain("runs-on: windows-latest");
+    expect(workflow).toContain("npm run package:standalone");
+    expect(workflow).toContain("scripts/package-smoke.ps1 -Mode Local");
+    expect(workflow).toContain("docker-build:");
+    expect(workflow).toContain("docker build --pull");
+    expect(workflow).toContain("/api/health");
+    expect(workflow).toContain("docker rm --force");
   });
 
   it("keeps generated verification artifacts out of commits", () => {

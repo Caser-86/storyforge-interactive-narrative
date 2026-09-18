@@ -12,6 +12,7 @@ import {
 } from "@/lib/authoring/schemas";
 import { CreateProjectInputSchema } from "@/lib/authoring/api-contracts";
 import type { ProjectSizePreset, StoryNodeKind, VersionKind } from "@/lib/authoring/schemas";
+import { validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
 
 describe("authoring schemas", () => {
   it("exports the locked authoring aliases", () => {
@@ -90,6 +91,30 @@ describe("authoring schemas", () => {
 
   it("parses a typed graph payload", () => {
     expect(StoryGraphSchema.parse({ versionId: "v1", chapters: [], nodes: [], edges: [] }).versionId).toBe("v1");
+  });
+
+  it("rejects duplicate graph identifiers before persistence", () => {
+    const graph = validReleaseGraph();
+
+    expect(() => StoryGraphSchema.parse({
+      ...graph,
+      nodes: [graph.nodes[0]!, ...graph.nodes],
+    })).toThrow(/duplicate.*nodes|nodes.*duplicate/i);
+
+    expect(() => StoryGraphSchema.parse({
+      ...graph,
+      edges: [graph.edges[0]!, ...graph.edges],
+    })).toThrow(/duplicate.*edges|edges.*duplicate/i);
+
+    expect(() => StoryGraphSchema.parse({
+      ...graph,
+      nodes: [graph.nodes[0]!, { ...graph.nodes[1]!, nodeKey: graph.nodes[0]!.nodeKey }, ...graph.nodes.slice(2)],
+    })).toThrow(/duplicate.*nodekey|nodekey.*duplicate/i);
+
+    expect(() => StoryGraphSchema.parse({
+      ...graph,
+      edges: [graph.edges[0]!, { ...graph.edges[0]!, id: "edge-duplicate-relation" }, ...graph.edges.slice(1)],
+    })).toThrow(/duplicate.*relation|relation.*duplicate/i);
   });
 
   it("preserves required nullable version keys", () => {

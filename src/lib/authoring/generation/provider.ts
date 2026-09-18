@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 import type { GenerationStage } from "./schemas";
 
 export interface StructuredGenerationRequest<T> {
@@ -6,10 +6,12 @@ export interface StructuredGenerationRequest<T> {
   stepKey: string;
   systemPrompt: string;
   userPrompt: string;
-  outputSchema: ZodType<T>;
+  // Providers parse untrusted model JSON, so schemas may normalize a wider input shape into T.
+  outputSchema: ZodType<T, ZodTypeDef, unknown>;
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  signal?: AbortSignal;
 }
 
 export interface ProviderResult<T> {
@@ -17,6 +19,7 @@ export interface ProviderResult<T> {
   rawResponse: string;
   inputTokens: number;
   outputTokens: number;
+  usageConfirmed?: boolean;
   latencyMs: number;
   model: string;
   requestId?: string;

@@ -1,0 +1,13 @@
+{
+  "id": "zh-fantasy-8",
+  "title": "潮汐王冠",
+  "premise": "年轻的守潮人拾到一枚会回应海声的王冠，必须在城门关闭前决定是否相信它。",
+  "genre": "奇幻冒险",
+  "tone": "明亮而克制",
+  "pointOfView": "第一人称",
+  "rating": "PG-13",
+  "language": "zh-CN",
+  "sizePreset": "short",
+  "targetTurns": 8,
+  "riskSequence": ["high", "low", "medium", "high", "low", "medium", "high"]
+}

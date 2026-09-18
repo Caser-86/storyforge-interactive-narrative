@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
+import { AUTHORING_MIGRATIONS } from "@/lib/authoring/migrations";
 import { createDatabaseCheckpoint } from "@/lib/authoring/database-backup";
 import { collectAuthoringDiagnostics, DiagnosticReportSchema } from "@/lib/authoring/diagnostics";
 
@@ -55,7 +56,8 @@ describe("authoring diagnostics", () => {
     });
 
     expect(DiagnosticReportSchema.parse(report)).toEqual(report);
-    expect(report.database.migrationVersion).toBe(8);
+    expect(report.database.migrationVersion).toBe(AUTHORING_MIGRATIONS.at(-1)?.version);
+    expect(report.database.pendingMigrations).toBe(false);
     expect(report.database.integrity).toBe("ok");
     expect(report.database.writable).toBe(true);
     expect(report.backup.freshness).toBe("missing");

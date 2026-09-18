@@ -8,6 +8,8 @@ export const QUALITY_RULE_THRESHOLDS = {
   depthImbalanceRatio: 2,
   repeatedNgramSize: 4,
   repeatedNgramMinimumTokens: 8,
+  repeatedCjkNgramSize: 8,
+  repeatedCjkNgramMinimumTokens: 16,
   maxEnumeratedPaths: 1000,
 } as const;
 
@@ -57,18 +59,29 @@ function findSimilarChoices(graph: StoryGraph): ValidationIssueInput[] {
 
 function findRepeatedProse(graph: StoryGraph): ValidationIssueInput[] {
   const ngramOwners = new Map<string, { nodeId: string; nodeKey: string }>();
+  const reportedPairs = new Set<string>();
   const issues: ValidationIssueInput[] = [];
   for (const node of graph.nodes) {
     const tokens = tokenize(node.body);
-    if (tokens.length < QUALITY_RULE_THRESHOLDS.repeatedNgramMinimumTokens) continue;
+    const containsHan = tokens.some((token) => /[\p{Script=Han}]/u.test(token));
+    const ngramSize = containsHan
+      ? QUALITY_RULE_THRESHOLDS.repeatedCjkNgramSize
+      : QUALITY_RULE_THRESHOLDS.repeatedNgramSize;
+    const minimumTokens = containsHan
+      ? QUALITY_RULE_THRESHOLDS.repeatedCjkNgramMinimumTokens
+      : QUALITY_RULE_THRESHOLDS.repeatedNgramMinimumTokens;
+    if (tokens.length < minimumTokens) continue;
     const seenInNode = new Set<string>();
-    for (let index = 0; index <= tokens.length - QUALITY_RULE_THRESHOLDS.repeatedNgramSize; index += 1) {
-      const ngram = tokens.slice(index, index + QUALITY_RULE_THRESHOLDS.repeatedNgramSize).join(" ");
+    for (let index = 0; index <= tokens.length - ngramSize; index += 1) {
+      const ngram = tokens.slice(index, index + ngramSize).join(containsHan ? "" : " ");
       if (seenInNode.has(ngram)) continue;
       seenInNode.add(ngram);
       const previous = ngramOwners.get(ngram);
       if (previous && previous.nodeId !== node.id) {
-        issues.push(warning("REPEATED_PROSE", `Prose repeats a phrase shared with node "${previous.nodeKey}".`, node.id, null, { ngram, comparedNodeId: previous.nodeId, ngramSize: QUALITY_RULE_THRESHOLDS.repeatedNgramSize }));
+        const pairKey = [previous.nodeId, node.id].sort().join("|");
+        if (reportedPairs.has(pairKey)) continue;
+        reportedPairs.add(pairKey);
+        issues.push(warning("REPEATED_PROSE", `Prose repeats a phrase shared with node "${previous.nodeKey}".`, node.id, null, { ngram, comparedNodeId: previous.nodeId, ngramSize }));
       } else {
         ngramOwners.set(ngram, { nodeId: node.id, nodeKey: node.nodeKey });
       }

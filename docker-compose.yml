@@ -10,8 +10,8 @@ services:
         required: false
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
-      - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-chat}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://ark.cn-beijing.volces.com/api/plan/v3}
+      - OPENAI_MODEL=${OPENAI_MODEL:-doubao-seed-evolving}
       - SQLITE_DB_PATH=/app/data/storyforge.sqlite
       - SQLITE_BACKUP_DIR=/app/data/backups
       - STORYFORGE_HOST=127.0.0.1

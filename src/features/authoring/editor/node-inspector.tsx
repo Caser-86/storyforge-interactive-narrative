@@ -9,7 +9,7 @@ import { CandidateDiff } from "./candidate-diff";
 type NodeInspectorProps = {
   projectId: string;
   node: StoryNode;
-  onApplied: (node: StoryNode) => void;
+  onApplied: (node: StoryNode, draftRevision: number) => void;
 };
 
 export function NodeInspector({ projectId, node, onApplied }: NodeInspectorProps) {
@@ -35,7 +35,7 @@ export function NodeInspector({ projectId, node, onApplied }: NodeInspectorProps
     setError(null);
     try {
       const result = await applyCandidate(projectId, candidate.id, node.contentRevision);
-      onApplied(result.node);
+      onApplied(result.node, result.draftRevision);
       setCandidate(null);
     } catch (applyError) {
       setError(applyError instanceof Error ? applyError.message : "候选应用失败，可能已经过期");

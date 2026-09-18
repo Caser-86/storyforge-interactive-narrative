@@ -361,7 +361,7 @@ Commit: `docs: publish accurate local data policy`
 
 **Interfaces:**
 - Produces a reproducible CI gate: `npm ci`, `npm run verify`, `npm run test:e2e:authoring`.
-- Produces a manual `npm run smoke:deepseek` command that is never run in CI and never prints the API key.
+- The original draft proposed a manual DeepSeek smoke command. That script is not part of the current repository; the maintained replacement is `npm run authoring:llm:smoke`, with `--dry-run` as the CI-safe path and live execution kept as an explicit operator action.
 
 - [ ] **Step 1: Add a failing CI-content test or checklist assertion**
 

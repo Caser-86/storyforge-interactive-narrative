@@ -7,11 +7,18 @@ type ProjectRouteContext = { params: Promise<{ projectId: string }> };
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET(_request: Request, { params }: ProjectRouteContext): Promise<Response> {
+export async function GET(request: Request, { params }: ProjectRouteContext): Promise<Response> {
   const interactive = createInteractiveRepository();
   try {
     const { projectId } = await params;
-    return json(InteractiveSessionListResponseSchema, { sessions: await interactive.listSessions(projectId) });
+    const url = new URL(request.url);
+    const limit = url.searchParams.get("limit");
+    const cursor = url.searchParams.get("cursor");
+    const page = await interactive.listSessionSummaries(projectId, {
+      limit: limit === null ? undefined : Number(limit),
+      cursor,
+    });
+    return json(InteractiveSessionListResponseSchema, page);
   } catch (error) {
     return errorResponse(error);
   } finally {

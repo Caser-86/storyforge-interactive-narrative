@@ -107,7 +107,7 @@ describe("ProjectBriefForm", () => {
     await fillRequiredFields(user);
     await user.click(screen.getByRole("button", { name: "创建项目" }));
 
-    expect(await screen.findByText("项目已建立，正在进入生成流程…")).toBeInTheDocument();
+    expect(await screen.findByText("项目已建立，正在进入分支写作…")).toBeInTheDocument();
     expect(push).toHaveBeenCalledWith("/projects/project-created/generate");
     expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/projects", expect.objectContaining({
       body: expect.stringContaining('"language":"Chinese"'),

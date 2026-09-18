@@ -2,6 +2,8 @@
 
 当前交付物是 Node 24 standalone 目录，不是签名安装器。
 
+构建和本地分发 smoke 需要 Node 24、npm 11 以及 PowerShell 7.x（命令为 `pwsh`）。Windows PowerShell 5.1 的 `powershell` 命令不能替代 `pwsh`；开始前可运行 `pwsh --version` 检查环境。
+
 ## 构建
 
 ```powershell

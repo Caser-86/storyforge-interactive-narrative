@@ -74,7 +74,7 @@ test.describe("authoring manual closed loop", () => {
       const persistedGraphPayload = await persistedGraphResponse.json();
       expect(JSON.stringify(persistedGraphPayload.graph)).toContain(editedBody);
 
-      const createSnapshot = await request.post(`/api/projects/${project.id}/snapshots`);
+    const createSnapshot = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
       assertOk(createSnapshot, "create snapshot");
       expect(createSnapshot.status()).toBe(201);
       const snapshotPayload = await createSnapshot.json();

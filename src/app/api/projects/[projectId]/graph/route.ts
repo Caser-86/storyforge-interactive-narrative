@@ -6,6 +6,7 @@ import {
   NodePatchInputSchema,
   NodePatchResponseSchema,
   StoryGraphResponseSchema,
+  MAX_GRAPH_WRITE_BYTES,
   errorResponse,
   json,
   parseVersionIdFromRequest,
@@ -14,7 +15,8 @@ import {
 import { z } from "zod";
 import type { GraphWriteInputPayload } from "@/lib/authoring/api-contracts";
 import type { NodePatchInputPayload } from "@/lib/authoring/api-contracts";
-import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "@/lib/authoring/graph";
+import { validateStoryGraph } from "@/lib/authoring/graph";
+import { resolveReleaseLimits } from "@/lib/authoring/release-policy";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 
 type ProjectRouteContext = {
@@ -43,7 +45,7 @@ export async function PUT(request: Request, { params }: ProjectRouteContext): Pr
 
   try {
     ({ projectId } = await params);
-    input = await readJsonBody(request, GraphWriteInputSchema);
+    input = await readJsonBody(request, GraphWriteInputSchema, MAX_GRAPH_WRITE_BYTES);
   } catch (error) {
     return errorResponse(error);
   }
@@ -52,11 +54,8 @@ export async function PUT(request: Request, { params }: ProjectRouteContext): Pr
 
   try {
     const project = await repo.getProject(projectId);
-    const issues = validateStoryGraph(input.graph, {
-      ...RELEASE_GRAPH_LIMITS,
-      maxNodes: project.targetNodeCount,
-      maxEndings: project.targetEndingCount,
-    });
+    const profile = await repo.getReleaseProfile(projectId, input.graph.versionId);
+    const issues = validateStoryGraph(input.graph, resolveReleaseLimits(profile, project));
     const graph = await repo.replaceDraftGraph(projectId, input.graph, input.expectedRevision);
 
     return json(GraphWriteResponseSchema, { graph, issues });

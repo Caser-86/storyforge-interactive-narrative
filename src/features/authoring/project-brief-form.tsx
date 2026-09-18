@@ -235,7 +235,7 @@ export function ProjectBriefForm() {
       </div>
 
       {submitError ? <p className="form-submit-error" role="alert">{submitError}</p> : null}
-      {createdMessage ? <p className="form-success" role="status">项目已建立，正在进入生成流程…</p> : null}
+      {createdMessage ? <p className="form-success" role="status">项目已建立，正在进入分支写作…</p> : null}
       <div className="brief-form-actions">
         <p>创建后会先保存项目简报，不会立即调用模型。</p>
         <button className="button button-primary" type="submit" disabled={isSubmitting}>

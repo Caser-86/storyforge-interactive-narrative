@@ -264,6 +264,10 @@ export function validateStoryGraph(graph: StoryGraph, limits: GraphLimits): Vali
     .map((issue) => finalizeIssue(graph.versionId, issue));
 }
 
+export function getBlockingGraphIssues(graph: StoryGraph, limits: GraphLimits): ValidationIssue[] {
+  return validateStoryGraph(graph, limits).filter((issue) => issue.severity === "blocking");
+}
+
 export function topologicalSort(graph: StoryGraph): string[] {
   const index = createGraphIndex(graph);
   const indegreeByNodeId = createIndegreeMap(index.nodes, index.outgoingValidEdges);

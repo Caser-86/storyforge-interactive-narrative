@@ -24,6 +24,7 @@ export const STAGE_MAX_TOKENS = {
   graph: 7000,
   nodes: 2200,
   continuity_review: 7000,
+  author_ending: 3600,
 } as const;
 
 export function minimumBranchingNodes(context: GenerationProjectContext): number {

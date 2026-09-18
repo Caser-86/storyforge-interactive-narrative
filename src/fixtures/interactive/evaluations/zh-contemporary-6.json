@@ -1,0 +1,13 @@
+{
+  "id": "zh-contemporary-6",
+  "title": "雾中的档案室",
+  "premise": "档案员在雾中找到一份被篡改的记录，必须逐幕决定如何核对真相。",
+  "genre": "现实悬疑",
+  "tone": "克制紧张",
+  "pointOfView": "第三人称",
+  "rating": "PG-13",
+  "language": "zh-CN",
+  "sizePreset": "micro",
+  "targetTurns": 6,
+  "riskSequence": ["low", "medium", "high", "low", "high"]
+}

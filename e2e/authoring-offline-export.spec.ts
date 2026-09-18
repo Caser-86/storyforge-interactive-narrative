@@ -24,7 +24,7 @@ test.describe("authoring offline release", () => {
       const project = (await projectResponse.json()).project as { id: string; activeDraftVersionId: string };
       const graphResponse = await request.put(`/api/projects/${project.id}/graph`, { data: { graph: manualStoryGraph(project.activeDraftVersionId), expectedRevision: 0 } });
       expect(graphResponse.ok()).toBe(true);
-      const snapshotResponse = await request.post(`/api/projects/${project.id}/snapshots`);
+      const snapshotResponse = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
       expect(snapshotResponse.ok()).toBe(true);
       const snapshot = (await snapshotResponse.json()).snapshot as { id: string };
       const exportResponse = await request.get(`/api/projects/${project.id}/export/html?snapshotId=${snapshot.id}`);
