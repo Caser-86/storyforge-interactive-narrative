@@ -111,6 +111,18 @@ npm run interactive:evaluate -- --provider live --allow-network --approve-paid-c
 
 本轮最终结构结果可作为人工阅读材料索引；没有保存 API key、原始 prompt 或完整 provider 响应。四个维度的 1–5 分、作者逐幕确认、真实读屏/移动端验收和最终发布模型确认仍未完成。
 
+## 2026-09-19 当前发布配置模型复评
+
+为消除进程级 DeepSeek 复评与本地最终配置之间的模型差异，本轮又直接读取 `.env.local` 的发布配置执行受控 live 评测：Provider 为 `live`，模型为 `doubao-seed-evolving`，使用 `--save-review --expected-model doubao-seed-evolving`；配置 smoke 同样通过，脱敏用量为输入 `370`、输出 `128`、延迟 `4692ms`。
+
+| 样本 | 结果 | 结构化证据 | 审阅材料 |
+| --- | --- | --- | --- |
+| `zh-contemporary-6` | 通过 | `6/6`；`activeSceneCount=5`；ending、choice contract、risk coverage、consequence 均通过；`issueCodes=[]` | `output/evaluations/interactive-review-zh-contemporary-6.md` |
+| `zh-fantasy-8` | 通过 | `8/8`；`activeSceneCount=7`；ending、choice contract、risk coverage、consequence 均通过；`issueCodes=[]` | `output/evaluations/interactive-review-zh-fantasy-8.md` |
+| `zh-suspense-16` | 通过 | `16/16`；`activeSceneCount=15`；ending、choice contract、risk coverage、consequence 均通过；`issueCodes=[]` | `output/evaluations/interactive-review-zh-suspense-16.md` |
+
+三份最新结构化结果与当前 `OPENAI_MODEL` 一致，审阅材料的敏感信息扫描未发现 `sk-`、`ark-`、Bearer、API key、原始 prompt 或原始响应标记。这只关闭模型一致性的自动化证据，不关闭四维人工语义评分。
+
 ## 逐样本评分
 
 每个样本单独填写一行四维评分，并填写证据幕号。4 分表示达到发布目标，3 分表示可读但需要修改，1–2 分表示存在明显质量问题。不要用另一个样本的分数代替空白项。

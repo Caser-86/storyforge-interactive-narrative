@@ -244,4 +244,5 @@ pwsh -File scripts/package-smoke.ps1 -Mode Local -Root $closeoutSmokeRoot
 - 人工反馈：作者反馈当前项目已测试完且没有问题；未提供可核对的项目 ID、最终模型和逐样本语义评分，因此未推断或代填真实模型质量门禁。
 - 发布收尾：候选提交 `ff24399` 已推送；PR #3 已合并为 `f2fec8b`；`v0.1.8` 标签 CI run `35365455851` 的 verify、authoring E2E、Docker、Windows standalone 和 release evidence 全部成功；GitHub Release 已创建。标签 CI evidence manifest 的最终统计为 `packageFileCount=2023`、`secretsIncluded=false`、`signed=false`。
 - 真实模型复评：以进程级 `OPENAI_MODEL=deepseek-v4-flash` 重新执行三套受控 live 样本，最终为 `6/6`、`8/8`、`16/16`，结构、结局、选择契约、风险覆盖和直接后果检查均通过且 `issueCodes=[]`；16 幕样本首次在 `14/16` 出现 `GENERATION_SCHEMA`/`RISK_SEQUENCE`，有界重试后恢复，已作为稳定性风险记录而不是隐藏失败。
+- 最终配置模型复评：直接读取 `.env.local` 的 `doubao-seed-evolving` 执行 provider smoke 和三套受控 live 样本，最终为 `6/6`、`8/8`、`16/16`，结构检查均通过且 `issueCodes=[]`；最新审阅材料与当前 `OPENAI_MODEL` 一致并通过敏感信息标记扫描。人工四维语义评分仍未代填。
 - 残余人工门禁：真实模型语义评分尚未代填，代码签名和干净 Windows 账户安装仍未完成；它们不被本地自动化或当前 Release 记录冒充为已通过。
