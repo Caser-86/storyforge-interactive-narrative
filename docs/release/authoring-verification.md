@@ -8,10 +8,10 @@
 - Scope: private local text authoring, bounded generation, graph editing, quality gate, snapshots, offline export, V2 backup/restore, bounded interactive sessions, project/session lifecycle controls, and legacy read-only export.
 - Remote CI: PR #1 targeted `master`; `CI/verify` and `CI/e2e-authoring` passed before merge. Tag run `32687684469` passed on `v0.1.4` at merged commit `e175f84467af1ff9383c023121969be844fd13fa`.
 
-## 0.1.8 Closeout Candidate (Local Verification, Not Published)
+## 0.1.8 Published Verification
 
 - Date: 2026-09-18
-- Source branch: `codex/branch-writing-v0.1.5`; existing local and remote `v0.1.7` were not moved.
+- Canonical commit: `f2fec8bfdeb3185e1a9334cee5757601da077074`; candidate commit `ff243999b5288fd500978f4614094157983e9ad6` was merged by PR #3. Existing local and remote `v0.1.7` were not moved.
 - Scope: version-level single-path release policy, independent author-ending usage ledger, migration 14, editor/release-gate consistency, documentation and version convergence.
 - `npm run verify`: exit code `0`; 87 Vitest files / 437 tests passed, with typecheck, lint, and Next production build.
 - `npm run test:e2e:authoring`: exit code `0`; 18/18 authoring Playwright tests passed, including selected-path materialization, optional second-ending branching, snapshot creation, and offline export.
@@ -24,11 +24,12 @@
 - `npm run authoring:llm:smoke -- --dry-run`: exit code `0`; model resolved as `doubao-seed-evolving`, `networkRequest=false`. No real model call was made in this verification batch.
 - `npm audit --audit-level=high`: exit code `0`; 0 vulnerabilities.
 - `npm run package:standalone`: exit code `0`; generated `output/package/StoryForge-0.1.8`.
-- `npm run release:evidence`: exit code `0`; package file count `2268`, `secretsIncluded=false`, `signed=false`, with SBOM and SHA-256 files for `0.1.8`.
+- `npm run release:evidence`: exit code `0`; the final tag CI evidence manifest reports package file count `2023`, `secretsIncluded=false`, `signed=false`, with SBOM and SHA-256 files for `0.1.8`.
 - `npm run package:smoke`: exit code `0`; dry-run was non-destructive. Isolated Local package smoke also passed clean install, health, upgrade, failed-upgrade, rollback, and uninstall-preserves-data, then removed its temporary root.
 - Runtime smoke: `GET http://127.0.0.1:3202/api/health` returned HTTP 200 with version `0.1.8`, persistent SQLite storage, and configured LLM.
 - Manual acceptance: the author reported the current project test completed without an issue. This is recorded as functional feedback only; the project ID, exact model, and semantic quality scores are not known from that feedback and are not inferred.
-- Release status: local implementation and evidence are ready; commit, push, PR/merge, exact remote CI, `v0.1.8` tag, and GitHub Release remain pending. Existing historical v0.1.4/v0.1.7 evidence is not reused as proof for this candidate.
+- Release status: published. Candidate commit `ff24399`, PR #3, canonical commit `f2fec8b`, annotated tag `v0.1.8`, and tag CI run `35365455851` are recorded. GitHub Release: https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8. Existing historical v0.1.4/v0.1.7 evidence is not reused as proof for this release.
+- Release assets: standalone ZIP, ZIP SHA-256, SBOM, standalone file SHA-256 list, and release evidence manifest. The manifest reports `signed=false`; code signing and clean Windows-account installation remain future gates.
 
 ## v0.1.7 Completion Hardening Candidate (Not Published)
 

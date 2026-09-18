@@ -1,6 +1,6 @@
 # StoryForge 私人本地版本收尾执行计划
 
-> **执行状态（2026-09-18）：** 本计划已进入执行阶段。任务 0–4 的本地代码、文档、恢复和分发门禁已执行并记录；任务 5 的提交、远程 CI、合并、标签和 GitHub Release 仍未执行，不以本地通过替代远程证据。
+> **执行状态（2026-09-19）：** 本计划已执行完毕。任务 0–4 的本地代码、文档、恢复和分发门禁已记录；任务 5 已完成提交、远程 CI、合并、标签和 GitHub Release。真实模型语义评分、代码签名和干净 Windows 账户安装仍保留为后续人工门禁。
 
 **Goal:** 完成“作者逐幕选择 -> 模型收尾 -> 保存草稿 -> 校验 -> 封存 -> 离线导出”的单路径闭环，补齐模型用量记录，再发布可追溯的私人本地版本。
 
@@ -200,14 +200,14 @@ pwsh -File scripts/package-smoke.ps1 -Mode Local -Root $closeoutSmokeRoot
 
 **主要文件/服务：** Git、`.github/workflows/ci.yml`、GitHub PR/Actions/Release、发布验证记录。
 
-- [ ] 审查最终 diff，逐项暂存相关代码、测试和文档；确认未暂存数据、凭据或生成包，不使用无差别清理来获得干净工作树。
-- [ ] 按功能整理提交，记录候选提交 SHA、版本、验证摘要及残余限制。已有人工功能确认不等同于精确提交的审核证据。
-- [ ] 推送候选分支并创建或更新面向 `master` 的 PR；确保 CI 实际触发。当前 CI 不在普通特性分支 push 时自动运行，不能只 push 后假定正在验证。
-- [ ] 等待精确候选提交的 verify、authoring E2E、Windows standalone 和 Docker job 完成；失败先修复，并对新提交重新验证。
-- [ ] 按现有发布授权和仓库权限完成审核与合并，核对最终 `master` SHA；需要人工最终动作时展示具体提交、版本和证据，不重复要求已完成的功能测试。
-- [ ] 为最终合并提交创建新的 annotated tag，推送后检查标签 CI；禁止移动或覆盖 `v0.1.7` 等已有标签。
-- [ ] 从该标签创建 GitHub Release，附对应平台产物、SBOM、校验清单；平台原生 SQLite 产物不得混用。确认 Windows 验证产物具有可下载归档，当前 CI 如仅 smoke 而未上传则补齐归档步骤。
-- [ ] 验证 Release 链接、tag 指向、下载文件、版本号和 checksum，记录 PR、提交、CI 与 Release URL。
+- [x] 审查最终 diff，逐项暂存相关代码、测试和文档；确认未暂存数据、凭据或生成包，不使用无差别清理来获得干净工作树。
+- [x] 按功能整理提交，候选提交为 `ff24399`，版本为 `0.1.8`；人工语义评分、签名和干净 Windows 账户安装仍是残余限制。
+- [x] 推送候选分支并更新面向 `master` 的 PR #3；CI 已实际触发。
+- [x] 精确候选提交 `ff24399` 的 `verify`、authoring E2E、Windows standalone 和 Docker job 全部通过。
+- [x] PR #3 已合并，最终 `master` 合并提交为 `f2fec8b`。
+- [x] 已基于 `f2fec8b` 创建并推送新的 annotated tag `v0.1.8`；既有 `v0.1.7` 未移动或覆盖。
+- [x] 已从 `v0.1.8` 创建 GitHub Release，附 standalone ZIP、ZIP SHA-256、SBOM、standalone 文件清单和 release evidence；标签 CI 的 evidence manifest 报告 `packageFileCount=2023`、`secretsIncluded=false`、`signed=false`。
+- [x] 已核对 Release 链接、tag 指向、下载文件、版本号、checksum 和标签 CI：PR https://github.com/Caser-86/storyforge-interactive-narrative/pull/3，CI https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35365455851，Release https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8。
 
 **交付标准：** 可以从 GitHub 下载一个与标签和验证记录一致的版本；发布状态由远程可观察结果证明。
 
@@ -229,7 +229,7 @@ pwsh -File scripts/package-smoke.ps1 -Mode Local -Root $closeoutSmokeRoot
 - [x] 补充结局调用的实际和未知消耗可追溯。
 - [x] 用户最新数据有 fresh checkpoint，且恢复演练通过。
 - [x] 版本、模型、文档、源码、构建产物和验收证据一致。
-- [ ] 当前提交远程 CI 通过，新标签与 Release 对应同一审核提交。
+- [x] 当前提交远程 CI 通过，新标签与 Release 对应同一审核提交 `f2fec8b`。
 - [x] 私人版本限制被清楚记录，尚未完成的分发能力没有标为通过。
 
 完成以上项后冻结本轮范围，后续需求进入新版本；新发现的阻断 bug 单独修复并补回归，不用扩展功能替代收尾。
@@ -242,4 +242,5 @@ pwsh -File scripts/package-smoke.ps1 -Mode Local -Root $closeoutSmokeRoot
 - 离线评测与安全：结构化 fake 3/3、互动 fake 3/3，`npm audit --audit-level=high` 为 0 vulnerabilities；LLM dry-run 为 `doubao-seed-evolving` 且未发网络请求。
 - 分发：standalone `0.1.8`、SBOM、SHA-256、脱敏扫描和 Local package smoke 通过；签名仍为 false。
 - 人工反馈：作者反馈当前项目已测试完且没有问题；未提供可核对的项目 ID、最终模型和逐样本语义评分，因此未推断或代填真实模型质量门禁。
-- 未执行：本轮尚未提交、推送、创建/合并 PR、等待远程 CI、创建 `v0.1.8` 标签或 GitHub Release；这些动作必须基于精确提交和远程可观察证据继续完成。
+- 发布收尾：候选提交 `ff24399` 已推送；PR #3 已合并为 `f2fec8b`；`v0.1.8` 标签 CI run `35365455851` 的 verify、authoring E2E、Docker、Windows standalone 和 release evidence 全部成功；GitHub Release 已创建。标签 CI evidence manifest 的最终统计为 `packageFileCount=2023`、`secretsIncluded=false`、`signed=false`。
+- 残余人工门禁：真实模型语义评分尚未代填，代码签名和干净 Windows 账户安装仍未完成；它们不被本地自动化或当前 Release 记录冒充为已通过。
