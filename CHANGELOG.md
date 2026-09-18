@@ -4,7 +4,11 @@ All notable changes to StoryForge are documented here.
 
 ## [Unreleased]
 
-当前收尾候选版本为 `0.1.8`；正式版本仍需精确提交的远程 CI、canonical `master` 标签和 GitHub Release 证据。
+暂无未发布变更。
+
+## [0.1.8] - 2026-09-18
+
+> 已从 canonical `master` 提交 `f2fec8b` 发布为 [GitHub Release v0.1.8](https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8)。后续发布证据文档更新通过 PR [#5](https://github.com/Caser-86/storyforge-interactive-narrative/pull/5) 合并，未移动或重建 `v0.1.8` 标签。
 
 ### Reliability and Authoring Flow
 
