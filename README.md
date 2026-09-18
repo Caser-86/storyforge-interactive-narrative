@@ -2,7 +2,7 @@
 
 StoryForge 是一个私人本地互动叙事创作工作台。默认主流程是：项目库 -> 作者选择分支 -> 模型逐幕生成 -> 模型收尾 -> 图谱编辑 -> 质量校验 -> 快照 -> 离线 HTML 导出。
 
-当前开发候选版本号为 `0.1.8`。本工作树位于 `codex/branch-writing-v0.1.5`，包含尚未合并到 `master` 的可靠性审查改动；在远程合并、标签和 GitHub Release 完成前，不应把它视为正式发布。
+当前正式版本为 `0.1.8`，已从 canonical `master` 提交 `f2fec8b` 创建 GitHub Release。后续发布证据文档更新已通过 PR [#5](https://github.com/Caser-86/storyforge-interactive-narrative/pull/5) 合并到 `master`；`v0.1.8` 标签保持不可变。
 
 当前产品只聚焦文字创作，不需要登录，不提供公开分享，不依赖 Redis、PostgreSQL 或图片 worker。默认服务只绑定 `127.0.0.1`。
 

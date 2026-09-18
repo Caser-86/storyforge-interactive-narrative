@@ -33,7 +33,7 @@ Use this checklist before treating a local build as a releasable private authori
 - [ ] Clean Windows account install evidence is recorded.
 - [ ] Code signing and a user-facing installer are approved; standalone directory is not yet a signed installer.
 
-## v0.1.8 Closeout Candidate
+## v0.1.8 Release and Residual Gates
 
 - [x] Version candidate is `0.1.8`; the existing `v0.1.7` tag remains untouched.
 - [x] Version-level release policy distinguishes `selected_path` from `branching_graph`; the editor, graph API, validation, snapshot sealing, and materialization use the same policy resolver.
@@ -49,6 +49,7 @@ Use this checklist before treating a local build as a releasable private authori
 - [x] Candidate commit `ff24399` was pushed, PR #3 was merged into canonical `master` as `f2fec8b`, and the exact candidate commit passed remote CI.
 - [x] Annotated `v0.1.8` and GitHub Release were created from canonical commit `f2fec8b`; tag CI run `35365455851` passed all jobs including release evidence.
 - [x] Release links are recorded: [PR #3](https://github.com/Caser-86/storyforge-interactive-narrative/pull/3), [tag CI](https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35365455851), [GitHub Release](https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8).
+- [x] Post-release evidence documentation was synchronized through [PR #5](https://github.com/Caser-86/storyforge-interactive-narrative/pull/5), merged to `master` as `144180c`; merge CI run [35372119006](https://github.com/Caser-86/storyforge-interactive-narrative/actions/runs/35372119006) passed.
 
 ## v0.1.7 Branch Candidate
 
