@@ -595,4 +595,36 @@ export const AUTHORING_MIGRATIONS: AuthoringMigration[] = [
         ON interactive_sessions(project_id, updated_at DESC, id DESC);
     `,
   },
+  {
+    version: 14,
+    name: "author_ending_usage_ledger",
+    up: `
+      CREATE TABLE IF NOT EXISTS author_ending_generation_usage (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        version_id TEXT NOT NULL,
+        source_node_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('reserved', 'succeeded', 'failed', 'unknown')),
+        reserved_output_tokens INTEGER NOT NULL CHECK (reserved_output_tokens >= 0),
+        input_tokens INTEGER CHECK (input_tokens IS NULL OR input_tokens >= 0),
+        output_tokens INTEGER CHECK (output_tokens IS NULL OR output_tokens >= 0),
+        latency_ms INTEGER CHECK (latency_ms IS NULL OR latency_ms >= 0),
+        request_id TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id, version_id) REFERENCES story_versions(project_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (version_id, source_node_id) REFERENCES story_nodes(version_id, id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_author_ending_usage_project
+        ON author_ending_generation_usage(project_id, created_at, status);
+      CREATE INDEX IF NOT EXISTS idx_author_ending_usage_version
+        ON author_ending_generation_usage(version_id, created_at);
+    `,
+  },
 ];

@@ -26,6 +26,17 @@ export const ProjectGenerationMetricsSchema = z.object({
     reservedOutputTokens: z.number().int().min(0),
     retries: z.number().int().min(0),
   }).strict(),
+  authorEndingUsage: z.object({
+    totalCalls: z.number().int().min(0),
+    succeededCalls: z.number().int().min(0),
+    failedCalls: z.number().int().min(0),
+    unknownCalls: z.number().int().min(0),
+    reservedCalls: z.number().int().min(0),
+    inputTokens: z.number().int().min(0),
+    outputTokens: z.number().int().min(0),
+    unknownOutputTokens: z.number().int().min(0),
+    reservedOutputTokens: z.number().int().min(0),
+  }).strict(),
 }).strict();
 
 export type ProjectGenerationMetricsPayload = z.infer<typeof ProjectGenerationMetricsSchema>;

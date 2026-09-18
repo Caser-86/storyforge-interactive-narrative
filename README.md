@@ -2,7 +2,7 @@
 
 StoryForge 是一个私人本地互动叙事创作工作台。默认主流程是：项目库 -> 作者选择分支 -> 模型逐幕生成 -> 模型收尾 -> 图谱编辑 -> 质量校验 -> 快照 -> 离线 HTML 导出。
 
-当前开发候选版本号仍为 `0.1.7`。本工作树位于 `codex/branch-writing-v0.1.5`，包含尚未发布的可靠性审查改动；未合并到 `master`，也不应视为新的 GitHub Release 或新的版本标签。
+当前开发候选版本号为 `0.1.8`。本工作树位于 `codex/branch-writing-v0.1.5`，包含尚未合并到 `master` 的可靠性审查改动；在远程合并、标签和 GitHub Release 完成前，不应把它视为正式发布。
 
 当前产品只聚焦文字创作，不需要登录，不提供公开分享，不依赖 Redis、PostgreSQL 或图片 worker。默认服务只绑定 `127.0.0.1`。
 
@@ -34,6 +34,7 @@ npm ci
 OPENAI_API_KEY=your-ark-api-key
 OPENAI_BASE_URL=https://ark.cn-beijing.volces.com/api/plan/v3
 OPENAI_MODEL=doubao-seed-evolving
+# 如果本次发布目标是已开通的 DeepSeek v4 Flash，可改为：deepseek-v4-flash
 # 可选：单次模型请求超时，默认 180 秒
 OPENAI_TIMEOUT_MS=180000
 # 可选：单个互动会话的累计输出 token 上限；超时未知用量会保守占用预算
@@ -69,9 +70,13 @@ npm run dev
 
 ## 分支写作
 
-默认 `/projects/:projectId/generate` 中的“分支写作”是作者实际走一次创作路径，而不是播放预先生成的故事：系统先生成当前场景和 3 个选择，作者选择后才根据该选择生成下一幕，直到模型生成收束场景。未选择的分支不会被预先生成或伪造。旧 `/play` 地址继续兼容；批量管线位于 `/projects/:projectId/generate/structured`。
+默认 `/projects/:projectId/generate` 中的“分支写作”是作者实际走一次创作路径，而不是播放预先生成的故事：系统先生成当前场景和 3 个选择，作者选择后才根据该选择生成下一幕，直到模型生成收束场景。未选择的分支不会被预先生成或伪造。每幕会自动保存地点、时间、在场角色和当前目标的“剧情锚点”，下一幕必须继承这些信息或在正文中解释变化；作者可在页面和审阅材料中查看，但不需要手动填写。旧 `/play` 地址继续兼容；批量管线位于 `/projects/:projectId/generate/structured`。
+
+`/projects/:projectId/preview` 是封存快照的只读预览：其中的选择只跳转到已有节点，不会调用模型生成新剧情。看到“只读预览”时，请使用页面中的“进入分支写作”或“继续分支写作”返回 `/generate`。
 
 到达结局后，作者可以点击“保存为正式故事草稿”。系统会创建新的 `review_required` 草稿版本，保留原草稿并把作者实际选择的线性主线路径写入 StoryGraph；进入编辑器后可以继续补充分支和作者结局，并完成质量校验，才能创建可发布快照。
+
+作者实际走完的线性路径使用 `selected_path` 发布策略：只要结构完整、至少有一个可达结局，就可以校验、封存和导出，不要求为了满足多分支数量再人工补结局。一次性结构化生成和明确的多分支图谱使用 `branching_graph` 策略，继续要求至少两个结局；策略随故事版本保存，不依赖浏览器参数。
 
 在正式编辑器中，作者可以选中一个非结局节点，新增作者支线或直接新增作者结局。两种操作都会以一次带修订号校验的整图写入保存；作者结局会创建新的 `ending` 节点，作者支线会连接到已有结局。结局节点、达到项目节点上限或达到项目结局上限时不会提供对应操作。
 
@@ -83,7 +88,7 @@ npm run dev
 | `npm run build` | Next 生产构建 |
 | `npm run start` | loopback 生产启动 |
 | `npm run verify` | typecheck、lint、Vitest、生产构建 |
-| `npm run test:e2e:authoring` | 生产构建下的 16 项完整 authoring E2E |
+| `npm run test:e2e:authoring` | 生产构建下的完整 authoring E2E 套件 |
 | `npm run db:authoring:smoke` | SQLite authoring 生命周期 smoke |
 | `npm run db:authoring:backup` | 迁移前 SQLite 备份、完整性和 SHA-256 检查 |
 | `npm run db:authoring:checkpoint` | 日常 SQLite checkpoint、manifest 和保留策略 |
@@ -94,8 +99,9 @@ npm run dev
 | `npm run interactive:evaluate -- --provider fake` | 不联网地走完 6/8/16 幕互动样本，检查选择风险路径、逐幕选项和模型收尾契约 |
 | `npm run interactive:evaluate -- --provider live --dry-run` | 只规划真实模型互动评测，不发网络请求 |
 | `npm run interactive:evaluate -- --provider live --allow-network --approve-paid-calls --fixture zh-contemporary-6` | 在明确批准付费调用后，只执行一个固定互动样本的真实模型评测 |
+| `npm run interactive:evaluate -- --provider live --allow-network --approve-paid-calls --fixture zh-contemporary-6 --save-review --expected-model <当前 OPENAI_MODEL>` | 在同样的人工批准下，额外保存逐幕人工审阅 Markdown；要求预期模型与当前配置一致，只含校验后的正文、选择和后果，不含 prompt、原始响应或密钥 |
 | `npm run package:smoke` | Windows 分发 smoke dry-run，不安装、不删除数据 |
-| `pwsh -File scripts/package-smoke.ps1 -Mode Local -Root "$env:TEMP\storyforge-package-smoke-0.1.7"` | 在隔离临时根中验证 standalone 安装、升级、回滚和卸载保留数据 |
+| `pwsh -File scripts/package-smoke.ps1 -Mode Local -Root "$env:TEMP\storyforge-package-smoke-0.1.8"` | 在隔离临时根中验证 standalone 安装、升级、回滚和卸载保留数据 |
 | `npm run package:standalone` | 生成不含作者数据和密钥的 Node standalone 目录 |
 | `npm run release:evidence` | 生成 CycloneDX SBOM、standalone SHA-256 清单和脱敏发布证据 |
 | `npm run legacy:export -- --dry-run` | 只读检查旧 session，不删除源数据 |
@@ -106,7 +112,7 @@ npm run dev
 - 正式数据使用 authoring SQLite，不复用旧 `game_sessions` 图式。
 - 自动迁移前备份写入 `SQLITE_BACKUP_DIR`，保留策略和恢复步骤见 [authoring-recovery.md](docs/authoring-recovery.md)。
 - 互动生成任务、租约、重试和取消状态保存在 SQLite；重启服务后会自动重新领取未完成任务，单个任务最多 3 次尝试并受截止时间约束。
-- `STORYFORGE_MAX_OUTPUT_TOKENS` 作用于单个互动会话的输出 token 预算；请求先预留、成功后按实际用量结算，超时等无法确认的用量会标记为 `unknown`，不会按 0 计算。
+- `STORYFORGE_MAX_OUTPUT_TOKENS` 作用于单个互动会话的输出 token 预算；请求先预留、成功后按实际用量结算，超时等无法确认的用量会标记为 `unknown`，不会按 0 计算。编辑器的“生成作者结局”使用独立账本和阶段输出上限，确认用量、失败和未知预算会显示在项目生成指标中，不占用互动会话预算。
 - 互动历史列表默认按 50 条摘要分页加载，单页最多 100 条；列表只读取状态和进度，恢复某条记录时才按 ID 读取完整正文。
 - 项目 JSON 备份包含已生成互动会话和选择记录，但不包含进行中的模型任务租约和调用账本。导入时正在生成的开场会转为可重试失败状态，正在生成下一幕的选择会被释放；需要精确恢复执行中的任务时使用 SQLite checkpoint。
 - 项目 JSON 备份从项目库导出，恢复默认生成新项目 ID。

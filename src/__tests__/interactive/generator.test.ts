@@ -250,6 +250,64 @@ describe("interactive scene generation", () => {
     expect(result.scene.choices).toHaveLength(3);
   });
 
+  it("repairs active scenes with too many choices before strict normalization", async () => {
+    const generate = vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate")
+      .mockResolvedValueOnce({
+        data: {
+          scene: {
+            title: "过量的岔路",
+            body: "门后同时出现了四条方向，故事还没有结束。",
+            summary: "模型返回了超过契约数量的选项。",
+            choices: [
+              { id: "choice_a", label: "查看门缝", intent: "确认光源位置", risk: "low", consequencePreview: "你会获得一条线索。" },
+              { id: "choice_b", label: "记录声音", intent: "保存异常证据", risk: "medium", consequencePreview: "你会留下可核对的记录。" },
+              { id: "choice_c", label: "冲入房间", intent: "立即控制现场", risk: "high", consequencePreview: "你会正面承担风险。" },
+              { id: "choice_d", label: "呼叫同伴", intent: "请求外部支援", risk: "low", consequencePreview: "你会暴露当前位置。" },
+            ],
+            isEnding: false,
+            endingSummary: null,
+          },
+          statePatch: {},
+        },
+        rawResponse: "{}",
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        model: "deepseek-v4-flash",
+      })
+      .mockResolvedValueOnce({
+        data: {
+          scene: {
+            title: "收束后的岔路",
+            body: "三条方向重新分开，每一条都指向不同的代价。",
+            summary: "作者可以继续决定方向。",
+            choices: [
+              { id: "choice_a", label: "退回门外", intent: "保留安全退路", risk: "low", consequencePreview: "你会保留退路。" },
+              { id: "choice_b", label: "继续观察", intent: "确认现场变化", risk: "medium", consequencePreview: "你会获得更多信息。" },
+              { id: "choice_c", label: "直接进入", intent: "承担即时危险", risk: "high", consequencePreview: "你可能触发警报。" },
+            ],
+            isEnding: false,
+            endingSummary: null,
+          },
+          statePatch: {},
+        },
+        rawResponse: "{}",
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        model: "deepseek-v4-flash",
+      });
+
+    const result = await generateInteractiveScene(
+      { project, state, previousScene, selectedChoice },
+      new OpenAICompatibleGenerationProvider(),
+    );
+
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:choice-repair:7");
+    expect(result.scene.choices).toHaveLength(3);
+  });
+
   it("ignores whitespace-only legacy memory entries from the model", async () => {
     vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate").mockResolvedValue({
       data: {
@@ -317,10 +375,123 @@ describe("interactive scene generation", () => {
     await generateInteractiveScene({ project, state, previousScene, selectedChoice }, new OpenAICompatibleGenerationProvider());
 
     expect(generate.mock.calls[0]?.[0].userPrompt).toContain("Author selected direction: 推门进入");
+    expect(generate.mock.calls[0]?.[0].userPrompt).toContain("Maintain a coherent timeline");
+    expect(generate.mock.calls[0]?.[0].userPrompt).toContain("Use an unambiguous 24-hour clock");
+    expect(generate.mock.calls[0]?.[0].userPrompt).toContain("Direct consequence must be concrete");
     expect(generate.mock.calls[0]?.[0].userPrompt).toContain("JSON validity is mandatory");
     expect(generate.mock.calls[0]?.[0].userPrompt).toContain("Keep statePatch concise");
     expect(generate.mock.calls[0]?.[0].userPrompt).toContain("one low, one medium, and one high risk choice");
-    expect(generate.mock.calls[0]?.[0].temperature).toBe(0.4);
+    expect(generate.mock.calls[0]?.[0].userPrompt).toContain("scene.body must contain between 1 and 1800 characters");
+    expect(generate.mock.calls[0]?.[0].temperature).toBe(0.2);
+  });
+
+  it("uses the generated scene summary when the model returns a generic choice impact", async () => {
+    vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate").mockResolvedValue({
+      data: {
+        scene: {
+          title: "门后的回声",
+          body: "推门后的录音明确说出了新的档案编号，调查方向被迫改变。",
+          summary: "录音给出新的档案编号，调查转向地下库房。",
+          choices: [
+            { id: "choice_a", label: "查看档案", intent: "寻找记录", risk: "low", consequencePreview: "你会获得线索。" },
+            { id: "choice_b", label: "离开房间", intent: "暂时撤退", risk: "medium", consequencePreview: "你会失去部分时间。" },
+            { id: "choice_c", label: "撬开暗门", intent: "冒险寻找出口", risk: "high", consequencePreview: "你可能触发警报。" },
+          ],
+          isEnding: false,
+          endingSummary: null,
+        },
+        statePatch: { lastChoiceImpact: "局势发生了变化。" },
+      },
+      rawResponse: "{}",
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: 0,
+      model: "test-model",
+    });
+
+    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice }, new OpenAICompatibleGenerationProvider());
+
+    expect(result.state.lastChoiceImpact).toBe("录音给出新的档案编号，调查转向地下库房。");
+  });
+
+  it("carries a model-written continuity anchor into the next scene prompt", async () => {
+    const generate = vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate").mockResolvedValue({
+      data: {
+        scene: {
+          title: "门后的回声",
+          body: "沈沉留在丰村档案室，等候潮汐钟的下一次回响。",
+          summary: "沈沉必须在档案室确认潮汐钟的来源。",
+          choices: [
+            { id: "choice_a", label: "核对档案", intent: "确认潮汐钟来源", risk: "low", consequencePreview: "你会获得一条可验证的线索。" },
+            { id: "choice_b", label: "呼叫同伴", intent: "让同伴赶到档案室", risk: "medium", consequencePreview: "你会让更多人进入现场。" },
+            { id: "choice_c", label: "打开暗门", intent: "立即承担未知风险", risk: "high", consequencePreview: "你可能触发档案室的机关。" },
+          ],
+          isEnding: false,
+          endingSummary: null,
+        },
+        statePatch: {
+          continuity: {
+            location: "丰村档案室",
+            time: "当日 15:41",
+            activeCharacters: ["沈沉"],
+            sceneGoal: "确认潮汐钟的来源",
+          },
+        },
+      },
+      rawResponse: "{}",
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: 0,
+      model: "test-model",
+    });
+
+    const opening = await generateInteractiveScene({
+      project,
+      state: { ...state, turn: 1 },
+      previousScene: null,
+      selectedChoice: null,
+    }, new OpenAICompatibleGenerationProvider());
+    await generateInteractiveScene({
+      project,
+      state: opening.state,
+      previousScene: opening.scene,
+      selectedChoice: opening.scene.choices[0],
+    }, new OpenAICompatibleGenerationProvider());
+
+    expect(opening.state.continuity).toEqual({
+      location: "丰村档案室",
+      time: "当日 15:41",
+      activeCharacters: ["沈沉"],
+      sceneGoal: "确认潮汐钟的来源",
+    });
+    expect(generate.mock.calls[1]?.[0].userPrompt ?? "").toContain("Continuity anchor");
+    expect(generate.mock.calls[1]?.[0].userPrompt ?? "").toContain("丰村档案室");
+  });
+
+  it("normalizes a compatible provider that places endingReadiness at the envelope root", async () => {
+    const create = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({
+        scene: {
+          title: "门后的回声",
+          body: "门后的录音给出新的档案编号。",
+          summary: "调查方向变得更明确。",
+          choices: [
+            { id: "choice_a", label: "查看档案", intent: "寻找记录", risk: "low", consequencePreview: "你会获得线索。" },
+            { id: "choice_b", label: "离开房间", intent: "暂时撤退", risk: "medium", consequencePreview: "你会失去时间。" },
+            { id: "choice_c", label: "撬开暗门", intent: "冒险寻找出口", risk: "high", consequencePreview: "你可能触发警报。" },
+          ],
+          isEnding: false,
+          endingSummary: null,
+        },
+        statePatch: {},
+        endingReadiness: 48,
+      }) } }],
+    });
+    const provider = new OpenAICompatibleGenerationProvider({ client: { chat: { completions: { create } } } });
+
+    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice }, provider);
+
+    expect(result.state.endingReadiness).toBe(48);
   });
 
   it("rejects an active model scene without enough choices", async () => {
@@ -406,6 +577,8 @@ describe("interactive scene generation", () => {
 
     expect(generate).toHaveBeenCalledTimes(2);
     expect(generate.mock.calls[0]?.[0].userPrompt).toContain("收尾时优先回应仍未解决的主线伏笔");
+    expect(generate.mock.calls[0]?.[0].userPrompt).toContain('"choices": [], "isEnding": true, "endingSummary": "string"');
+    expect(generate.mock.calls[0]?.[0].userPrompt).not.toContain('"choices": [{ "id": "choice_a"');
     expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:ending-repair:8");
     expect(result.scene.isEnding).toBe(true);
     expect(result.scene.title).toBe("终局");
@@ -497,5 +670,220 @@ describe("interactive scene generation", () => {
     expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:ending-repair:8");
     expect(result.scene.choices).toEqual([]);
     expect(result.scene.endingSummary).toContain("代价");
+  });
+
+  it("repairs an ending that promises future continuation instead of closing the conflict", async () => {
+    const generate = vi.spyOn(OpenAICompatibleGenerationProvider.prototype, "generate")
+      .mockResolvedValueOnce({
+        data: {
+          scene: {
+            title: "暂时的平静",
+            body: "钟声停下，潮水退去，但旧档案将继续揭示王冠的真相。",
+            summary: "危机暂时结束，真相仍将继续揭示。",
+            choices: [],
+            isEnding: true,
+            endingSummary: "旧档案将继续揭示王冠与潮门的真相。",
+          },
+          statePatch: {},
+        },
+        rawResponse: "{}",
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        model: "deepseek-v4-flash",
+      })
+      .mockResolvedValueOnce({
+        data: {
+          scene: {
+            title: "潮声止息",
+            body: "钟塔停止运转，潮门闭合，王冠的力量被封存，城中的咸潮也随之退去。",
+            summary: "主线危机被解决，作者的选择留下了明确代价。",
+            choices: [],
+            isEnding: true,
+            endingSummary: "潮门闭合，城港获救，王冠被封存，守潮人承担了失去旧记忆的代价。",
+          },
+          statePatch: {},
+        },
+        rawResponse: "{}",
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        model: "deepseek-v4-flash",
+      });
+
+    const result = await generateInteractiveScene({
+      project,
+      state: { ...state, turn: 7 },
+      previousScene,
+      selectedChoice,
+    }, new OpenAICompatibleGenerationProvider());
+
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[1]?.[0].stepKey).toBe("interactive:ending-repair:8");
+    expect(result.scene.endingSummary).toContain("城港获救");
+  });
+
+  it("lets the final repair handle omitted ending fields from a compatible provider", async () => {
+    const create = vi.fn()
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "未完成的终局",
+            body: "门已经关上，但结局没有被说明。",
+            summary: "模型省略了结局字段。",
+            isEnding: true,
+          },
+        }) } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "终局",
+            body: "门后的真相终于与作者的选择合拢。",
+            summary: "故事完成了最后的收束。",
+            choices: [],
+            isEnding: true,
+            endingSummary: "作者承担了打开这扇门的代价。",
+          },
+          statePatch: {},
+        }) } }],
+      });
+    const provider = new OpenAICompatibleGenerationProvider({ client: { chat: { completions: { create } } } });
+
+    const result = await generateInteractiveScene({
+      project,
+      state: { ...state, turn: 7 },
+      previousScene,
+      selectedChoice,
+    }, provider);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result.scene.isEnding).toBe(true);
+    expect(result.scene.endingSummary).toContain("代价");
+  });
+
+  it("routes a final response with an omitted ending marker through ending repair", async () => {
+    const create = vi.fn()
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "漏标记的终局",
+            body: "潮声停在门外，冲突仍没有被说明。",
+            summary: "模型省略了结局标记和选项字段。",
+          },
+        }) } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "潮声之后",
+            body: "沈沉把证据交给妹妹，承担了公开档案后的代价。",
+            summary: "作者选择推动真相公开，故事完成收束。",
+            choices: [],
+            isEnding: true,
+            endingSummary: "真相被留下，沈沉也接受了无法撤回的后果。",
+          },
+          statePatch: {},
+        }) } }],
+      });
+    const provider = new OpenAICompatibleGenerationProvider({ client: { chat: { completions: { create } } } });
+
+    const result = await generateInteractiveScene({
+      project,
+      state: { ...state, turn: 7 },
+      previousScene,
+      selectedChoice,
+    }, provider);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result.scene.isEnding).toBe(true);
+    expect(result.scene.endingSummary).toContain("后果");
+  });
+
+  it("routes an oversized final scene through ending repair instead of failing at the provider boundary", async () => {
+    const create = vi.fn()
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "过长的终局",
+            body: "a".repeat(1_801),
+            summary: "s".repeat(301),
+            choices: [],
+            isEnding: true,
+            endingSummary: "暂未完成收束。",
+          },
+        }) } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "完成的终局",
+            body: "模型根据作者选择完成了最后一幕。",
+            summary: "主要冲突得到收束。",
+            choices: [],
+            isEnding: true,
+            endingSummary: "作者承担了公开真相后的代价。",
+          },
+          statePatch: {},
+        }) } }],
+      });
+    const provider = new OpenAICompatibleGenerationProvider({ client: { chat: { completions: { create } } } });
+
+    const result = await generateInteractiveScene({
+      project,
+      state: { ...state, turn: 7 },
+      previousScene,
+      selectedChoice,
+    }, provider);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result.scene.title).toBe("完成的终局");
+    expect(result.scene.body.length).toBeLessThanOrEqual(1_800);
+    expect(result.scene.summary.length).toBeLessThanOrEqual(300);
+  });
+
+  it("routes an oversized active scene through choice repair instead of persisting it", async () => {
+    const create = vi.fn()
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "过长的中段",
+            body: "a".repeat(1_801),
+            summary: "s".repeat(301),
+            choices: [
+              { id: "choice_a", label: "调查线索", intent: "确认线索来源", risk: "low", consequencePreview: "你会获得更多信息。" },
+              { id: "choice_b", label: "保护证据", intent: "降低暴露风险", risk: "medium", consequencePreview: "你会暂时保住证据。" },
+              { id: "choice_c", label: "公开档案", intent: "立即推动真相公开", risk: "high", consequencePreview: "你会承担公开后的代价。" },
+            ],
+            isEnding: false,
+            endingSummary: null,
+          },
+        }) } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          scene: {
+            title: "修复后的中段",
+            body: "作者的选择带来新的线索。",
+            summary: "故事继续推进。",
+            choices: [
+              { id: "choice_a", label: "调查线索", intent: "确认线索来源", risk: "low", consequencePreview: "你会获得更多信息。" },
+              { id: "choice_b", label: "保护证据", intent: "降低暴露风险", risk: "medium", consequencePreview: "你会暂时保住证据。" },
+              { id: "choice_c", label: "公开档案", intent: "立即推动真相公开", risk: "high", consequencePreview: "你会承担公开后的代价。" },
+            ],
+            isEnding: false,
+            endingSummary: null,
+          },
+          statePatch: {},
+        }) } }],
+      });
+    const provider = new OpenAICompatibleGenerationProvider({ client: { chat: { completions: { create } } } });
+
+    const result = await generateInteractiveScene({ project, state, previousScene, selectedChoice }, provider);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[1]?.[0].messages[1]?.content).toContain("The previous response did not provide one choice for each risk level.");
+    expect(result.scene.body.length).toBeLessThanOrEqual(1_800);
+    expect(result.scene.summary.length).toBeLessThanOrEqual(300);
   });
 });

@@ -122,4 +122,49 @@ test.describe("full author-driven authoring flow", () => {
     const snapshot = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshot.status()).toBe(201);
   });
+
+  test("single-path story validates, snapshots, and exports without a second ending", async ({ page, request }) => {
+    const projectResponse = await request.post("/api/projects", {
+      data: {
+        title: "单路径发布测试",
+        premise: "一名档案员发现一扇不该存在的门。",
+        genre: "悬疑",
+        tone: "克制紧张",
+        pointOfView: "第二人称",
+        rating: "PG-13",
+        size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
+      },
+    });
+    expect(projectResponse.ok()).toBe(true);
+    const project = (await projectResponse.json()).project as { id: string };
+
+    await page.goto(`/projects/${project.id}/generate`);
+    await page.getByRole("button", { name: "开始分支写作" }).click();
+    const stage = page.locator(".interactive-stage");
+    await expect(stage.getByText("第 1 / 6 幕")).toBeVisible();
+    for (let turn = 1; turn < 6; turn += 1) {
+      await page.getByRole("button", { name: turn === 1 ? "改道前进" : "继续调查" }).click();
+      await expect(stage.getByText(`第 ${turn + 1} / 6 幕`)).toBeVisible();
+    }
+    await expect(page.getByText("故事已结束")).toBeVisible();
+    await page.getByRole("button", { name: "保存为正式故事草稿" }).click();
+    await expect(page.getByText("已保存为正式故事草稿")).toBeVisible();
+
+    const graph = (await (await request.get(`/api/projects/${project.id}/graph`)).json()).graph as {
+      nodes: Array<{ kind: string }>;
+    };
+    expect(graph.nodes).toHaveLength(6);
+    expect(graph.nodes.filter((node) => node.kind === "ending")).toHaveLength(1);
+
+    const validation = await request.post(`/api/projects/${project.id}/validate`, { data: { sources: ["structural", "rule"] } });
+    expect(validation.ok()).toBe(true);
+    expect((await validation.json()).allowed).toBe(true);
+
+    const snapshot = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
+    expect(snapshot.status()).toBe(201);
+    const snapshotId = ((await snapshot.json()).snapshot as { id: string }).id;
+    const exported = await request.get(`/api/projects/${project.id}/export/html?snapshotId=${snapshotId}`);
+    expect(exported.status()).toBe(200);
+    expect(await exported.text()).toContain("单路径发布测试");
+  });
 });

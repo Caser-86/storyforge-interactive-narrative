@@ -15,7 +15,7 @@ import {
 } from "./jobs";
 import { configuredInteractiveOutputBudget } from "./usage";
 import {
-  InteractiveSceneSchema,
+  InteractiveSceneReadSchema,
   InteractiveSessionSchema,
   InteractiveSessionSummarySchema,
   InteractiveStateSchema,
@@ -114,7 +114,7 @@ function parseState(value: string): InteractiveState {
 }
 
 function parseScene(value: string): InteractiveScene {
-  return InteractiveSceneSchema.parse(JSON.parse(value));
+  return InteractiveSceneReadSchema.parse(JSON.parse(value));
 }
 
 function generationProgress(job: InteractiveGenerationJob | null | undefined): InteractiveSession["generation"] {

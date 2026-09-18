@@ -1,3 +1,4 @@
+import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import { expect, test } from "@playwright/test";
@@ -35,6 +36,9 @@ test.describe("interactive authoring flow", () => {
     await expect(page.getByRole("heading", { name: "第 1 幕" })).toBeVisible();
     const stage = page.locator(".interactive-stage");
     await expect(stage.getByText("第 1 / 8 幕")).toBeVisible();
+    await expect(stage.getByText("你正在亲自推进一条分支：每次只生成当前选择的下一幕，未选择的方向不会生成；达到计划幕数后由模型收尾。")).toBeVisible();
+    await expect(stage.getByText("当前剧情锚点")).toBeVisible();
+    await expect(stage.getByText("地点：当前场景")).toBeVisible();
 
     await page.getByRole("button", { name: "继续调查" }).click();
     await expect(stage.getByText("第 2 / 8 幕")).toBeVisible();
@@ -128,5 +132,58 @@ test.describe("interactive authoring flow", () => {
     expect(validation.ok()).toBe(true);
     const snapshot = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshot.status()).toBe(201);
+  });
+
+  test("recovers a legacy active scene with no choices without changing the source record", async ({ page, request }) => {
+    const projectResponse = await request.post("/api/projects", {
+      data: {
+        title: "旧会话浏览器恢复测试",
+        premise: "一名档案员发现一扇不该存在的门。",
+        genre: "悬疑",
+        tone: "克制紧张",
+        pointOfView: "第二人称",
+        rating: "PG-13",
+        size: { preset: "short", targetNodes: 15, targetEndings: 2 },
+      },
+    });
+    expect(projectResponse.ok()).toBe(true);
+    const project = (await projectResponse.json()).project as { id: string };
+
+    const startedResponse = await request.post(`/api/projects/${project.id}/play`);
+    expect(startedResponse.status()).toBe(202);
+    const started = (await startedResponse.json()).session as { id: string };
+    let activeSession: { id: string; status: string; turn: number } | null = null;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const response = await request.get(`/api/projects/${project.id}/play/${started.id}`);
+      expect(response.ok()).toBe(true);
+      const session = (await response.json()).session as { id: string; status: string; turn: number };
+      if (session.status === "active") {
+        activeSession = session;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(activeSession).not.toBeNull();
+
+    const database = new Database(SQLITE_E2E_PATH);
+    try {
+      database.pragma("busy_timeout = 5000");
+      const row = database.prepare("SELECT scene_json FROM interactive_turns WHERE session_id = ? ORDER BY turn DESC LIMIT 1").get(activeSession!.id) as { scene_json: string } | undefined;
+      expect(row).toBeDefined();
+      const scene = JSON.parse(row!.scene_json) as { choices: unknown[] };
+      database.prepare("UPDATE interactive_turns SET scene_json = ? WHERE session_id = ? AND turn = 1").run(JSON.stringify({ ...scene, choices: [] }), activeSession!.id);
+    } finally {
+      database.close();
+    }
+
+    await page.goto(`/projects/${project.id}/generate?sessionId=${encodeURIComponent(activeSession!.id)}`);
+    const stage = page.locator(".interactive-stage");
+    const legacyNotice = stage.locator(".interactive-legacy-notice");
+    await expect(legacyNotice).toContainText("这条旧记录无法继续");
+    await expect(legacyNotice).toContainText("没有可选择的分支");
+    await expect(stage.getByRole("button", { name: "新建分支写作" })).toBeVisible();
+    await expect(stage.locator(".interactive-choices")).toHaveCount(0);
+    const persisted = await request.get(`/api/projects/${project.id}/play/${activeSession!.id}`);
+    expect((await persisted.json()).session.scene.choices).toEqual([]);
   });
 });

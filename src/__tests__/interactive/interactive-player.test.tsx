@@ -261,6 +261,73 @@ describe("InteractivePlayer", () => {
     expect(turnsRequestCount).toBe(2);
   });
 
+  it("shows the author's previous choice as the context for the current scene", async () => {
+    const nextSession = {
+      ...session,
+      turn: 2,
+      state: { ...session.state, turn: 2 },
+      scene: { ...session.scene, title: "承接选择的一幕" },
+    };
+    const firstTurn = { turn: 1, scene: session.scene, selectedChoiceId: "choice_a", selectedChoiceLabel: "推门进入", createdAt: session.createdAt };
+    const secondTurn = { turn: 2, scene: nextSession.scene, selectedChoiceId: null, selectedChoiceLabel: null, createdAt: session.updatedAt };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/play/sessions")) return Promise.resolve(new Response(JSON.stringify({ sessions: [nextSession] }), { status: 200 }));
+      if (url.endsWith("/turns")) return Promise.resolve(new Response(JSON.stringify({ turns: [firstTurn, secondTurn] }), { status: 200 }));
+      return Promise.resolve(new Response(JSON.stringify({ session: nextSession }), { status: 200 }));
+    });
+    localStorage.setItem("storyforge:interactive-session:project-1", session.id);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    expect(await screen.findByRole("heading", { name: "承接选择的一幕" })).toBeInTheDocument();
+    expect(await screen.findByText("承接你的选择")).toBeInTheDocument();
+    expect(screen.getByText("上一幕你选择了“推门进入”，本幕展示该方向产生的后果。")).toBeInTheDocument();
+  });
+
+  it("explains that the active scene follows the author's selected path", async () => {
+    localStorage.setItem("storyforge:interactive-session:project-1", session.id);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      const payload = url.endsWith("/play/sessions") ? { sessions: [session] } : { session };
+      return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+    }));
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    expect(await screen.findByText("你正在亲自推进一条分支：每次只生成当前选择的下一幕，未选择的方向不会生成；达到计划幕数后由模型收尾。")).toBeInTheDocument();
+  });
+
+  it("shows the current continuity anchor without adding author input", async () => {
+    const anchoredSession = {
+      ...session,
+      state: {
+        ...session.state,
+        continuity: {
+          location: "丰村档案室",
+          time: "当日 15:41",
+          activeCharacters: ["沈沉", "沈沙"],
+          sceneGoal: "确认潮汐钟的来源",
+        },
+      },
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      return Promise.resolve(new Response(JSON.stringify(url.endsWith("/play/sessions") ? { sessions: [anchoredSession] } : { session: anchoredSession }), { status: 200 }));
+    });
+    localStorage.setItem("storyforge:interactive-session:project-1", session.id);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    expect(await screen.findByText("当前剧情锚点")).toBeInTheDocument();
+    expect(screen.getByText("地点：丰村档案室")).toBeInTheDocument();
+    expect(screen.getByText("时间：当日 15:41")).toBeInTheDocument();
+    expect(screen.getByText("在场：沈沉、沈沙")).toBeInTheDocument();
+    expect(screen.getByText("目标：确认潮汐钟的来源")).toBeInTheDocument();
+  });
+
   it("shows a retryable error when the next scene generation is released", async () => {
     localStorage.setItem("storyforge:interactive-session:project-1", session.id);
     const failedGeneration = {
@@ -303,6 +370,57 @@ describe("InteractivePlayer", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("下一幕生成超时，当前选择已恢复，可以重新选择。");
     expect(await screen.findByText("需重试")).toBeInTheDocument();
     expect(screen.queryByText("进行中")).not.toBeInTheDocument();
+  });
+
+  it("explains that resumable history waits for the author's next choice", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ sessions: [session] }), { status: 200 })));
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    expect(await screen.findByText("可继续")).toBeInTheDocument();
+    expect(screen.getByText("“可继续”表示记录已保存且等待你的下一次选择，不代表模型正在后台生成。")).toBeInTheDocument();
+    expect(screen.getByText(/最近更新/)).toHaveTextContent("记录 session-");
+    expect(screen.queryByText("进行中")).not.toBeInTheDocument();
+  });
+
+  it("identifies a restored active session that uses the legacy two-choice contract", async () => {
+    localStorage.setItem("storyforge:interactive-session:project-1", session.id);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      return Promise.resolve(new Response(JSON.stringify(url.endsWith("/turns") ? { turns: [] } : { session }), { status: 200 }));
+    }));
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    expect(await screen.findByText("这是旧规则会话")).toBeInTheDocument();
+    expect(screen.getByText(/当前幕只有 2 个选项/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /推门进入/ })).toBeInTheDocument();
+  });
+
+  it("offers a fresh branch-writing path when a legacy active scene has no choices", async () => {
+    const emptyChoiceSession = {
+      ...session,
+      scene: { ...session.scene, choices: [] },
+    };
+    localStorage.setItem("storyforge:interactive-session:project-1", emptyChoiceSession.id);
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/play") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ session: { ...emptyChoiceSession, id: "session-new", scene: null, status: "generating" as const } }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify(url.endsWith("/turns") ? { turns: [] } : { session: emptyChoiceSession }), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InteractivePlayer projectId="project-1" projectTitle="第九档案室" />);
+
+    expect(await screen.findByText("这条旧记录无法继续")).toBeInTheDocument();
+    expect(screen.getByText(/没有可选择的分支/)).toBeInTheDocument();
+    expect(screen.queryByText("选择你的行动")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "新建分支写作" }));
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/projects/project-1/play", expect.objectContaining({ method: "POST" }));
+    expect(localStorage.getItem("storyforge:interactive-session:project-1")).toBe("session-new");
   });
 
   it("keeps an opening failure visible and offers a fresh retry", async () => {

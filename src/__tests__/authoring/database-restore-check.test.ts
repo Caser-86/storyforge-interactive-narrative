@@ -4,6 +4,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository } from "@/lib/authoring/repository";
+import { AUTHORING_MIGRATIONS } from "@/lib/authoring/migrations";
 import { createDatabaseCheckpoint } from "@/lib/authoring/database-backup";
 import { restoreAuthoringDatabaseBackup } from "@/lib/authoring/database-restore-check";
 
@@ -43,7 +44,7 @@ describe("authoring database restore checks", () => {
 
     expect(result).toMatchObject({
       integrityCheck: "ok",
-      migrationVersion: 13,
+      migrationVersion: AUTHORING_MIGRATIONS.at(-1)?.version,
       projectCount: 1,
       graphReadable: true,
     });

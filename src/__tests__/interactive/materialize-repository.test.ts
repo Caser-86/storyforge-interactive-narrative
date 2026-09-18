@@ -118,7 +118,7 @@ describe("interactive draft materialization", () => {
     await expect(authoring.materializeInteractiveDraft(project.id, created.id, graph)).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
-  it("rejects materialization when a resized project has no room for its reserved ending", async () => {
+  it("keeps a completed selected path publishable after a project resize", async () => {
     const project = await authoring.createProject({
       title: "预算收缩测试",
       premise: state.seedPrompt,
@@ -140,6 +140,8 @@ describe("interactive draft materialization", () => {
     const graph = materializeInteractivePath({ versionId: "pending", projectTitle: project.title, turns });
     await authoring.updateProject(project.id, { size: { preset: "custom", targetNodes: 8, targetEndings: 2 } });
 
-    await expect(authoring.materializeInteractiveDraft(project.id, endedSessionId, graph)).rejects.toMatchObject({ code: "CONFLICT" });
+    const materialized = await authoring.materializeInteractiveDraft(project.id, endedSessionId, graph);
+    expect(materialized.graph.nodes).toHaveLength(8);
+    expect(await authoring.getReleaseProfile(project.id, materialized.version.id)).toBe("selected_path");
   });
 });

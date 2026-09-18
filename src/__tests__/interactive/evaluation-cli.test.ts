@@ -32,6 +32,34 @@ describe("interactive evaluation CLI", () => {
     });
   });
 
+  it("requires the explicit live gates before saving a review artifact", () => {
+    expect(() => parseInteractiveEvaluationOptions([
+      "--provider", "live",
+      "--allow-network",
+      "--approve-paid-calls",
+      "--fixture", "zh-contemporary-6",
+      "--save-review",
+    ])).toThrow("--expected-model");
+    expect(parseInteractiveEvaluationOptions([
+      "--provider", "live",
+      "--allow-network",
+      "--approve-paid-calls",
+      "--fixture", "zh-contemporary-6",
+      "--save-review",
+      "--expected-model", "doubao-seed-evolving",
+    ])).toMatchObject({ saveReview: true, expectedModel: "doubao-seed-evolving" });
+    expect(() => parseInteractiveEvaluationOptions(["--provider", "fake", "--save-review"])).toThrow("live");
+    expect(() => parseInteractiveEvaluationOptions([
+      "--provider", "live",
+      "--dry-run",
+      "--save-review",
+    ])).toThrow("network");
+  });
+
+  it("rejects an expected model flag outside manual live review", () => {
+    expect(() => parseInteractiveEvaluationOptions(["--provider", "fake", "--expected-model", "doubao-seed-evolving"])).toThrow("live");
+  });
+
   it("rejects unknown providers, flags, and fixture IDs", () => {
     expect(() => parseInteractiveEvaluationOptions(["--provider", "unknown"])).toThrow("fake or live");
     expect(() => parseInteractiveEvaluationOptions(["--provider", "live", "--dry-run", "--unknown"])).toThrow("Unknown option");

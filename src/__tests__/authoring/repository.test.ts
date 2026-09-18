@@ -5,6 +5,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AuthoringError } from "@/lib/authoring/errors";
 import { runAuthoringMigrations } from "@/lib/authoring/database";
+import { AUTHORING_MIGRATIONS } from "@/lib/authoring/migrations";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 import type { AuthoringRepository, CreateProjectInput } from "@/lib/authoring/repository";
 import type { Chapter, StoryEdge, StoryGraph, StoryNode } from "@/lib/authoring/schemas";
@@ -283,7 +284,7 @@ describe("authoring repository", () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('projects', 'story_versions')")
         .all();
 
-      expect(migrations).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 }, { version: 13 }]);
+      expect(migrations).toEqual(AUTHORING_MIGRATIONS.map(({ version }) => ({ version })));
       expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_interactive_sessions_project_updated_id'").get()).toEqual({ name: "idx_interactive_sessions_project_updated_id" });
       expect(projectTables).toEqual([{ name: "projects" }, { name: "story_versions" }]);
     } finally {

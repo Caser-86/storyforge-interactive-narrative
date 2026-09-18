@@ -12,7 +12,8 @@ export default async function EditPage({ params }: EditPageProps) {
     const project = await repository.getProject(projectId);
     const graph = await repository.getProjectGraph(projectId);
     const draftRevision = await repository.getDraftRevision(projectId);
-    return <EditorShell project={project} graph={graph} draftRevision={draftRevision} />;
+    const releaseProfile = await repository.getReleaseProfile(projectId, graph.versionId);
+    return <EditorShell project={project} graph={graph} draftRevision={draftRevision} releaseProfile={releaseProfile} />;
   } finally {
     repository.close();
   }

@@ -12,11 +12,15 @@ const preview = {
   graph: {
     versionId: "snapshot-1",
     chapters: [{ id: "chapter-1", ordinal: 0, title: "第一章", summary: "进入档案馆" }],
-    nodes: [
-      { id: "start", chapterId: "chapter-1", nodeKey: "start", kind: "start" as const, title: "入口", body: "你站在档案馆门口。", summary: "故事开始。" },
-      { id: "ending", chapterId: "chapter-1", nodeKey: "ending", kind: "ending" as const, title: "灯塔结局", body: "你点亮了灯塔。", summary: "故事结束。" },
+      nodes: [
+        { id: "start", chapterId: "chapter-1", nodeKey: "start", kind: "start" as const, title: "入口", body: "你站在档案馆门口。", summary: "故事开始。" },
+        { id: "ending", chapterId: "chapter-1", nodeKey: "ending", kind: "ending" as const, title: "灯塔结局", body: "你点亮了灯塔。", summary: "故事结束。" },
+        { id: "author-ending", chapterId: "chapter-1", nodeKey: "author-ending", kind: "ending" as const, title: "作者结局", body: "你留下了另一种选择。", summary: "作者分支结束。" },
+      ],
+    edges: [
+      { id: "edge-1", sourceNodeId: "start", targetNodeId: "ending", label: "点亮灯塔", sortOrder: 0, branchType: "main" as const },
+      { id: "edge-2", sourceNodeId: "start", targetNodeId: "author-ending", label: "承担代价", sortOrder: 1, branchType: "side" as const },
     ],
-    edges: [{ id: "edge-1", sourceNodeId: "start", targetNodeId: "ending", label: "点亮灯塔", sortOrder: 0 }],
   },
   runtime: { currentNodeId: "start", nodePath: [], edgePath: [], isEnding: false },
 };
@@ -27,12 +31,19 @@ describe("PreviewPlayer", () => {
     api.loadPreview.mockResolvedValue(preview);
     render(<PreviewPlayer projectId="project-1" projectTitle="灯塔档案" initialSnapshotId={null} />);
 
+    expect(screen.getByText("预览只运行通过结构校验的不可变快照。封存当前草稿后，只能运行快照中已经存在的分支。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "进入分支写作" })).toHaveAttribute("href", "/projects/project-1/generate");
     fireEvent.click(screen.getByRole("button", { name: "封存当前草稿并预览" }));
 
     expect(await screen.findByRole("heading", { name: "入口" })).toBeInTheDocument();
+    expect(screen.getByText("作者分支 · 作者结局")).toBeInTheDocument();
+    expect(screen.getByText("以下选项只会跳转到快照中已经生成的节点，不会生成新的剧情。")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /点亮灯塔/ }));
     expect(screen.getByRole("heading", { name: "灯塔结局" })).toBeInTheDocument();
     expect(screen.getByText("故事到达结局")).toBeInTheDocument();
+    expect(screen.getByText("当前运行的是已封存快照；选择只会跳转到已有节点，不会调用模型生成新剧情。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "进入分支写作" })).toHaveAttribute("href", "/projects/project-1/generate");
+    expect(screen.getByRole("link", { name: "继续分支写作" })).toHaveAttribute("href", "/projects/project-1/generate");
     expect(api.createPreviewSnapshot).toHaveBeenCalledWith("project-1");
     expect(api.loadPreview).toHaveBeenCalledWith("project-1", "snapshot-1");
   });

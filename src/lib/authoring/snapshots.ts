@@ -3,7 +3,8 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { initializeAuthoringDatabase } from "./database";
 import { AuthoringError } from "./errors";
-import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "./graph";
+import { validateStoryGraph } from "./graph";
+import { parseStoredReleasePolicy, resolveReleaseLimits, serializeReleasePolicy } from "./release-policy";
 import type { GraphLimits } from "./graph";
 import {
   ChapterSchema,
@@ -157,12 +158,19 @@ const StoredGraphLimitsSchema = z
     minEndings: z.number().int().min(0),
     maxNodes: z.number().int().min(1),
     maxEndings: z.number().int().min(1),
+    releaseProfile: z.enum(["selected_path", "branching_graph"]).optional(),
   })
   .strict();
 
 function parseStoredGraphLimits(text: string): GraphLimits {
   try {
-    return StoredGraphLimitsSchema.parse(JSON.parse(text));
+    const parsed = StoredGraphLimitsSchema.parse(JSON.parse(text));
+    return {
+      minNodes: parsed.minNodes,
+      minEndings: parsed.minEndings,
+      maxNodes: parsed.maxNodes,
+      maxEndings: parsed.maxEndings,
+    };
   } catch (error) {
     throw new AuthoringError("STORAGE", "Snapshot validation limits are invalid", {
       cause: error instanceof Error ? error.message : String(error),
@@ -529,11 +537,8 @@ export function sealSnapshotInDatabase(db: Database.Database, projectId: string)
     }
 
     const draftGraph = readGraphByVersionId(db, draft.id);
-    const validationLimits: GraphLimits = {
-      ...RELEASE_GRAPH_LIMITS,
-      maxNodes: project.targetNodeCount,
-      maxEndings: project.targetEndingCount,
-    };
+    const releaseProfile = parseStoredReleasePolicy(draft.validation_limits_json).releaseProfile;
+    const validationLimits: GraphLimits = resolveReleaseLimits(releaseProfile, project);
     const issues = validateStoryGraph(draftGraph, validationLimits);
     const blockingIssues = issues.filter((issue) => issue.severity === "blocking");
 
@@ -551,7 +556,7 @@ export function sealSnapshotInDatabase(db: Database.Database, projectId: string)
       draft.id,
       "valid",
       nowIso(),
-      JSON.stringify(validationLimits),
+      serializeReleasePolicy(releaseProfile, validationLimits),
     );
     copyGraphRows(db, draft.id, snapshot.id);
 

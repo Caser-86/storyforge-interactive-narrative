@@ -14,9 +14,10 @@ afterEach(() => {
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
-async function createVersionTwelveDatabase(dbPath: string, backupDir: string): Promise<void> {
+async function createPreLatestDatabase(dbPath: string, backupDir: string): Promise<number> {
   const latestMigration = AUTHORING_MIGRATIONS.pop();
   if (!latestMigration) throw new Error("Expected a latest authoring migration");
+  const expectedVersion = AUTHORING_MIGRATIONS.at(-1)?.version ?? 0;
   try {
     const repository = createAuthoringRepository({ dbPath, backupDir });
     await repository.createProject({
@@ -29,6 +30,7 @@ async function createVersionTwelveDatabase(dbPath: string, backupDir: string): P
       size: { preset: "micro", targetNodes: 8, targetEndings: 2 },
     });
     repository.close();
+    return expectedVersion;
   } finally {
     AUTHORING_MIGRATIONS.push(latestMigration);
   }
@@ -39,7 +41,7 @@ describe("authoring migration safety", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "storyforge-migration-safety-"));
     const dbPath = path.join(tempDir, "authoring.sqlite");
     const backupDir = path.join(tempDir, "backups");
-    await createVersionTwelveDatabase(dbPath, backupDir);
+    await createPreLatestDatabase(dbPath, backupDir);
 
     const database = initializeAuthoringDatabase({ dbPath, backupDir });
     database.close();
@@ -52,7 +54,7 @@ describe("authoring migration safety", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "storyforge-migration-safety-"));
     const dbPath = path.join(tempDir, "authoring.sqlite");
     const backupDir = path.join(tempDir, "backup-file");
-    await createVersionTwelveDatabase(dbPath, path.join(tempDir, "initial-backups"));
+    const expectedVersion = await createPreLatestDatabase(dbPath, path.join(tempDir, "initial-backups"));
     fs.writeFileSync(backupDir, "backup destination is not a directory");
 
     await expect(Promise.resolve().then(() => {
@@ -62,7 +64,7 @@ describe("authoring migration safety", () => {
 
     const database = new Database(dbPath, { readonly: true });
     const migration = database.prepare("SELECT MAX(version) AS version FROM authoring_migrations").get() as { version: number };
-    expect(migration.version).toBe(12);
+    expect(migration.version).toBe(expectedVersion);
     database.close();
   });
 
@@ -70,12 +72,12 @@ describe("authoring migration safety", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "storyforge-migration-safety-"));
     const dbPath = path.join(tempDir, "authoring.sqlite");
     const backupDir = path.join(tempDir, "backups");
-    await createVersionTwelveDatabase(dbPath, backupDir);
+    const expectedVersion = await createPreLatestDatabase(dbPath, backupDir);
     const before = fs.readFileSync(dbPath);
 
     const report = await collectAuthoringDiagnostics({ dbPath, backupDir, now: new Date("2026-09-08T00:00:00.000Z") });
 
-    expect(report.database.migrationVersion).toBe(12);
+    expect(report.database.migrationVersion).toBe(expectedVersion);
     expect(report.database.pendingMigrations).toBe(true);
     expect(fs.readFileSync(dbPath)).toEqual(before);
   });

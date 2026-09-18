@@ -8,7 +8,10 @@ import {
 import { FakeGenerationProvider } from "@/lib/authoring/generation/fake-provider";
 import { OpenAICompatibleGenerationProvider } from "@/lib/authoring/generation/openai-provider";
 import { generateAuthorEnding } from "@/lib/authoring/generation/stages/author-ending";
-import type { GenerationProjectContext } from "@/lib/authoring/generation/prompts";
+import { STAGE_MAX_TOKENS, type GenerationProjectContext } from "@/lib/authoring/generation/prompts";
+import { DEFAULT_OPENAI_MODEL } from "@/lib/authoring/generation/defaults";
+import { classifyProviderError } from "@/lib/authoring/generation/provider-errors";
+import { createAuthorEndingUsageRepository, type AuthorEndingUsageRepository, type AuthorEndingUsageReservation } from "@/lib/authoring/ending-usage";
 import { createAuthoringDatabaseScope } from "@/lib/authoring/database";
 import { createAuthoringRepository } from "@/lib/authoring/repository";
 
@@ -47,6 +50,8 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
 
   const databaseScope = createAuthoringDatabaseScope();
   const authoring = createAuthoringRepository(databaseScope.options);
+  let usageRepository: AuthorEndingUsageRepository | null = null;
+  let usageReservation: AuthorEndingUsageReservation | null = null;
   try {
     const { projectId } = await params;
     const project = await authoring.getProject(projectId);
@@ -93,12 +98,27 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
       provider.reply("author_ending", `author-ending:${sourceNode.id}`, fakeEnding(sourceNode.title));
     }
 
+    usageRepository = createAuthorEndingUsageRepository(databaseScope.options);
+    usageReservation = await usageRepository.reserve({
+      projectId: project.id,
+      versionId: graph.versionId,
+      sourceNodeId: sourceNode.id,
+      model: process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL,
+      reservedOutputTokens: STAGE_MAX_TOKENS.author_ending,
+    });
     const result = await generateAuthorEnding({
       provider,
       context,
       graph,
       sourceNodeId: sourceNode.id,
       direction: input.direction,
+    });
+    await usageRepository.complete(usageReservation, {
+      requestId: result.providerResult.requestId,
+      inputTokens: result.providerResult.inputTokens,
+      outputTokens: result.providerResult.outputTokens,
+      latencyMs: result.providerResult.latencyMs,
+      usageConfirmed: result.providerResult.usageConfirmed,
     });
 
     return json(AuthorEndingGenerationResponseSchema, {
@@ -111,8 +131,21 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
       ...(result.providerResult.usageConfirmed === undefined ? {} : { usageConfirmed: result.providerResult.usageConfirmed }),
     });
   } catch (error) {
+    if (usageRepository && usageReservation) {
+      const classified = classifyProviderError(error);
+      try {
+        await usageRepository.fail(usageReservation, {
+          code: classified.code,
+          message: classified.message,
+          unknown: ["EMPTY", "NETWORK", "TIMEOUT", "UNKNOWN"].includes(classified.code),
+        });
+      } catch {
+        // Preserve the original generation error if usage reconciliation also fails.
+      }
+    }
     return errorResponse(error);
   } finally {
+    usageRepository?.close();
     authoring.close();
     databaseScope.close();
   }

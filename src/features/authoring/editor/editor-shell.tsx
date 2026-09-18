@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { getBlockingGraphIssues, RELEASE_GRAPH_LIMITS } from "@/lib/authoring/graph";
+import { getBlockingGraphIssues } from "@/lib/authoring/graph";
+import { resolveReleaseLimits, type ReleaseProfile } from "@/lib/authoring/release-policy";
 import type { Project, StoryEdge, StoryGraph, StoryNode, ValidationIssue } from "@/lib/authoring/schemas";
 import { initialEditorState } from "./editor-store";
 import { NodeEditor } from "./node-editor";
@@ -20,9 +21,10 @@ type EditorShellProps = {
   project: Project;
   graph: StoryGraph;
   draftRevision: number;
+  releaseProfile?: ReleaseProfile;
 };
 
-export function EditorShell({ project, graph, draftRevision: initialDraftRevision }: EditorShellProps) {
+export function EditorShell({ project, graph, draftRevision: initialDraftRevision, releaseProfile = "branching_graph" }: EditorShellProps) {
   const initial = initialEditorState(graph);
   const [draftGraph, setDraftGraph] = useState(graph);
   const [draftRevision, setDraftRevision] = useState(initialDraftRevision);
@@ -31,11 +33,7 @@ export function EditorShell({ project, graph, draftRevision: initialDraftRevisio
   const [selectedNodeId, setSelectedNodeId] = useState(initial.selectedNodeId);
   const [collapsedChapterIds, setCollapsedChapterIds] = useState(initial.collapsedChapterIds);
   const selectedNode = draftGraph.nodes.find((node) => node.id === selectedNodeId) ?? null;
-  const blockingIssues = getBlockingGraphIssues(draftGraph, {
-    ...RELEASE_GRAPH_LIMITS,
-    maxNodes: project.targetNodeCount,
-    maxEndings: project.targetEndingCount,
-  });
+  const blockingIssues = getBlockingGraphIssues(draftGraph, resolveReleaseLimits(releaseProfile, project));
 
   function toggleChapter(chapterId: string) {
     setCollapsedChapterIds((current) => current.includes(chapterId) ? current.filter((id) => id !== chapterId) : [...current, chapterId]);

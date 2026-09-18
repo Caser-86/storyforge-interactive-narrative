@@ -21,17 +21,37 @@
 
 - A1–A5 的核心代码修复已完成，新增/更新回归测试已通过。
 - B1 持久化任务、B2 互动预算/账本、C1 结构化记忆和 C2 进度/历史阅读的核心代码已完成；补充了 worker 初始化保护、跨会话并发上限、JSON 备份进行中状态归一化、可见性退避、provider 凭据错误脱敏、缺失 token usage 的 unknown 预算保护、非最终幕提示词契约、高优先级伏笔保留、非最终幕结局修复、风险选项修复和 Zod 错误分类。
-- D1 已完成历史列表的摘要分页接入、100/1000 会话读取基准、事务边界清单，并在生成 worker 和多 repository route 内采用显式共享数据库作用域；前端默认按 50 条加载更多。当前单元验证：`npm test` 为 86 个测试文件、408 个测试通过；`npm run test:e2e:authoring` 为 16/16；生产构建和 fake 评测已通过，真实跨进程、SQLite busy 和过期 queued 任务恢复演练也已记录。
+- D1 已完成历史列表的摘要分页接入、100/1000 会话读取基准、事务边界清单，并在生成 worker 和多 repository route 内采用显式共享数据库作用域；前端默认按 50 条加载更多。当前单元验证：`npm test` 为 86 个测试文件、433 个测试通过；`npm run test:e2e:authoring` 为 17/17；生产构建和 fake 评测已通过，真实跨进程、SQLite busy 和过期 queued 任务恢复演练也已记录。
 - 新增编辑器低负担结局收尾：作者只需输入可选方向，模型生成预览，作者确认后原子写入；接口、修订冲突、结局节点限制和高级手填兼容均已覆盖。当前主流程不再要求作者填写七个结构化字段。
+- 2026-09-10 真实模型结构复核补充：默认 `doubao-seed-evolving` 的 `zh-contemporary-6` 受控路径通过 6/6 幕；最终幕缺失字段或 `isEnding` 标记会进入一次有界收尾修复，超长主动/最终场景会进入有界修复，兼容模型返回的 `facts`、`threads`、`resolvedIds` 简写记忆字段，并过滤不完整的辅助记忆条目。该证据仍不替代 C1 的四维人工语义评分。
+- 2026-09-10 正式 runner 复核：`npm run interactive:evaluate -- --provider live --allow-network --approve-paid-calls --fixture zh-contemporary-6` 返回 `status=passed`，`generatedTurns=6`、`endingPass=true`、`choiceContractPass=true`、`consequencePass=true`、`issueCodes=[]`；只记录脱敏结构摘要，不保存原始 prompt/response 或密钥。
+- 2026-09-10 三样本当前版本复核：受控 live runner 逐样本通过 `zh-contemporary-6`（6/6）、`zh-fantasy-8`（8/8）和 `zh-suspense-16`（16/16）；三者的 ending、choice contract、risk coverage、consequence 检查均通过且 `issueCodes=[]`。该证据仍不替代四维人工语义评分。
+- 2026-09-10 当前草稿校验刷新：使用同源 `Origin` 重跑 `第九档案室` 的 `structural + rule`，结果为 `allowed=true`、`generationComplete=true`、0 个阻断项和 3 个 warning（2 个 `REPEATED_PROSE`、1 个 `DEPTH_IMBALANCE`）；此前读取到的 34 条是历史持久化结果，已由当前规则结果替换。
+- 2026-09-10 全量草稿校验复核：随后使用同源 API 完成 `structural + rule + ai_review`，结果仍为 `allowed=true`、`generationComplete=true`、0 个阻断项；最新结果有 6 个 warning，其中 AI 审阅包含 2 个 `ARC_UNRESOLVED` 和 1 个 `PACING`，其余为 2 个 `REPEATED_PROSE` 与 1 个 `DEPTH_IMBALANCE`。AI 审阅存在模型波动，这些提示需人工判断，不能替代四维语义评分。
+- 2026-09-10 预览职责补充：只读预览页明确标注封存快照和“不会调用模型”，并提供“进入分支写作”入口；作者实际选择并生成下一幕的路径仍是 `/projects/:projectId/generate`，旧 `/play` 仅作兼容入口。
 - 2026-09-09 人工流程复核：真实作者会话已完成 `8/8` 幕并成功落稿；全量结构、规则和 AI 验证返回 HTTP 200，AI 审阅无新增问题。新增修复了中文重复正文告警降噪，以及兼容模型 `warnings` 审阅响应归一化；当前唯一阻塞是落稿路径只有 1 个结局，而发布门禁要求至少 2 个结局，另有 13 条非阻塞正文重复告警待人工确认。
 - 阶段 A 仍保留一项需要人工确认的内容：真实模型的语义收尾核验；受控 DeepSeek 结构评测已完成，但不能替代事实一致、伏笔回收和文风质量评分。跨来源浏览器攻击已在隔离 E2E 项目中验收。
 - B1–C2 仍保留验收项：真实模型人工语义评分、真实设备可访问性和作者实走；真实进程退出/重启与短 SQLite busy 锁已用隔离子进程演练覆盖。D1 本轮边界/作用域批次已完成，D2 仍保留目标环境发布证据和人工发布确认。
+
+## 2026-09-16 自动门禁复核
+
+- 当前工作树重新执行 `npm run verify`：TypeScript、ESLint、`86` 个 Vitest 文件/`433` 个测试和 Next.js 生产构建全部通过。
+- `npm run test:e2e:authoring`：作者端 Playwright `17/17` 通过，包含逐幕选择、旧会话恢复、焦点、跨来源写入、移动端长文本和发布流程。
+- `npm run interactive:evaluate -- --provider fake` 与 `npm run authoring:evaluate -- --provider fake`：分别为 `3/3`，均 `networkRequest=false`；`npm audit --audit-level=high` 为 `0 vulnerabilities`。
+- `npm run interactive:evaluate -- --provider live --dry-run`、`npm run authoring:evaluate -- --provider live --dry-run` 和 `npm run authoring:llm:smoke -- --dry-run` 均通过，均 `networkRequest=false`，未产生真实模型调用。
+- 2026-09-16 有界真实 provider smoke 复核：以进程级 `OPENAI_MODEL=deepseek-v4-flash` 执行 `npm run authoring:llm:smoke`，退出码 `0`，返回 `status=passed`；仅记录脱敏指标（输入 `332`、输出 `107`、延迟 `1323ms`），未输出 API key、prompt 或原始响应。该结果只证明当前 provider 连通和结构化 brief 请求可用，不替代四维人工语义评分，也不自动关闭最终模型一致性门禁。
+- 2026-09-16 逐幕审阅材料复核：以同一进程级模型运行 `interactive:evaluate` 的 `zh-contemporary-6` 单样本，退出码 `0`，`6/6` 幕通过，结局、选项契约、风险覆盖和具体后果检查均通过且 `issueCodes=[]`；已生成脱敏材料 `output/evaluations/interactive-review-zh-contemporary-6.md`。该材料供作者进行四维语义评分，不能由结构结果自动代替。
+- 2026-09-16 同模型审阅材料补齐：使用相同进程级 `OPENAI_MODEL=deepseek-v4-flash` 为 `zh-fantasy-8` 和 `zh-suspense-16` 重新运行 `--save-review`，分别通过 `8/8` 和 `16/16`，结局、选项契约、风险覆盖和具体后果检查均通过且 `issueCodes=[]`；三份材料均通过敏感信息扫描。材料仍只作为人工四维评分输入，不能自动关闭语义质量门禁。
+- 发现并处理备份 freshness 过期：`npm run db:authoring:checkpoint` 创建新 checkpoint，随后 `npm run db:authoring:restore-check -- --latest` 在临时副本恢复到迁移 v13 且图谱可读；复跑 `npm run authoring:doctor` 返回 `status=ok`、备份 `fresh`、SQLite 可写、完整性 `ok`、loopback-only 和 provider configured。
+- `npm run package:standalone`、`npm run release:evidence` 和 `npm run package:smoke` 均通过；最新独立产物为 `2268` 个文件，`secretsIncluded=false`、`signed=false`，dry-run `destructive=false`。
+- 重新启动本地开发服务后，`GET http://127.0.0.1:3202/api/health` 返回 `status=ok`、版本 `0.1.7`、SQLite 持久化且 LLM 已配置；此前拒绝连接仅是 E2E 构建结束后的服务生命周期状态。
+- 本次只刷新备份和验证文档证据，没有关闭真实模型四维人工评分、真实设备验收、干净 Windows 账户安装、签名/安装包、canonical `master` 合并、标签、CI 或 GitHub Release 门禁。
 
 ## 计划图
 
 ```mermaid
 flowchart TD
-    S[当前工作树 / 403 项单元测试] --> A1[A1 跨幕选择校验]
+    S[当前工作树 / 433 项单元测试] --> A1[A1 跨幕选择校验]
     S --> A2[A2 升级备份与只读诊断]
     S --> A3[A3 真实收尾与契约统一]
     S --> A4[A4 失败恢复与会话竞争]
@@ -153,6 +173,7 @@ flowchart TD
 - [x] 受控真实模型结构评测已对 `zh-contemporary-6`、`zh-fantasy-8`、`zh-suspense-16` 各完成至少一次成功运行；记录了 16 幕样本一次失败、重试后通过的波动，模型为进程级覆盖的 `deepseek-v4-flash`，默认 `doubao-seed-evolving` 未被静默替换。
 - [ ] 真实模型人工评测仍需检查选择后果、事实一致、伏笔回收和结局完整；已准备 [`互动真实模型审阅表`](../../release/interactive-evaluation-review.md)，结构 runner 不能替代样本版本记录和四维人工评分，也不能用 fake 结果替代。
 - [ ] 提议质量门槛：无主线事实硬冲突、所有高优先级伏笔有交代；人工评分四维均至少 4/5。该数字是目标，尚无达标结论；评测消耗受 B2 预算控制。
+- [ ] 最终人工评测和发布必须记录并确认同一个 `OPENAI_MODEL`；当前本地默认是 `doubao-seed-evolving`，若目标是 `deepseek-v4-flash`，需先切换并重新完成对应评测。
 
 ### C2 生成进度与历史阅读（审核 A06/A07，依赖 B1/B2）
 
@@ -226,7 +247,7 @@ flowchart TD
 
 ## 2026-09-10 计划门禁复核
 
-- `npm run verify`：退出码 `0`；TypeScript、ESLint、`86` 个 Vitest 文件/`408` 个测试和 Next.js 生产构建全部通过。
+- `npm run verify`：退出码 `0`；TypeScript、ESLint、`86` 个 Vitest 文件/`416` 个测试和 Next.js 生产构建全部通过。
 - `npm run test:e2e:authoring`：退出码 `0`；作者端 Playwright `16/16` 通过，覆盖逐幕选择、作者结局预览确认、失败恢复、发布门禁、离线播放、跨来源写请求和移动端长文本。
 - `npm run interactive:evaluate -- --provider fake`：退出码 `0`；`3/3` 个 `6/8/16` 幕样本通过，`networkRequest=false`。
 - `npm run authoring:evaluate -- --provider fake`：退出码 `0`；`3/3` 个结构化样本通过，`networkRequest=false`。
@@ -235,10 +256,49 @@ flowchart TD
 - `npm run db:authoring:checkpoint`：退出码 `0`；新 checkpoint 完整性为 `ok`，随后 `npm run db:authoring:restore-check -- --latest` 退出码 `0`，临时副本迁移版本 `13` 且图谱可读；`npm run authoring:doctor` 返回 `status=ok`、备份 `fresh`、loopback-only 和 provider configured。
 - `npm audit --omit=dev --audit-level=high` 与 `npm audit --audit-level=high`：均退出码 `0`，报告 `0 vulnerabilities`。
 - `npm run package:standalone` 与 `npm run release:evidence`：均退出码 `0`；当前证据记录 `packageFileCount=2268`、`secretsIncluded=false`、`signed=false`。
+- 顺序打包复核：停止本地开发服务后先完成 `npm run package:standalone`，再单独运行 `npm run release:evidence`；两者均退出码 `0`，独立证据仍为 `packageFileCount=2268`、`secretsIncluded=false`、`signed=false`。此前并行执行造成的文件锁失败不计入发布结论。
 - `npm run package:smoke`：退出码 `0`；分发 dry-run 确认 Node 24、better-sqlite3、数据目录隔离和升级/回滚/保留数据卸载检查项，且 `destructive=false`；`npm ci --dry-run --ignore-scripts` 也退出码 `0`。
 - `pwsh -File scripts/package-smoke.ps1 -Mode Local -Root <系统临时目录> -Port 3111`：退出码 `0`；`clean-install`、`health`、`upgrade`、`failed-upgrade`、`rollback`、`uninstall-preserves-data` 全部通过，临时根已由脚本清理。这是本机隔离生命周期证据，不等同于干净 Windows 账户验收。
 - Docker Desktop Linux engine 在首次检查时不可连接，使用 `docker desktop start` 启动后完成隔离 Compose build/health smoke：镜像构建退出码 `0`，容器 healthy，`/api/health` 返回 `200`，SQLite 持久化正常；未注入 API key，容器 LLM 状态为 `not_configured`，不能作为 live 模型证据。隔离容器、卷、网络和镜像已清理。
-- 本次复核新增并修复了两个远程环境契约问题：互动生成测试显式注入 mock provider，Windows package smoke 支持受 GitHub runner 管理的 `RUNNER_TEMP` 并修正清理变量。修复后提交 `fd76beb` 的远程 CI run `34418237947` 已通过。仍未完成：真实模型四维人工评分、真实读屏/手机验收、目标环境安装证据、作者发布确认以及后续合并 master、标签和 GitHub Release。
+- 本次复核新增并修复了最终幕缺失 `isEnding`、超长场景文本的有界修复边界，以及两个远程环境契约问题：互动生成测试显式注入 mock provider，Windows package smoke 支持受 GitHub runner 管理的 `RUNNER_TEMP` 并修正清理变量。修复后提交 `fd76beb` 的远程 CI run `34418237947` 已通过。仍未完成：真实模型四维人工评分、真实读屏/手机验收、目标环境安装证据、作者发布确认以及后续合并 master、标签和 GitHub Release。
+
+## 2026-09-15 运行与恢复复核
+
+- `npm run db:authoring:checkpoint`：退出码 `0`；创建新 checkpoint，完整性为 `ok`，并在 manifest 中记录 SHA-256。
+- `npm run db:authoring:restore-check -- --latest`：退出码 `0`；临时副本恢复到迁移版本 `13`，图谱可读，默认作者数据库未被恢复演练修改。
+- `npm run authoring:doctor`：退出码 `0`；数据库完整性正常、无待迁移、SQLite 可写、备份 freshness 为 `fresh`、仅 loopback 绑定、provider 已配置。
+- `npm run interactive:evaluate -- --provider fake`：退出码 `0`；`6/8/16` 幕互动样本 `3/3` 通过且未联网。
+- `npm run authoring:evaluate -- --provider fake`：退出码 `0`；结构化样本 `3/3` 通过且未联网。
+- 预览职责澄清：预览页页尾新增“继续分支写作”入口并指向 canonical `/generate`，避免作者把只读快照误认为模型续写流程；组件回归先失败后修复并通过。
+- 作者会话状态澄清：历史中的 `active` 会话改显示为“可继续”，并说明它只代表等待作者选择，不代表模型正在后台运行；针对状态标签和说明的回归测试已补充。
+- 人工评测可执行性补充：live 单样本 runner 新增受门禁保护的 `--save-review --expected-model`，输出逐幕人工审阅 Markdown，并在网络请求前锁定评测模型；默认摘要报告、fake 和 dry-run 均不写出审阅正文。
+- 历史记录可辨识性补充：列表显示最近更新时间和短记录编号，覆盖同一项目多条相同幕数会话的恢复选择；组件回归测试已通过。
+- 旧互动会话兼容性补充：恢复到少于 3 个选项的历史活动场景时，作者端明确显示“旧规则会话”和新三选项规则；不改写历史正文，也不在提示阶段额外调用模型。读取和 V2 备份层同时兼容零选项活动场景，让恢复界面能够明确引导新建会话并保留数据，而新生成契约仍保持严格。
+- 上一幕选择承接补充：当前互动场景在正文后显示上一幕作者选择及其承接说明；模型提示词同时要求时间线连续和具体记录选择后果，空泛 `lastChoiceImpact` 会回退到当前场景摘要，相关回归覆盖已通过。
+- `npm run verify`：退出码 `0`；预览澄清、作者会话状态修正、人工审阅导出、旧互动会话提示、上一幕选择上下文、具体后果归一化、有限过量选项修复、模型一致性门禁、终局未来承诺防护、24 小时制时间线提示、已知 provider envelope 漂移归一化、未知顶层字段拒绝回归、零选项旧会话 UI/API/备份恢复、连续性锚点传递和作者路径说明后的 TypeScript、ESLint、`86` 个 Vitest 文件/`433` 个测试和 Next 生产构建全部通过。
+- `npm run test:e2e:authoring`：退出码 `0`；预览澄清、人工审阅导出和旧零选项会话恢复实现后的作者端 Playwright `17/17` 通过。
+- 旧互动会话提示和模型一致性门禁后的包级复核：`npm run package:standalone` 和 `npm run release:evidence` 均退出码 `0`；最新 standalone 包扫描为 `2268` 个文件、`secretsIncluded=false`、`signed=false`，`npm run package:smoke` dry-run 为 `destructive=false`。
+- 预览浏览器定向回归：`npm run test:e2e:authoring -- --grep "edits choices, protects stale candidates, and previews an ending"` 通过 `1/1`，隔离流程确认只读提示和两个 `/generate` 入口均可用。
+- `npm run package:standalone`：退出码 `0`；重新生成 `StoryForge-0.1.7` standalone 包。
+- `npm run release:evidence`：退出码 `0`；重新扫描后的产物为 `packageFileCount=2268`、`secretsIncluded=false`、`signed=false`。
+- 本轮会话历史可辨识性修正后的发布复核：`npm run package:standalone` 和 `npm run release:evidence` 均退出码 `0`；`npm run package:smoke` dry-run 退出码 `0`，并确认该模式不安装、不删除数据。
+- 隔离 Local package smoke：退出码 `0`；唯一临时根完成 `clean-install`、`health`、`upgrade`、`failed-upgrade`、`rollback`、`uninstall-preserves-data`，结束后临时根不存在，项目 `data` 目录仍保留。
+- 模型配置门禁复核：当前 `.env.local` 的默认模型是 `doubao-seed-evolving`；进程级覆盖 `OPENAI_MODEL=deepseek-v4-flash` 的 dry-run 通过且未联网，但未擅自修改本地配置。最终发布前必须确认人工评测和发布目标使用同一个模型。
+- 人工审阅导出回归：`--save-review` 只接受 live 非 dry-run 单样本并要求网络/付费确认及 `--expected-model`；模型不一致、fake 和 dry-run 均在网络请求前拒绝，fake 默认报告保持原 schema。
+- 模型一致性边界复核：使用错误的 `--expected-model` 执行受控 live 审阅命令，退出码为 `1`，在评测请求前拒绝；未产生真实模型调用。
+- 审阅导出实现后的发布复核：重新执行 `npm run package:standalone`、`npm run release:evidence` 和 `npm run package:smoke`；均退出码 `0`，最新产物为 2268 个文件、`secretsIncluded=false`、`signed=false`，dry-run 保持 `destructive=false`。
+- 2026-09-15 发布前自动化补充：`npm run package:smoke` dry-run、`npm run interactive:evaluate -- --provider fake`（3/3）、`npm run authoring:evaluate -- --provider fake`（3/3）、`npm audit --audit-level=high`（0 vulnerabilities）以及 `npm run authoring:llm:smoke -- --dry-run`（未联网）均退出码 `0`。
+- 2026-09-15 真实语义材料补充：使用当前默认模型 `doubao-seed-evolving`、`--save-review --expected-model` 重跑 `zh-contemporary-6`，live 结构评测 `6/6` 幕通过；逐幕审阅材料中的选择后果均为具体描述，未发现无解释时间戳，且敏感信息扫描干净。该材料仍待作者按四维量表人工评分，不关闭质量门禁。
+- 2026-09-15 长上下文漂移补充：同一默认模型的 `zh-fantasy-8` 通过 `8/8`；`zh-suspense-16` 首次在生成第 `10` 幕前后因过量选项响应在 provider 边界被 `max(3)` 拒绝，报告 `GENERATION_SCHEMA`/`RISK_SEQUENCE`。将 provider 适配层有限放宽到最多 6 个选项、保留最终三选项契约并进入既有 `choice-repair` 后，重跑 `zh-suspense-16` 通过 `16/16`，审阅材料的逐幕直接后果具体、结局完整且敏感信息扫描干净；该材料仍待作者四维人工评分。
+- 2026-09-15 终局与字段漂移补充：后续一次 `zh-suspense-16` 在 `10/16` 处出现 `GENERATION_SCHEMA`/`RISK_SEQUENCE`；安全字段级诊断确认兼容 provider 将 `endingReadiness` 放在 envelope 顶层。现在仅把该已知字段归一化到 `statePatch`，仍保留持久化契约的严格校验；同时新增终局未来承诺防护和同日午后 24 小时制提示。使用当前默认模型重跑 `zh-contemporary-6`、`zh-fantasy-8`、`zh-suspense-16` 分别通过 `6/6`、`8/8`、`16/16`，三者结构检查均无 issue code；仍待作者四维人工评分。
+- 2026-09-15 旧会话恢复补充：发现非结局旧活动场景可能没有任何选项，原界面会显示“可继续”但没有可点击控件。现在明确提示该记录无法继续、保留原记录并提供“新建分支写作”入口；组件回归、完整作者端 E2E、standalone 重建和 release evidence 均通过，产物仍为 2268 个文件且未包含密钥。
+- 2026-09-15 剧情连续性补充：互动状态新增可选剧情锚点，模型每幕返回地点、时间、在场角色和当前目标；下一幕提示词携带该锚点，作者页与脱敏人工审阅材料均可查看，未增加作者手填字段。生成器、组件、评测材料和作者端 E2E 回归已覆盖。
+- 2026-09-15 作者路径说明补充：进入具体场景后再次提示作者选择、模型逐幕续写和有限回合收尾的分工，避免将动态续写误解为预生成的固定节点路线；组件回归和完整作者端 E2E `17/17` 已通过。
+- `git diff --check`：退出码 `0`；未发现空白错误。本轮修复了作者会话状态和历史记录辨识性、provider envelope 已知字段漂移、终局未来承诺和时间线提示，并同步了文档；未提交、推送、打标签或发布。
+- 当前运行实例复核：`/api/health` 为 `status=ok`、版本 `0.1.7`、SQLite 持久化、LLM 已配置；当前有两个本地项目，`第九档案室` 为 0 个阻断项，`森林` 仍为未完成草稿并有 4 个结构阻断项。
+- 预览误解防护补充：在只读快照的选项区重复说明选择只跳转已有节点、不调用模型，覆盖作者滚动到选项区后的操作语境；组件回归先失败后通过。
+- 远端发布状态复核：`origin/codex/branch-writing-v0.1.5` 与当前候选 `HEAD` 均为 `23a2aa0`；`origin/master` 仍为 `e3c35cf`；远端 `v0.1.7` 是历史注释标签，解析到 `56dae71`，不是当前工作树改动。未移动或创建标签。
+- 本轮没有关闭人工门禁：真实模型四维语义评分、真实读屏/手机验收、作者发布确认，以及 canonical `master` 的提交、CI、标签和 GitHub Release 仍需人工授权与验证。
 
 ## 追踪规则
 

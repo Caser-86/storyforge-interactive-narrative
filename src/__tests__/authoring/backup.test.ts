@@ -232,6 +232,31 @@ describe("authoring project backup", () => {
     }
   });
 
+  it("round-trips a legacy active scene with no choices", async () => {
+    const project = await createProjectWithGraph();
+    const database = new Database(dbPath);
+    try {
+      const legacyScene = {
+        title: "旧记录",
+        body: "这是一幕由旧版本保存的内容。",
+        summary: "旧版本没有保存可继续的选项。",
+        choices: [],
+        isEnding: false,
+        endingSummary: null,
+      };
+      database.prepare("UPDATE interactive_turns SET scene_json = ? WHERE id = ?").run(JSON.stringify(legacyScene), "interactive-turn-2");
+    } finally {
+      database.close();
+    }
+
+    const backup = ProjectBackupV2Schema.parse(await exportProjectBackup(project.id, { dbPath, backupDir }));
+    expect(backup.interactive.turns.find((turn) => turn.id === "interactive-turn-2")?.scene.choices).toEqual([]);
+
+    const imported = await importProjectBackup(backup, "new-id", { dbPath, backupDir });
+    const importedBackup = await exportProjectBackup(imported.id, { dbPath, backupDir });
+    expect(importedBackup.interactive.turns.some((turn) => turn.scene.choices.length === 0 && !turn.scene.isEnding)).toBe(true);
+  });
+
   it("replaces an existing project only after the complete backup validates", async () => {
     const project = await createProjectWithGraph();
     const backup = await exportProjectBackup(project.id, { dbPath, backupDir });

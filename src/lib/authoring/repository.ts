@@ -4,7 +4,8 @@ import { AuthoringError } from "./errors";
 import { acquireAuthoringDatabase } from "./database";
 import type { AuthoringDatabaseOptions } from "./database";
 import { sealSnapshotInDatabase } from "./snapshots";
-import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "./graph";
+import { validateStoryGraph } from "./graph";
+import { parseStoredReleasePolicy, resolveReleaseLimits, serializeReleasePolicy, type ReleaseProfile } from "./release-policy";
 import { findAffectedNodes } from "./impact";
 import { StoryGraphSchema } from "./schemas";
 import type {
@@ -70,6 +71,7 @@ export interface AuthoringRepository {
   listProjects(): Promise<ProjectSummary[]>;
   updateProject(projectId: string, input: UpdateProjectInput): Promise<Project>;
   getProjectGraph(projectId: string, versionId?: string): Promise<StoryGraph>;
+  getReleaseProfile(projectId: string, versionId?: string): Promise<ReleaseProfile>;
   createGenerationDraft(projectId: string): Promise<GenerationDraft>;
   materializeInteractiveDraft(projectId: string, sessionId: string, graph: StoryGraph): Promise<MaterializedDraft>;
   replaceDraftGraph(projectId: string, graph: StoryGraph, expectedRevision: number): Promise<StoryGraph>;
@@ -371,10 +373,12 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
       return rows.map((row) => {
         const graph = this.readProjectGraph(row.id);
         const project = toProject(row);
+        const activeVersion = row.active_draft_version_id ? this.findVersion(row.id, row.active_draft_version_id) : undefined;
+        const releaseProfile = activeVersion
+          ? parseStoredReleasePolicy(activeVersion.validation_limits_json).releaseProfile
+          : "branching_graph";
         const blockingIssueCount = validateStoryGraph(graph, {
-          ...RELEASE_GRAPH_LIMITS,
-          maxNodes: project.targetNodeCount,
-          maxEndings: project.targetEndingCount,
+          ...resolveReleaseLimits(releaseProfile, project),
         }).filter(
           (issue) => issue.severity === "blocking",
         ).length;
@@ -459,6 +463,16 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
     }
   }
 
+  public async getReleaseProfile(projectId: string, versionId?: string): Promise<ReleaseProfile> {
+    try {
+      const project = this.requireProject(projectId);
+      const version = this.requireVersion(projectId, versionId ?? project.activeDraftVersionId ?? "");
+      return parseStoredReleasePolicy(version.validation_limits_json).releaseProfile;
+    } catch (error) {
+      throw storageError(error, "Failed to read authoring release profile");
+    }
+  }
+
   public async createGenerationDraft(projectId: string): Promise<GenerationDraft> {
     try {
       const create = this.db.transaction(() => {
@@ -523,8 +537,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         }
 
         const endingCount = requestedGraph.nodes.filter((node) => node.kind === "ending").length;
-        const reservedEndingCount = Math.max(0, project.targetEndingCount - endingCount);
-        if (requestedGraph.nodes.length + reservedEndingCount > project.targetNodeCount) {
+        if (requestedGraph.nodes.length > project.targetNodeCount) {
           throw new AuthoringError("CONFLICT", "The selected path no longer fits the project's current size limits", {
             projectId,
             nodeCount: requestedGraph.nodes.length,
@@ -535,7 +548,15 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         }
 
         const source = this.requireVersion(projectId, project.activeDraftVersionId);
-        const version = this.createVersionCopy(projectId, source, "draft", source.id, null, "review_required");
+        const version = this.createVersionCopy(
+          projectId,
+          source,
+          "draft",
+          source.id,
+          null,
+          "review_required",
+          serializeReleasePolicy("selected_path", resolveReleaseLimits("selected_path", project)),
+        );
         const versionedGraph: StoryGraph = {
           ...requestedGraph,
           versionId: version.id,
@@ -1079,6 +1100,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
     sourceVersionId: string | null,
     sealedAt: string | null,
     status: StoryVersion["status"] = sourceVersion.status,
+    validationLimitsJson = sourceVersion.validation_limits_json,
   ): StoryVersion {
     const id = randomUUID();
     const nextVersionNumber = this.nextVersionNumber(projectId);
@@ -1108,7 +1130,7 @@ export class BetterSqliteAuthoringRepository implements AuthoringRepository {
         sourceVersion.canon_json,
         createdAt,
         sealedAt,
-        sourceVersion.validation_limits_json,
+        validationLimitsJson,
       );
 
     return toStoryVersion(this.requireVersion(projectId, id));

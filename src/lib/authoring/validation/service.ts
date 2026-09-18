@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { redactSensitiveText } from "@/lib/errors";
-import { RELEASE_GRAPH_LIMITS, validateStoryGraph } from "../graph";
+import { validateStoryGraph } from "../graph";
+import { resolveReleaseLimits } from "../release-policy";
 import type { AuthoringRepository } from "../repository";
 import { OpenAICompatibleGenerationProvider } from "../generation/openai-provider";
 import type { GenerationProvider } from "../generation/provider";
@@ -45,7 +46,7 @@ export const ValidationRunResultSchema = ValidationDecisionSchema.extend({
 }).strict();
 
 export interface ValidationServiceDependencies {
-  authoringRepository: Pick<AuthoringRepository, "getProject" | "getProjectGraph" | "getDraftRevision">;
+  authoringRepository: Pick<AuthoringRepository, "getProject" | "getProjectGraph" | "getDraftRevision"> & Partial<Pick<AuthoringRepository, "getReleaseProfile">>;
   validationRepository: ValidationRepository;
   generationProvider?: GenerationProvider;
   generationRepository?: Pick<GenerationRepository, "listRuns">;
@@ -76,11 +77,10 @@ export class AuthoringValidationService {
 
     try {
       if (selectedSources.includes("structural")) {
-        const structuralIssues = validateStoryGraph(graph, {
-          ...RELEASE_GRAPH_LIMITS,
-          maxNodes: project.targetNodeCount,
-          maxEndings: project.targetEndingCount,
-        }).map(toIssueInput);
+        const profile = this.authoringRepository.getReleaseProfile
+          ? await this.authoringRepository.getReleaseProfile(projectId, graph.versionId)
+          : "branching_graph";
+        const structuralIssues = validateStoryGraph(graph, resolveReleaseLimits(profile, project)).map(toIssueInput);
         await this.validationRepository.replaceIssues(graph.versionId, revision, "structural", structuralIssues, run.id);
       }
 

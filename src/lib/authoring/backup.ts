@@ -20,7 +20,7 @@ import { ValidationIssueStatusSchema, ValidationRunStatusSchema, ValidationSever
 import type { AuthoringDatabaseOptions } from "./database";
 import { MAX_SETTINGS_JSON_CHARS } from "./schemas";
 import type { Chapter, JsonValue, Project, StoryEdge, StoryNode } from "./schemas";
-import { InteractiveSceneSchema, InteractiveSessionStatusSchema, InteractiveStateSchema } from "@/lib/interactive/schemas";
+import { InteractiveSceneReadSchema, InteractiveSessionStatusSchema, InteractiveStateSchema } from "@/lib/interactive/schemas";
 
 const BackupGenerationRunSchema = z
   .object({
@@ -145,7 +145,7 @@ const BackupInteractiveTurnSchema = z
     id: z.string().min(1),
     sessionId: z.string().min(1),
     turn: z.number().int().min(1),
-    scene: InteractiveSceneSchema,
+    scene: InteractiveSceneReadSchema,
     selectedChoiceId: z.string().min(1).nullable(),
     selectedAt: z.string().min(1).nullable(),
     createdAt: z.string().min(1),
@@ -434,7 +434,7 @@ function readProjectBackup(db: Database.Database, projectId: string): ProjectBac
       id: row.id,
       sessionId: row.session_id,
       turn: row.turn,
-      scene: InteractiveSceneSchema.parse(JSON.parse(String(row.scene_json))),
+      scene: InteractiveSceneReadSchema.parse(JSON.parse(String(row.scene_json))),
       selectedChoiceId: row.selected_choice_id,
       selectedAt: row.selected_at,
       createdAt: row.created_at,

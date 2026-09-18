@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AuthoringError } from "@/lib/authoring/errors";
 import type { Project } from "@/lib/authoring/schemas";
-import type { InteractiveChoice, InteractiveScene } from "./schemas";
+import { InteractiveContinuitySchema, InteractiveSceneSchema, type InteractiveChoice, type InteractiveScene } from "./schemas";
 import type { GenerationProvider } from "@/lib/authoring/generation/provider";
 import { classifyProviderError } from "@/lib/authoring/generation/provider-errors";
 import { FakeInteractiveGenerationProvider } from "./fake-provider";
@@ -64,6 +64,22 @@ export const InteractiveEvaluationResultSchema = z
 
 export type InteractiveEvaluationResult = z.infer<typeof InteractiveEvaluationResultSchema>;
 
+export const InteractiveEvaluationTraceTurnSchema = z
+  .object({
+    turn: z.number().int().positive(),
+    scene: InteractiveSceneSchema,
+    selectedChoiceLabel: z.string().min(1).nullable(),
+    stateLastChoiceImpact: z.string(),
+    continuity: InteractiveContinuitySchema.nullable(),
+  })
+  .strict();
+
+export type InteractiveEvaluationTraceTurn = z.infer<typeof InteractiveEvaluationTraceTurnSchema>;
+
+export type InteractiveEvaluationOptions = {
+  onTurn?: (turn: InteractiveEvaluationTraceTurn) => void;
+};
+
 const targetNodeCountByTurns = { 6: 8, 8: 10, 16: 18 } as const;
 
 function evaluationProject(fixture: InteractiveEvaluationFixture): Project {
@@ -112,6 +128,7 @@ function resultFor(
 export async function evaluateInteractiveFixture(
   fixtureInput: unknown,
   provider: GenerationProvider = new FakeInteractiveGenerationProvider(),
+  options: InteractiveEvaluationOptions = {},
 ): Promise<InteractiveEvaluationResult> {
   const fixture = InteractiveEvaluationFixtureSchema.parse(fixtureInput);
   const project = evaluationProject(fixture);
@@ -172,6 +189,13 @@ export async function evaluateInteractiveFixture(
         consequencePass = false;
         issueCodes.add("STATE_CONSEQUENCE");
       }
+      options.onTurn?.({
+        turn: turnIndex + 1,
+        scene: generated.scene,
+        selectedChoiceLabel: selectedChoice?.label ?? null,
+        stateLastChoiceImpact: generated.state.lastChoiceImpact,
+        continuity: generated.state.continuity ?? null,
+      });
       state = generated.state;
       previousScene = generated.scene;
     }
@@ -193,4 +217,57 @@ export async function evaluateInteractiveFixture(
     selectedRisks,
     issueCodes: [...issueCodes],
   });
+}
+
+function reviewRiskLabel(risk: InteractiveScene["choices"][number]["risk"]): string {
+  return risk === "low" ? "低风险" : risk === "medium" ? "中风险" : "高风险";
+}
+
+export function renderInteractiveEvaluationReviewMarkdown(input: {
+  fixture: InteractiveEvaluationFixture;
+  result: InteractiveEvaluationResult;
+  provider: "fake" | "live";
+  model: string;
+  evaluatedAt: string;
+  turns: readonly InteractiveEvaluationTraceTurn[];
+}): string {
+  const fixture = InteractiveEvaluationFixtureSchema.parse(input.fixture);
+  const result = InteractiveEvaluationResultSchema.parse(input.result);
+  const turns = input.turns.map((turn) => InteractiveEvaluationTraceTurnSchema.parse(turn));
+  const lines = [
+    `# 互动人工审阅样本：${fixture.title}`,
+    "",
+    `- 样本：${fixture.id}`,
+    `- Provider：${input.provider}`,
+    `- 模型：${input.model}`,
+    `- 评测时间：${input.evaluatedAt}`,
+    `- 目标幕数：${fixture.targetTurns}`,
+    `- 结构结果：${result.passed ? "通过" : "不通过"}`,
+    `- 结构问题码：${result.issueCodes.length > 0 ? result.issueCodes.join(", ") : "无"}`,
+    `- 风险路径：${result.selectedRisks.join(" -> ")}`,
+    "",
+    "> 本文件只包含经过场景契约校验的最终文本、摘要、选择和直接后果，不包含 prompt、原始 provider 响应或密钥。",
+    "",
+  ];
+
+  for (const turn of turns) {
+    lines.push(`## 第 ${turn.turn} 幕：${turn.scene.title}`, "", turn.scene.body.trim(), "", `> 摘要：${turn.scene.summary.trim()}`, "");
+    if (turn.selectedChoiceLabel) lines.push(`**进入本幕的作者选择：** ${turn.selectedChoiceLabel}`, "");
+    if (turn.stateLastChoiceImpact.trim()) lines.push(`**模型记录的直接后果：** ${turn.stateLastChoiceImpact.trim()}`, "");
+    if (turn.continuity) {
+      lines.push(`**连续性账本：** 地点：${turn.continuity.location}；时间：${turn.continuity.time}；在场：${turn.continuity.activeCharacters.join("、")}；目标：${turn.continuity.sceneGoal}`, "");
+    } else {
+      lines.push("**连续性账本：** 本幕未返回，人工检查是否承接前文。", "");
+    }
+    if (turn.scene.choices.length > 0) {
+      lines.push("### 本幕可选方向", "");
+      for (const choice of turn.scene.choices) {
+        lines.push(`- ${choice.label}（${reviewRiskLabel(choice.risk)}）：${choice.consequencePreview}`);
+      }
+      lines.push("");
+    }
+    if (turn.scene.isEnding && turn.scene.endingSummary) lines.push(`**结局摘要：** ${turn.scene.endingSummary}`, "");
+  }
+
+  return `${lines.join("\n").trim()}\n`;
 }

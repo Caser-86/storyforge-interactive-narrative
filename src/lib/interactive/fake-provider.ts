@@ -41,6 +41,12 @@ export class FakeInteractiveGenerationProvider implements GenerationProvider {
         resolvedThreads: isEnding ? ["门后的真相"] : [],
         lastChoiceImpact: "调查方向发生了变化。",
         endingReadiness: isEnding ? 100 : Math.min(90, turn * 10),
+        continuity: {
+          location: "当前场景",
+          time: `第 ${turn} 幕`,
+          activeCharacters: ["主角"],
+          sceneGoal: isEnding ? "收束所有线索" : "推进当前线索",
+        },
       },
     };
     const parsed = request.outputSchema.safeParse(value);

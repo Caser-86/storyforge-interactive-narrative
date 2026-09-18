@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateProjectResponseSchema } from "@/lib/authoring/api-contracts";
 import { createAuthoringRepository, type CreateProjectInput } from "@/lib/authoring/repository";
 import { AuthorEndingGenerationResponseSchema } from "@/lib/authoring/generation/api-contracts";
+import { getProjectGenerationMetrics } from "@/lib/authoring/metrics";
 import type { StoryGraph } from "@/lib/authoring/schemas";
 import { validReleaseGraph } from "@/__tests__/fixtures/authoring-graphs";
 
@@ -109,6 +110,10 @@ describe("author ending generation API", () => {
     expect((await after.getProjectGraph(project.id)).nodes).toHaveLength(8);
     expect(await after.getDraftRevision(project.id)).toBe(1);
     after.close();
+    await expect(getProjectGenerationMetrics(project.id)).resolves.toMatchObject({
+      totalCalls: 1,
+      authorEndingUsage: { totalCalls: 1, succeededCalls: 1, failedCalls: 0 },
+    });
 
     const stale = await route.POST(
       request("http://local/generate-ending", "POST", {
@@ -138,5 +143,9 @@ describe("author ending generation API", () => {
     );
 
     expect(response.status).toBe(400);
+    await expect(getProjectGenerationMetrics(project.id)).resolves.toMatchObject({
+      totalCalls: 0,
+      authorEndingUsage: { totalCalls: 0 },
+    });
   });
 });

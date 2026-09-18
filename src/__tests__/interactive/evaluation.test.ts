@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ProviderError } from "@/lib/authoring/generation/provider-errors";
 import type { GenerationProvider, ProviderResult, StructuredGenerationRequest } from "@/lib/authoring/generation/provider";
-import { evaluateInteractiveFixture, InteractiveEvaluationFixtureSchema } from "@/lib/interactive/evaluation";
+import {
+  evaluateInteractiveFixture,
+  InteractiveEvaluationFixtureSchema,
+  renderInteractiveEvaluationReviewMarkdown,
+  type InteractiveEvaluationTraceTurn,
+} from "@/lib/interactive/evaluation";
 import { FakeInteractiveGenerationProvider } from "@/lib/interactive/fake-provider";
 
 const fixture = {
@@ -35,6 +40,33 @@ describe("interactive evaluation", () => {
     });
     expect(result.selectedRisks).toEqual(fixture.riskSequence);
     expect(result.issueCodes).toEqual([]);
+  });
+
+  it("can expose only validated scenes for a manual review artifact", async () => {
+    const trace: InteractiveEvaluationTraceTurn[] = [];
+    const parsedFixture = InteractiveEvaluationFixtureSchema.parse(fixture);
+    const result = await evaluateInteractiveFixture(parsedFixture, undefined, {
+      onTurn: (turn) => trace.push(turn),
+    });
+
+    expect(result.passed).toBe(true);
+    expect(trace).toHaveLength(fixture.targetTurns);
+    expect(trace[0]?.scene.body).toBeTruthy();
+    expect(trace.at(-1)?.scene.isEnding).toBe(true);
+    const markdown = renderInteractiveEvaluationReviewMarkdown({
+      fixture: parsedFixture,
+      result,
+      provider: "live",
+      model: "test-model",
+      evaluatedAt: "2026-09-15T00:00:00.000Z",
+      turns: trace,
+    });
+
+    expect(markdown).toContain("# 互动人工审阅样本：雾中的档案室");
+    expect(markdown).toContain("不包含 prompt、原始 provider 响应或密钥");
+    expect(markdown).toContain("## 第 6 幕");
+    expect(markdown).toContain("结局摘要");
+    expect(markdown).toContain("连续性账本");
   });
 
   it("retries a transient schema drift before failing the evaluated path", async () => {

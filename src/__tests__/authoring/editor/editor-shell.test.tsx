@@ -67,4 +67,18 @@ describe("EditorShell", () => {
 
     expect(input).toHaveValue("尚未提交的选择");
   });
+
+  it("uses the selected-path release minimum for a completed linear draft", () => {
+    const singleEnding = graph.nodes.find((node) => node.nodeKey === "city-ending");
+    const singleEndingGraph = {
+      ...graph,
+      nodes: graph.nodes.filter((node) => node.id !== singleEnding?.id),
+      edges: graph.edges.filter((edge) => edge.targetNodeId !== singleEnding?.id),
+    };
+
+    render(<EditorShell project={project} graph={singleEndingGraph} draftRevision={0} releaseProfile="selected_path" />);
+
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("个阻断问题")).toBeInTheDocument();
+  });
 });

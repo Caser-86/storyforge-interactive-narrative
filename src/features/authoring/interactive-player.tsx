@@ -39,7 +39,7 @@ function removeStoredSessionId(storageKey: string): void {
 function sessionStatusLabel(status: InteractiveSession["status"], materializedVersionId: string | null, lastError: string | null): string {
   if (materializedVersionId) return "已落稿";
   if (status === "active" && lastError) return "需重试";
-  return status === "ended" ? "已结束" : status === "active" ? "进行中" : status === "generating" ? "生成中" : "失败";
+  return status === "ended" ? "已结束" : status === "active" ? "可继续" : status === "generating" ? "生成中" : "失败";
 }
 
 function syncHistorySummary(items: InteractiveSessionSummary[], nextSession: InteractiveSession): InteractiveSessionSummary[] {
@@ -62,6 +62,12 @@ function formatElapsed(startedAt: string | null, now: number): string {
   const seconds = Math.floor(elapsed / 1_000);
   if (seconds < 60) return `${seconds} 秒`;
   return `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+}
+
+function formatHistoryUpdatedAt(updatedAt: string): string {
+  const timestamp = Date.parse(updatedAt);
+  if (!Number.isFinite(timestamp)) return "更新时间未知";
+  return new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(timestamp);
 }
 
 export function InteractivePlayer({ projectId, projectTitle, providerMode = "openai", initialSessionId }: InteractivePlayerProps) {
@@ -449,7 +455,14 @@ export function InteractivePlayer({ projectId, projectTitle, providerMode = "ope
   }
 
   const scene = session?.scene;
+  const legacyChoiceCount = session?.status === "active" && scene && !scene.isEnding && scene.choices.length !== 3
+    ? scene.choices.length
+    : null;
   const visibleTurns = turnsSessionId === session?.id ? turns : [];
+  const previousTurn = session?.status === "active"
+    ? visibleTurns.find((turn) => turn.turn === session.state.turn - 1)
+    : null;
+  const previousChoiceLabel = previousTurn?.selectedChoiceLabel ?? null;
   const screenReaderAnnouncement = session && scene && session.status !== "generating" && session.status !== "failed"
     ? scene.isEnding || session.status === "ended"
       ? "故事已经收束，可以保存为正式故事草稿。"
@@ -486,12 +499,28 @@ export function InteractivePlayer({ projectId, projectTitle, providerMode = "ope
         <section className="interactive-stage">
           {screenReaderAnnouncement ? <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{screenReaderAnnouncement}</p> : null}
           <div className="interactive-progress"><span>第 {session.state.turn} / {session.state.targetTurns} 幕</span><span>{session.status === "ended" ? "故事已结束" : session.status === "failed" ? "生成失败" : session.status === "generating" ? (session.generation?.status === "queued" ? "排队中" : "正在生成") : isBusy ? "正在根据你的选择生成…" : "等待选择"}</span></div>
+          <div className="interactive-flow-note" role="note">你正在亲自推进一条分支：每次只生成当前选择的下一幕，未选择的方向不会生成；达到计划幕数后由模型收尾。</div>
           {scene ? <article className="interactive-scene">
             <p className="eyebrow">{scene.isEnding ? "ENDING" : `SCENE ${String(session.state.turn).padStart(2, "0")}`}</p>
             <h1>{scene.title}</h1>
             <div className="interactive-body">{scene.body.split(/\n\s*\n/).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
             <p className="interactive-summary">{scene.summary}</p>
           </article> : null}
+          {previousChoiceLabel ? <div className="interactive-choice-context" role="note"><strong>承接你的选择</strong><span>上一幕你选择了“{previousChoiceLabel}”，本幕展示该方向产生的后果。</span></div> : null}
+          {session?.state.continuity ? <div className="interactive-continuity" role="note">
+            <strong>当前剧情锚点</strong>
+            <span>地点：{session.state.continuity.location}</span>
+            <span>时间：{session.state.continuity.time}</span>
+            <span>在场：{session.state.continuity.activeCharacters.join("、")}</span>
+            <span>目标：{session.state.continuity.sceneGoal}</span>
+          </div> : null}
+          {legacyChoiceCount !== null ? <div className="interactive-legacy-notice" role="note">
+            <strong>{legacyChoiceCount === 0 ? "这条旧记录无法继续" : "这是旧规则会话"}</strong>
+            <span>{legacyChoiceCount === 0
+              ? "当前幕没有可选择的分支，无法从这条旧记录继续。原记录会保留，你可以新建一条分支写作记录。"
+              : `当前幕只有 ${legacyChoiceCount} 个选项。新建分支写作时，每幕会生成低、中、高风险三个方向；本条历史记录仍可继续，不会被自动改写。`}</span>
+            {legacyChoiceCount === 0 ? <button className="button button-small button-primary" type="button" disabled={isBusy} onClick={() => { resetSession(); void start(); }}>{isBusy ? "正在生成开场…" : "新建分支写作"}</button> : null}
+          </div> : null}
           {error ? <p className="interactive-error" role="alert">{error}</p> : null}
           {session.status === "failed" ? (
           <div className="interactive-ending">
@@ -513,9 +542,9 @@ export function InteractivePlayer({ projectId, projectTitle, providerMode = "ope
             {session.materializedVersionId ? <div className="interactive-draft-saved"><span>已保存为正式故事草稿</span><Link className="text-link" href={`/projects/${projectId}/edit`}>进入编辑器</Link></div> : <button className="button button-primary button-small" type="button" disabled={isBusy} onClick={() => void materialize()}>{isBusy ? "正在保存草稿…" : "保存为正式故事草稿"}</button>}
             <button className="button button-small button-quiet" type="button" onClick={resetSession}>重新开始</button>
           </div>
-          ) : (
-            <div className="interactive-choices"><p className="eyebrow">选择你的行动</p>{scene?.choices.map((choice, index) => <button className="interactive-choice" key={choice.id} ref={index === 0 ? firstChoiceRef : undefined} type="button" disabled={isBusy} onClick={() => void choose(choice.id)}><span className={`interactive-risk interactive-risk-${choice.risk}`}>{choice.risk === "low" ? "低风险" : choice.risk === "medium" ? "中风险" : "高风险"}</span><strong>{choice.label}</strong><small>{choice.consequencePreview}</small></button>)}</div>
-          )}
+           ) : legacyChoiceCount === 0 ? null : (
+             <div className="interactive-choices"><p className="eyebrow">选择你的行动</p>{scene?.choices.map((choice, index) => <button className="interactive-choice" key={choice.id} ref={index === 0 ? firstChoiceRef : undefined} type="button" disabled={isBusy} onClick={() => void choose(choice.id)}><span className={`interactive-risk interactive-risk-${choice.risk}`}>{choice.risk === "low" ? "低风险" : choice.risk === "medium" ? "中风险" : "高风险"}</span><strong>{choice.label}</strong><small>{choice.consequencePreview}</small></button>)}</div>
+           )}
           {visibleTurns.length > 0 ? <section className="interactive-timeline" aria-labelledby="interactive-timeline-title">
              <p className="eyebrow" id="interactive-timeline-title">WRITTEN PATH</p>
              <ol>{visibleTurns.map((turn) => <li key={turn.turn}><span>第 {turn.turn} 幕</span><strong>{turn.scene.title}</strong><small>{turn.selectedChoiceLabel ? `作者选择：${turn.selectedChoiceLabel}` : "等待作者选择"}</small></li>)}</ol>
@@ -533,6 +562,7 @@ export function InteractivePlayer({ projectId, projectTitle, providerMode = "ope
             <div>
               <p className="eyebrow">LOCAL WRITING SESSIONS</p>
               <h2 id="interactive-history-title">作者分支写作记录</h2>
+              <p className="interactive-history-note">“可继续”表示记录已保存且等待你的下一次选择，不代表模型正在后台生成。</p>
             </div>
             <span>{history.length} 条</span>
           </div>
@@ -542,7 +572,7 @@ export function InteractivePlayer({ projectId, projectTitle, providerMode = "ope
                 <div>
                   <span className="interactive-history-status">{sessionStatusLabel(item.status, item.materializedVersionId, item.lastError)}</span>
                   <strong>{projectTitle}</strong>
-                  <small>第 {item.turn} / {item.targetTurns} 幕</small>
+                  <small>第 {item.turn} / {item.targetTurns} 幕 · 最近更新 {formatHistoryUpdatedAt(item.updatedAt)} · 记录 {item.id.slice(0, 8)}</small>
                 </div>
                 <div className="interactive-history-actions">
                   <button className="button button-small button-quiet" type="button" disabled={historyBusyId !== null} aria-label={`恢复${projectTitle}第 ${item.turn} 幕`} onClick={() => void resumeHistorySession(item.id)}>恢复</button>

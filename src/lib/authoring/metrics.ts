@@ -1,4 +1,5 @@
 import { initializeAuthoringDatabase } from "./database";
+import { reconcileStaleAuthorEndingUsage } from "./ending-usage";
 export { ProjectGenerationMetricsSchema } from "./metrics-contracts";
 
 type StageMetrics = { calls: number; p50: number; p95: number };
@@ -16,6 +17,18 @@ export interface InteractiveUsageMetrics {
   retries: number;
 }
 
+export interface AuthorEndingUsageMetrics {
+  totalCalls: number;
+  succeededCalls: number;
+  failedCalls: number;
+  unknownCalls: number;
+  reservedCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  unknownOutputTokens: number;
+  reservedOutputTokens: number;
+}
+
 export interface ProjectGenerationMetrics {
   totalRuns: number;
   activeRuns: number;
@@ -31,11 +44,13 @@ export interface ProjectGenerationMetrics {
   stageLatencyMs: Record<string, StageMetrics>;
   estimatedCost: number | null;
   interactiveUsage: InteractiveUsageMetrics;
+  authorEndingUsage: AuthorEndingUsageMetrics;
 }
 
 export async function getProjectGenerationMetrics(projectId: string): Promise<ProjectGenerationMetrics> {
   const db = initializeAuthoringDatabase();
   try {
+    reconcileStaleAuthorEndingUsage(db);
     const runs = db.prepare("SELECT status, input_tokens, output_tokens, retry_count, last_error_code FROM generation_runs WHERE project_id = ? ORDER BY created_at, id").all(projectId) as Array<{
       status: string;
       input_tokens: number;
@@ -66,10 +81,28 @@ export async function getProjectGenerationMetrics(projectId: string): Promise<Pr
       created_at: string;
       completed_at: string | null;
     }>;
+    const authorEndingUsage = db.prepare(
+      `SELECT status, input_tokens, output_tokens, reserved_output_tokens, error_code, created_at, completed_at
+       FROM author_ending_generation_usage
+       WHERE project_id = ? ORDER BY created_at, id`,
+    ).all(projectId) as Array<{
+      status: string;
+      input_tokens: number | null;
+      output_tokens: number | null;
+      reserved_output_tokens: number;
+      error_code: string | null;
+      created_at: string;
+      completed_at: string | null;
+    }>;
     const failuresByCode: Record<string, number> = {};
     for (const run of runs) if (run.status === "failed" && run.last_error_code) failuresByCode[run.last_error_code] = (failuresByCode[run.last_error_code] ?? 0) + 1;
     for (const step of steps) if (step.status === "failed" && step.error_code) failuresByCode[step.error_code] = (failuresByCode[step.error_code] ?? 0) + 1;
     for (const call of interactiveUsage) if (call.status === "unknown" && call.error_code) failuresByCode[call.error_code] = (failuresByCode[call.error_code] ?? 0) + 1;
+    for (const call of authorEndingUsage) {
+      if (["failed", "unknown"].includes(call.status) && call.error_code) {
+        failuresByCode[call.error_code] = (failuresByCode[call.error_code] ?? 0) + 1;
+      }
+    }
     const stageLatencies = new Map<string, number[]>();
     for (const step of steps) {
       if (!step.completed_at) continue;
@@ -96,6 +129,17 @@ export async function getProjectGenerationMetrics(projectId: string): Promise<Pr
         p95: percentile(interactiveLatencies, 0.95),
       };
     }
+    const authorEndingLatencies = authorEndingUsage
+      .filter((call) => call.completed_at)
+      .map((call) => new Date(call.completed_at!).getTime() - new Date(call.created_at).getTime())
+      .filter((duration) => Number.isFinite(duration) && duration >= 0);
+    if (authorEndingLatencies.length > 0) {
+      stageLatencyMs.author_ending = {
+        calls: authorEndingLatencies.length,
+        p50: percentile(authorEndingLatencies, 0.5),
+        p95: percentile(authorEndingLatencies, 0.95),
+      };
+    }
     const interactiveMetrics: InteractiveUsageMetrics = {
       totalCalls: interactiveUsage.length,
       succeededCalls: interactiveUsage.filter((call) => call.status === "succeeded").length,
@@ -108,8 +152,19 @@ export async function getProjectGenerationMetrics(projectId: string): Promise<Pr
       reservedOutputTokens: interactiveUsage.filter((call) => call.status === "reserved").reduce((sum, call) => sum + call.reserved_output_tokens, 0),
       retries: new Set(interactiveUsage.filter((call) => call.task_attempt > 1).map((call) => `${call.task_id}:${call.task_attempt}`)).size,
     };
-    const totalInputTokens = runs.reduce((sum, run) => sum + run.input_tokens, 0) + interactiveMetrics.inputTokens;
-    const totalOutputTokens = runs.reduce((sum, run) => sum + run.output_tokens, 0) + interactiveMetrics.outputTokens;
+    const authorEndingMetrics: AuthorEndingUsageMetrics = {
+      totalCalls: authorEndingUsage.length,
+      succeededCalls: authorEndingUsage.filter((call) => call.status === "succeeded").length,
+      failedCalls: authorEndingUsage.filter((call) => call.status === "failed").length,
+      unknownCalls: authorEndingUsage.filter((call) => call.status === "unknown").length,
+      reservedCalls: authorEndingUsage.filter((call) => call.status === "reserved").length,
+      inputTokens: authorEndingUsage.reduce((sum, call) => sum + (call.input_tokens ?? 0), 0),
+      outputTokens: authorEndingUsage.reduce((sum, call) => sum + (call.output_tokens ?? 0), 0),
+      unknownOutputTokens: authorEndingUsage.filter((call) => call.status === "unknown").reduce((sum, call) => sum + call.reserved_output_tokens, 0),
+      reservedOutputTokens: authorEndingUsage.filter((call) => call.status === "reserved").reduce((sum, call) => sum + call.reserved_output_tokens, 0),
+    };
+    const totalInputTokens = runs.reduce((sum, run) => sum + run.input_tokens, 0) + interactiveMetrics.inputTokens + authorEndingMetrics.inputTokens;
+    const totalOutputTokens = runs.reduce((sum, run) => sum + run.output_tokens, 0) + interactiveMetrics.outputTokens + authorEndingMetrics.outputTokens;
     const inputPrice = Number(process.env.STORYFORGE_INPUT_PRICE_PER_MILLION);
     const outputPrice = Number(process.env.STORYFORGE_OUTPUT_PRICE_PER_MILLION);
     const estimatedCost = Number.isFinite(inputPrice) && Number.isFinite(outputPrice)
@@ -125,11 +180,12 @@ export async function getProjectGenerationMetrics(projectId: string): Promise<Pr
       totalInputTokens,
       totalOutputTokens,
       totalRetries: runs.reduce((sum, run) => sum + run.retry_count, 0),
-      totalCalls: steps.length + interactiveMetrics.totalCalls,
+      totalCalls: steps.length + interactiveMetrics.totalCalls + authorEndingMetrics.totalCalls,
       failuresByCode,
       stageLatencyMs,
       estimatedCost,
       interactiveUsage: interactiveMetrics,
+      authorEndingUsage: authorEndingMetrics,
     };
   } finally {
     db.close();

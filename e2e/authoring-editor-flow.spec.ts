@@ -61,6 +61,9 @@ test.describe("authoring editor closed loop", () => {
     const snapshotResponse = await request.post(`/api/projects/${project.id}/snapshots`, { headers: { "x-storyforge-cli": "1" } });
     expect(snapshotResponse.status()).toBe(201);
     await page.goto(`/projects/${project.id}/preview`);
+    await expect(page.getByText("当前运行的是已封存快照；选择只会跳转到已有节点，不会调用模型生成新剧情。")).toBeVisible();
+    await expect(page.getByRole("link", { name: "进入分支写作" })).toHaveAttribute("href", `/projects/${project.id}/generate`);
+    await expect(page.getByRole("link", { name: "继续分支写作" })).toHaveAttribute("href", `/projects/${project.id}/generate`);
     await expect(page.getByRole("heading", { name: "Courtyard Gate" })).toBeVisible();
     for (const choice of ["Enter the author-approved archive", "Share it with the city"]) {
       await page.getByRole("button", { name: new RegExp(choice) }).click();

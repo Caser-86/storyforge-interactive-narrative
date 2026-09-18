@@ -10,6 +10,7 @@ StoryForge 是私人、本地、单作者、文字优先的互动故事创作工
 
 ## 产品与架构
 
+- [2026-09-18 私人版本收尾计划](superpowers/plans/2026-09-18-storyforge-closeout-plan.md)：本轮待执行任务，覆盖单路径发布、结局调用统计、备份、版本文档和 GitHub 发布验收。
 - [2026-09-08 深度审核](2026-09-08-deep-audit.md)：当前代码问题、隔离复现和证据边界。
 - [稳定性与创作质量优化计划](superpowers/plans/2026-09-08-storyforge-reliability-roadmap.md)：阶段 A–D、依赖图、任务清单、当前执行状态和验收门槛。
 - [事务边界](architecture/authoring-transaction-boundaries.md)：SQLite repository 的读写事务、lease 和连接 owner 约束。

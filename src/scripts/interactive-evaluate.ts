@@ -7,6 +7,8 @@ import { DEFAULT_OPENAI_MODEL } from "../lib/authoring/generation/defaults";
 import {
   evaluateInteractiveFixture,
   InteractiveEvaluationFixtureSchema,
+  renderInteractiveEvaluationReviewMarkdown,
+  type InteractiveEvaluationTraceTurn,
   type InteractiveEvaluationFixture,
 } from "../lib/interactive/evaluation";
 
@@ -17,6 +19,8 @@ export type InteractiveEvaluationCliOptions = {
   dryRun: boolean;
   allowNetwork: boolean;
   approvePaidCalls: boolean;
+  saveReview: boolean;
+  expectedModel?: string;
   fixtureId?: string;
 };
 
@@ -34,6 +38,8 @@ export function parseInteractiveEvaluationOptions(
   let dryRun = false;
   let allowNetwork = false;
   let approvePaidCalls = false;
+  let saveReview = false;
+  let expectedModel: string | undefined;
   let fixtureId: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -49,6 +55,13 @@ export function parseInteractiveEvaluationOptions(
       allowNetwork = true;
     } else if (argument === "--approve-paid-calls") {
       approvePaidCalls = true;
+    } else if (argument === "--save-review") {
+      saveReview = true;
+    } else if (argument === "--expected-model") {
+      const value = requiredValue(args, index, argument).trim();
+      if (!value) throw new Error("--expected-model requires a non-empty value.");
+      expectedModel = value;
+      index += 1;
     } else if (argument === "--fixture") {
       fixtureId = requiredValue(args, index, argument);
       index += 1;
@@ -65,13 +78,23 @@ export function parseInteractiveEvaluationOptions(
   if (provider === "fake" && (allowNetwork || approvePaidCalls)) {
     throw new Error("--allow-network and --approve-paid-calls are only valid with --provider live.");
   }
+  if (expectedModel && provider !== "live") {
+    throw new Error("--expected-model is only valid with --provider live.");
+  }
+  if (saveReview && provider !== "live") {
+    throw new Error("--save-review is only valid with --provider live.");
+  }
+  if (saveReview && dryRun) {
+    throw new Error("--save-review requires a live network run, not --dry-run.");
+  }
   if (provider === "live" && !dryRun) {
     if (!allowNetwork) throw new Error("Live evaluation requires --allow-network; otherwise use --dry-run.");
     if (!approvePaidCalls) throw new Error("Live evaluation requires --approve-paid-calls.");
     if (!fixtureId) throw new Error("Live evaluation requires one --fixture ID to bound paid calls.");
+    if (saveReview && !expectedModel) throw new Error("--save-review requires --expected-model to lock the manual review model.");
   }
 
-  return { provider, dryRun, allowNetwork, approvePaidCalls, fixtureId };
+  return { provider, dryRun, allowNetwork, approvePaidCalls, saveReview, expectedModel, fixtureId };
 }
 
 function loadFixtures(): InteractiveEvaluationFixture[] {
@@ -96,6 +119,10 @@ async function main(): Promise<void> {
   loadAuthoringEnv();
   const fixtures = loadFixtures();
   const options = parseInteractiveEvaluationOptions(process.argv.slice(2), fixtures.map((fixture) => fixture.id));
+  const configuredModel = (process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL).trim();
+  if (options.saveReview && options.expectedModel !== configuredModel) {
+    throw new Error(`--expected-model does not match the configured OPENAI_MODEL (${configuredModel}).`);
+  }
   const selectedFixtures = options.fixtureId
     ? fixtures.filter((fixture) => fixture.id === options.fixtureId)
     : fixtures;
@@ -118,20 +145,35 @@ async function main(): Promise<void> {
 
     const fixture = selectedFixtures[0];
     if (!fixture) throw new Error("Selected interactive fixture was not found.");
-    const result = await evaluateInteractiveFixture(fixture, new OpenAICompatibleGenerationProvider());
+    const turns: InteractiveEvaluationTraceTurn[] = [];
+    const result = await evaluateInteractiveFixture(fixture, new OpenAICompatibleGenerationProvider(), {
+      onTurn: (turn) => turns.push(turn),
+    });
+    const model = configuredModel;
     const report = {
       schema: "storyforge-interactive-evaluation-run@1",
       policyVersion: "interactive-evaluation@1",
       status: result.passed ? "passed" : "failed",
       provider: options.provider,
-      model: process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL,
+      model,
       networkRequest: true,
       fixtureCount: 1,
       passCount: result.passed ? 1 : 0,
       passRate: result.passed ? 1 : 0,
       results: [result],
+      ...(options.saveReview ? { reviewArtifact: `interactive-review-${fixture.id}.md` } : {}),
     };
     writeReport(`interactive-live-${fixture.id}.json`, report);
+    if (options.saveReview) {
+      fs.writeFileSync(path.join(path.resolve("output/evaluations"), `interactive-review-${fixture.id}.md`), renderInteractiveEvaluationReviewMarkdown({
+        fixture,
+        result,
+        provider: options.provider,
+        model,
+        evaluatedAt: new Date().toISOString(),
+        turns,
+      }), "utf8");
+    }
     console.log(JSON.stringify(report, null, 2));
     if (!result.passed) process.exitCode = 1;
     return;
