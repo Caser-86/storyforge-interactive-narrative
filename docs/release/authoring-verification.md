@@ -333,3 +333,10 @@ The clean production route table contains only `/api/health`, `/api/projects/**`
 - `npm run package:smoke`：退出码 `0`；dry-run 验证 Node 24、better-sqlite3、数据目录隔离和升级/回滚/保留数据卸载检查项，`destructive=false`。
 - 本地运行时复核：重启 `npm run dev -- --port 3202` 后，`GET http://127.0.0.1:3202/api/health` 返回 `status=ok`、版本 `0.1.7`、SQLite 持久化和 LLM `configured`；此前拒绝连接仅由作者端 E2E 构建结束后的服务生命周期造成。
 - 本轮仅完成可自动执行的备份、验证和分发证据刷新；真实模型四维人工评分、真实读屏/手机验收、干净 Windows 账户安装、签名/用户安装包、作者发布确认以及 canonical `master` 合并/CI/标签/Release 仍未完成。
+
+## 2026-09-19 最终模型结构复评
+
+- 以作者已批准的真实调用方式执行进程级 `OPENAI_MODEL=deepseek-v4-flash`，启用 `--allow-network --approve-paid-calls`，并使用 `--save-review --expected-model deepseek-v4-flash` 生成三套脱敏审阅材料；`.env.local` 默认模型未修改，仍为 `doubao-seed-evolving`。
+- `zh-contemporary-6` 最终 `6/6`，`activeSceneCount=5`；`zh-fantasy-8` 最终 `8/8`，`activeSceneCount=7`；`zh-suspense-16` 最终 `16/16`，`activeSceneCount=15`。三者的 ending、choice contract、risk coverage、consequence 均通过，`issueCodes=[]`。
+- `zh-suspense-16` 在首次真实运行中于 `14/16` 暴露 `GENERATION_SCHEMA` 与 `RISK_SEQUENCE`，随后通过现有有界重试/重新运行完成 `16/16`。这证明当前边界对一次瞬态模型漂移有恢复能力，但不证明 live provider 永不失败；失败尝试没有作为最终审阅材料保存。
+- 复评产物仅包含结构化结果和契约校验后的逐幕文本，未保存 API key、原始 prompt 或完整 provider 响应。该复评仍是结构和可读材料证据，不关闭四维人工语义评分、作者逐幕确认、真实读屏/移动端验收、干净 Windows 账户安装、代码签名或最终发布模型确认。

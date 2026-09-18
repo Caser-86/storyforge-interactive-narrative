@@ -97,6 +97,20 @@ npm run interactive:evaluate -- --provider live --allow-network --approve-paid-c
 
 三份材料的模型、Provider 和幕数已由脚本复核；剩余动作是作者逐幕阅读并填写下方四个维度的 1–5 分，以及记录证据幕号和备注。
 
+## 2026-09-19 最终模型结构复评
+
+本轮在作者已批准真实模型调用的前提下，使用进程级 `OPENAI_MODEL=deepseek-v4-flash`、`Provider=live`、`--allow-network --approve-paid-calls` 和 `--save-review --expected-model deepseek-v4-flash` 重新执行三套固定样本。`.env.local` 默认模型没有被修改，仍为 `doubao-seed-evolving`，因此这不是“最终发布模型语义评分已完成”的证明。
+
+| 样本 | 最终结果 | 结构化证据 | 审阅材料 |
+| --- | --- | --- | --- |
+| `zh-contemporary-6` | 通过 | `6/6`；`activeSceneCount=5`；ending、choice contract、risk coverage、consequence 均通过；`issueCodes=[]` | `output/evaluations/interactive-review-zh-contemporary-6.md` |
+| `zh-fantasy-8` | 通过 | `8/8`；`activeSceneCount=7`；ending、choice contract、risk coverage、consequence 均通过；`issueCodes=[]` | `output/evaluations/interactive-review-zh-fantasy-8.md` |
+| `zh-suspense-16` | 重试后通过 | `16/16`；`activeSceneCount=15`；ending、choice contract、risk coverage、consequence 均通过；`issueCodes=[]`；风险序列完整 | `output/evaluations/interactive-review-zh-suspense-16.md` |
+
+运行过程还观察到一次可恢复的模型输出漂移：`zh-suspense-16` 首次运行在 `14/16` 幕停止，出现 `GENERATION_SCHEMA` 和 `RISK_SEQUENCE`，随后由现有有界重试/重新运行完成 `16/16`。失败结果没有被作为最终审阅材料保留；该现象说明当前重试边界能够恢复一次瞬态漂移，但不代表真实模型调用具有零失败保证，也不替代人工判断是否需要调整提示词或模型配置。
+
+本轮最终结构结果可作为人工阅读材料索引；没有保存 API key、原始 prompt 或完整 provider 响应。四个维度的 1–5 分、作者逐幕确认、真实读屏/移动端验收和最终发布模型确认仍未完成。
+
 ## 逐样本评分
 
 每个样本单独填写一行四维评分，并填写证据幕号。4 分表示达到发布目标，3 分表示可读但需要修改，1–2 分表示存在明显质量问题。不要用另一个样本的分数代替空白项。
