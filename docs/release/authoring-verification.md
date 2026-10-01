@@ -1,5 +1,9 @@
 # StoryForge Authoring Release Verification
 
+> **当前状态（2026-10-02）**：正式版本为 `0.1.8`，不可变标签 `v0.1.8` 指向 `f2fec8b`；发布后的状态同步 PR #9 已合并，合并后 CI 必需 job 全部通过。作者已报告手工项目测试完成且无问题，并批准发布 `v0.1.8`。后续仍待完成最终模型四维语义评分、悬疑样本结尾意图确认、干净 Windows 账户安装、代码签名/用户安装器、真实设备可访问性验收，以及 GitHub `master` 分支保护。下方带日期记录是当时的验证快照，状态变化以 [`CONTEXT.md`](../../CONTEXT.md) 和 [`TODO.md`](../../TODO.md) 为准。
+
+## Historical baseline: v0.1.4
+
 - Date: 2026-08-24
 - Published release: `v0.1.4`
 - GitHub Release: https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.4
@@ -24,7 +28,7 @@
 - `npm run authoring:llm:smoke -- --dry-run`: exit code `0`; model resolved as `doubao-seed-evolving`, `networkRequest=false`. No real model call was made in this verification batch.
 - `npm audit --audit-level=high`: exit code `0`; 0 vulnerabilities.
 - `npm run package:standalone`: exit code `0`; generated `output/package/StoryForge-0.1.8`.
-- `npm run release:evidence`: exit code `0`; the final tag CI evidence manifest reports package file count `2023`, `secretsIncluded=false`, `signed=false`, with SBOM and SHA-256 files for `0.1.8`.
+- `npm run release:evidence`: exit code `0`; the tag CI evidence manifest then reported package file count `2023`, while later sequential release-evidence rechecks reported `2268`; both reported `secretsIncluded=false` and `signed=false`, with SBOM and SHA-256 files for `0.1.8`.
 - `npm run package:smoke`: exit code `0`; dry-run was non-destructive. Isolated Local package smoke also passed clean install, health, upgrade, failed-upgrade, rollback, and uninstall-preserves-data, then removed its temporary root.
 - Runtime smoke: `GET http://127.0.0.1:3202/api/health` returned HTTP 200 with version `0.1.8`, persistent SQLite storage, and configured LLM.
 - Manual acceptance: the author reported the current project test completed without an issue. This is recorded as functional feedback only; the project ID, exact model, and semantic quality scores are not known from that feedback and are not inferred.

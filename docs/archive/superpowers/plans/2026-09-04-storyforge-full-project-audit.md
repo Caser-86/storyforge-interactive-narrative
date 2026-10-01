@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.1, React 19.2.4, TypeScript 5.9.3, Vitest 4.1.6, Playwright 1.60.0, better-sqlite3 12.10.0, npm lockfile v3, Docker Compose。
 
-**Spec:** `docs/superpowers/specs/2026-08-24-storyforge-production-maturity-design.md`
+**Spec:** `../specs/2026-08-24-storyforge-production-maturity-design.md`
 
 ## Global Constraints
 
@@ -210,7 +210,7 @@ Expected: clean install succeeds and production dependency audit reports no high
 - Modify: `PROJECT_REMEDIATION_ACTION_PLAN.md`
 - Modify: `PROJECT_DEEP_AUDIT_IMPROVEMENT_REPORT.md`
 - Modify: `LOCAL_PERSISTENCE_DESIGN_AND_AUDIT.md`
-- Modify: `docs/superpowers/plans/2026-08-24-storyforge-branch-writing.md`
+- Modify: `../plans/2026-08-24-storyforge-branch-writing.md`
 
 **Interfaces:**
 - Consumes: the current README/release verification documents and historical root roadmaps.

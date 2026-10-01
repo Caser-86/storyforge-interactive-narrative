@@ -4,11 +4,17 @@ All notable changes to StoryForge are documented here.
 
 ## [Unreleased]
 
-暂无未发布变更。
+### Documentation
+
+- 对齐项目说明、GitHub 元数据和当前发布状态；归档历史计划与审计记录，保留正式版本标签及发布证据。
+
+### Security
+
+- 将 Next.js 与 `eslint-config-next` 更新至 `16.3.8`，包含 [GHSA-vcvr-r3jv-pc5j](https://github.com/advisories/GHSA-vcvr-r3jv-pc5j) 修复及 Next.js 9 月 30 日安全更新；同时更新审计发现的易受影响传递依赖，完整 `npm audit` 结果为 0 vulnerabilities。
 
 ## [0.1.8] - 2026-09-18
 
-> 已从 canonical `master` 提交 `f2fec8b` 发布为 [GitHub Release v0.1.8](https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8)。后续发布证据文档更新通过 PR [#5](https://github.com/Caser-86/storyforge-interactive-narrative/pull/5) 合并，未移动或重建 `v0.1.8` 标签。
+> 已从 canonical `master` 提交 `f2fec8b` 发布为 [GitHub Release v0.1.8](https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8)。后续验证和文档状态同步通过 PR [#4](https://github.com/Caser-86/storyforge-interactive-narrative/pull/4) 至 [#9](https://github.com/Caser-86/storyforge-interactive-narrative/pull/9) 合并，未移动或重建 `v0.1.8` 标签。
 
 ### Reliability and Authoring Flow
 
@@ -62,13 +68,13 @@ All notable changes to StoryForge are documented here.
 - 扩展 provider 错误元数据脱敏，覆盖火山方舟 `ark-` 凭据，并避免互动 worker 日志记录原始凭据。
 - 为分支写作页标注 `GENERATION_PROVIDER=fake` 测试占位模式，避免固定占位内容被误认为真实模型质量；手工创作默认使用 `openai` provider。
 - standalone 打包和 release evidence 均新增独立产物凭据扫描，覆盖 `sk-`、`ark-`、Bearer 和 URL 凭据，并对空文件安全处理。
-- 明确完整验证、standalone 分发和 Windows smoke 的 PowerShell 7.x（`pwsh`）前置条件，并在 CI 的 Ubuntu verify 与 Windows 分发 job 中增加版本检查。
+- 在 CI 相关 job 中检查 PowerShell 7.x（`pwsh`），并记录分发、发布证据和 Windows lifecycle smoke 脚本的运行时要求。
 - 修复项目 JSON 导入把进行中会话恢复成永久“生成中”的问题；该格式仍明确不承诺恢复模型任务租约。
 - 完成迁移 v12/v13、worker 初始化保护、显式共享数据库作用域、multi-repository route 请求作用域、互动历史读取基准、租约竞争测试、真实跨进程退出/重启与短 SQLite busy 锁演练、预算账本测试、备份恢复测试和三会话并发回归；互动历史列表新增摘要分页索引，验证 repository 写入也统一到短事务边界。
 
 ## [0.1.7] - 2026-09-04
 
-> 作者分支审查加固候选版本：对应 `v0.1.7` 标签，尚未合并到 `master`，不是正式 GitHub Release。
+> 历史候选快照（2026-09-04）：当时的作者分支审查加固候选使用 `v0.1.7` 标签，未单独作为 GitHub Release 发布；相关功能后续随 `v0.1.8` 发布。
 
 ### Authoring Completion Hardening
 
@@ -84,7 +90,7 @@ All notable changes to StoryForge are documented here.
 
 ## [0.1.6] - 2026-08-28
 
-> 作者分支编辑候选版本：已在功能分支和标签中验证，尚未合并到 `master`，不是正式 GitHub Release。
+> 历史候选快照（2026-08-28）：作者分支编辑功能曾以 `v0.1.6` 候选验证，未单独作为 GitHub Release 发布；相关功能后续随 `v0.1.8` 发布。
 
 ### Authoring Branch Editing
 
@@ -95,7 +101,7 @@ All notable changes to StoryForge are documented here.
 
 ## [0.1.5] - 2026-08-24
 
-> 分支候选版本：已在功能分支和标签中验证，尚未合并到 `master`，不是正式 GitHub Release。
+> 历史候选快照（2026-08-24）：作者驱动的分支写作曾以 `v0.1.5` 候选验证，未单独作为 GitHub Release 发布；该流程后续随 `v0.1.8` 发布。
 
 ### Author-Driven Branch Writing
 
@@ -107,7 +113,7 @@ All notable changes to StoryForge are documented here.
 
 - 本地候选验证记录：`npm test` 通过 65 个 Vitest 文件 / 271 个测试；`npm run typecheck`、`npm run lint`、`npm run build` 通过。
 - `npm run test:e2e:authoring` 通过 10/10，包含作者逐幕选择、正式落稿、刷新恢复、离线导出、发布恢复和响应式筛选。
-- 尚未完成的发布门槛：合并到受保护的 `master`、对应远程 CI、干净 Windows 账户安装证据、代码签名和用户级安装器。
+- 当时尚未完成的发布门槛包括合并到 `master`、对应远程 CI、干净 Windows 账户安装证据、代码签名和用户级安装器；后续发布状态见 `v0.1.8` 与发布验证记录。
 
 ## [0.1.4] - 2026-08-24
 

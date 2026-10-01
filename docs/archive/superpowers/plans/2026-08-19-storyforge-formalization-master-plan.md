@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16, React 19, TypeScript 5.9, Zod 3, SQLite through `better-sqlite3`, OpenAI-compatible DeepSeek API, Vitest, Playwright, npm.
 
-**Spec:** `docs/superpowers/specs/2026-08-19-storyforge-local-authoring-platform-design.md`
+**Spec:** `../specs/2026-08-19-storyforge-local-authoring-platform-design.md`
 
 ## Global Constraints
 

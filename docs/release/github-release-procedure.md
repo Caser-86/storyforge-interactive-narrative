@@ -4,7 +4,7 @@ This procedure is for releasing a private-local runtime from a public source rep
 
 ## Preconditions
 
-1. The pull request targets the protected `master` branch.
+1. Release pull requests should target the protected `master` branch. GitHub reports that `master` is currently unprotected; configure and verify branch protection before relying on required-check enforcement.
 2. The pull request has passed `verify` and `e2e-authoring` in GitHub Actions.
 3. The local release checklist and verification record contain fresh command results.
 4. The live provider smoke, if used for this release, has been explicitly approved by the author; its report records the exact `OPENAI_MODEL` and contains only redacted metrics.
@@ -15,7 +15,7 @@ This procedure is for releasing a private-local runtime from a public source rep
 1. Merge the reviewed pull request into `master`.
 2. Confirm the merged commit is the exact commit intended for release.
 3. Run the full release checklist from a clean working tree.
-4. Create an annotated version tag from the merged `master` commit, using the next unused version from `package.json` (for example `v0.1.8`); never reuse an existing tag.
+4. Create an annotated version tag from the merged `master` commit, matching the next version in `package.json`; verify the tag does not already exist and never reuse a published tag.
 5. Push the tag. Wait for the tag-triggered Actions run and confirm the green Actions run is attached to the exact tag commit.
 6. Create a GitHub Release from that tag. Use the matching section from `CHANGELOG.md` as the release description.
 7. Attach only the public standalone artifact, generated SBOM, and checksum list. Never attach `.env*`, `data/`, SQLite files, raw logs, or test databases.
@@ -23,7 +23,7 @@ This procedure is for releasing a private-local runtime from a public source rep
 
 ## Repository Settings
 
-The repository owner must keep the repository visibility and licensing decision explicit, keep `master` protected with required status checks for `verify` and `e2e-authoring`, require review before merge, and disallow direct release tags from unmerged feature branches. These settings cannot be proven by local tests and must be checked in GitHub.
+The repository owner should keep visibility and licensing decisions explicit, protect `master` with required status checks for `verify` and `e2e-authoring`, require review before merge, and disallow direct release tags from unmerged feature branches. The branch is currently unprotected. These settings cannot be proven by local tests and must be configured and checked in GitHub.
 
 ## Rollback
 

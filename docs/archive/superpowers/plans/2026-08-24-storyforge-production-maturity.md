@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.1, React 19, TypeScript, Node 24, better-sqlite3, Zod, Vitest, Playwright, Docker Compose, GitHub Actions.
 
-**Spec:** `docs/superpowers/specs/2026-08-24-storyforge-production-maturity-design.md`
+**Spec:** `../specs/2026-08-24-storyforge-production-maturity-design.md`
 
 ## Global Constraints
 

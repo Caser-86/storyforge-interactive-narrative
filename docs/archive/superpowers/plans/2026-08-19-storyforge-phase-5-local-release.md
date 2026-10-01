@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16, SQLite, Node.js 24, npm, Vitest, Playwright, GitHub Actions.
 
-**Spec:** `docs/superpowers/specs/2026-08-19-storyforge-local-authoring-platform-design.md`
+**Spec:** `../specs/2026-08-19-storyforge-local-authoring-platform-design.md`
 
 ## Global Constraints
 

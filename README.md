@@ -2,19 +2,19 @@
 
 StoryForge 是一个私人本地互动叙事创作工作台。默认主流程是：项目库 -> 作者选择分支 -> 模型逐幕生成 -> 模型收尾 -> 图谱编辑 -> 质量校验 -> 快照 -> 离线 HTML 导出。
 
-当前正式版本为 `0.1.8`，已从 canonical `master` 提交 `f2fec8b` 创建 GitHub Release。后续发布证据文档更新已通过 PR [#5](https://github.com/Caser-86/storyforge-interactive-narrative/pull/5) 合并到 `master`；`v0.1.8` 标签保持不可变。
+当前正式版本为 `0.1.8`，GitHub Release 来自 canonical `master` 的不可变标签 `v0.1.8`，标签指向发布提交 `f2fec8b`。发布后的验证和文档状态同步已通过 PR [#4](https://github.com/Caser-86/storyforge-interactive-narrative/pull/4) 至 [#9](https://github.com/Caser-86/storyforge-interactive-narrative/pull/9) 合并；后续仓库整理不会移动或重建该标签。
 
 当前产品只聚焦文字创作，不需要登录，不提供公开分享，不依赖 Redis、PostgreSQL 或图片 worker。默认服务只绑定 `127.0.0.1`。
 
-文档总入口见 [`docs/README.md`](docs/README.md)。其中“当前文档”描述现行实现，“历史归档”仅用于追溯早期方案，不作为安装、开发或发布依据。
+文档总入口见 [`docs/README.md`](docs/README.md)。项目现状见 [`CONTEXT.md`](CONTEXT.md)，未完成事项见 [`TODO.md`](TODO.md)；`docs/archive/` 仅用于追溯早期方案，不作为安装、开发或发布依据。
 
 ## 快速开始
 
 ### 环境要求
 
 - Node.js `24.x`
-- npm `11.x`
-- PowerShell `7.x` (`pwsh`)：运行完整 `verify`、standalone 分发、发布证据和 Windows smoke 所需；Windows PowerShell 5.1 的 `powershell` 命令不能替代它。
+- npm `11.x`（当前验证使用的版本；依赖通过 `npm ci` 安装）
+- PowerShell `7.x` (`pwsh`)：本地分发、发布证据和 Windows lifecycle smoke 脚本需要；本地 `npm run verify` 本身不调用 PowerShell，但 GitHub Actions 的 verify job 会检查 PowerShell 7。Windows PowerShell 5.1 的 `powershell` 命令不能替代 `pwsh`。
 - OpenAI-compatible 文本模型 API key（仅在需要真实生成时配置）
 
 ### 安装
@@ -25,7 +25,7 @@ cd storyforge-interactive-narrative
 npm ci
 ```
 
-运行完整验证或分发脚本前，确认 `pwsh --version` 能找到 PowerShell 7.x；仅开发 Next 页面和运行不涉及分发的 Node 命令时不需要真实模型 key。
+本地运行 `npm run verify` 不需要 PowerShell；运行 `package:smoke`、`package:standalone`、`release:evidence` 或 Windows lifecycle smoke 前，确认 `pwsh --version` 能找到 PowerShell 7.x。自动化测试和构建不需要真实模型 key；实际模型生成需要在 `.env.local` 配置。
 
 复制 `.env.example` 为 `.env.local`，再填入本机配置；不要把真实 key 提交到 Git：
 
@@ -53,7 +53,15 @@ SQLITE_BACKUP_DIR=./data/backups
 npm run dev
 ```
 
-打开 `http://127.0.0.1:3000`。
+默认打开 `http://127.0.0.1:3000`。如需使用其他端口，例如 `3202`，运行 `npm run dev -- -p 3202`。
+
+## 当前状态与限制
+
+- 已完成私人本地文字创作闭环：项目简报、作者选择分支、逐幕生成、有限收尾、图谱编辑、质量校验、不可变快照和离线 HTML 导出。
+- 截至 2026-09-19 的发布自动化证据包括 `npm run verify`（87 个 Vitest 文件 / 437 个测试）、authoring E2E、SQLite 恢复演练、fake/live 结构契约评测、依赖审计和 standalone 生命周期 smoke；详细命令结果以 [`docs/release/authoring-verification.md`](docs/release/authoring-verification.md) 为准。
+- 作者已完成真实项目的手工测试并报告无问题，随后批准发布 `v0.1.8`。2026-10-02 的源码维护还更新了 Next.js 安全补丁；`v0.1.8` 发布标签保持不变，新安全依赖尚未随新版本发布。后续需完成最终模型四维语义评分与悬疑样本结尾意图确认、干净 Windows 账户安装证据、代码签名/用户安装器，以及真实设备上的键盘、读屏和移动端验收；详见 [`TODO.md`](TODO.md)。
+- 这是私人单作者工具，不包含登录、多用户隔离或公网分享能力；默认只监听 `127.0.0.1`，不要把它暴露到公网。
+- 本地数据库和备份属于用户数据，不能因为仓库清理而删除。当前运行数据不等于 Git 仓库内容，示例项目数量也不能从仓库推断。
 
 ## 正式创作闭环
 

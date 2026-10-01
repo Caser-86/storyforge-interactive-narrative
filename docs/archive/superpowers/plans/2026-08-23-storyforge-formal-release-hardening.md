@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.1, React, TypeScript, Vitest, Playwright, better-sqlite3, Docker Compose, Node.js 24.
 
-**Spec:** `docs/superpowers/plans/2026-08-19-storyforge-formalization-master-plan.md` and the 2026-08-23 formal-project audit.
+**Spec:** `../plans/2026-08-19-storyforge-formalization-master-plan.md` and the 2026-08-23 formal-project audit.
 
 ## Global Constraints
 

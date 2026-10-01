@@ -223,7 +223,7 @@ describe("InteractivePlayer", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: /推门进入/ }));
     const nextChoice = await screen.findByRole("button", { name: /进入下一幕/ }, { timeout: 3_000 });
-    expect(document.activeElement).toBe(nextChoice);
+    await waitFor(() => expect(document.activeElement).toBe(nextChoice));
   });
 
   it("refreshes the written path when a new turn becomes available", async () => {

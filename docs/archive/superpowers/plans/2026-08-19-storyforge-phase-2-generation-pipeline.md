@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Zod, OpenAI-compatible client, DeepSeek, SQLite, Next.js Route Handlers, Vitest, Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-08-19-storyforge-local-authoring-platform-design.md`
+**Spec:** `../specs/2026-08-19-storyforge-local-authoring-platform-design.md`
 
 ## Global Constraints
 

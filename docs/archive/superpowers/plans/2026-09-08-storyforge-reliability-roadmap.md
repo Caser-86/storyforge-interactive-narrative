@@ -6,7 +6,7 @@
 
 **Tech Stack:** Next.js 16、React 19、TypeScript、better-sqlite3、Zod、Vitest、Playwright。
 
-**Spec:** [2026-09-08 深度审核](../../2026-09-08-deep-audit.md)。代码基线 `11e4580`；本工作树已完成阶段 A 核心修复、阶段 B 的核心实现和阶段 C 的结构/UI 实现，仍需真实模型质量评测、目标环境发布验证和最终人工确认。
+**Spec:** [2026-09-08 深度审核](../../audits/2026-09-08-deep-audit.md)。代码基线 `11e4580`；本工作树已完成阶段 A 核心修复、阶段 B 的核心实现和阶段 C 的结构/UI 实现，仍需真实模型质量评测、目标环境发布验证和最终人工确认。
 
 ## 约束
 
@@ -171,7 +171,7 @@ flowchart TD
 - [x] 测试事实容量溢出不删除主线、重复伏笔幂等、稳定 ID 销账、长故事上下文预算稳定。
 - [x] 固定 6/8/16 幕、多题材和不同风险选择的离线样本；`npm run interactive:evaluate -- --provider fake` 逐幕走完样本，检查风险序列、选项契约、状态后果和最终收尾，且不联网。
 - [x] 受控真实模型结构评测已对 `zh-contemporary-6`、`zh-fantasy-8`、`zh-suspense-16` 各完成至少一次成功运行；记录了 16 幕样本一次失败、重试后通过的波动，模型为进程级覆盖的 `deepseek-v4-flash`，默认 `doubao-seed-evolving` 未被静默替换。
-- [ ] 真实模型人工评测仍需检查选择后果、事实一致、伏笔回收和结局完整；已准备 [`互动真实模型审阅表`](../../release/interactive-evaluation-review.md)，结构 runner 不能替代样本版本记录和四维人工评分，也不能用 fake 结果替代。
+- [ ] 真实模型人工评测仍需检查选择后果、事实一致、伏笔回收和结局完整；已准备 [`互动真实模型审阅表`](../../../release/interactive-evaluation-review.md)，结构 runner 不能替代样本版本记录和四维人工评分，也不能用 fake 结果替代。
 - [ ] 提议质量门槛：无主线事实硬冲突、所有高优先级伏笔有交代；人工评分四维均至少 4/5。该数字是目标，尚无达标结论；评测消耗受 B2 预算控制。
 - [ ] 最终人工评测和发布必须记录并确认同一个 `OPENAI_MODEL`；当前本地默认是 `doubao-seed-evolving`，若目标是 `deepseek-v4-flash`，需先切换并重新完成对应评测。
 
@@ -194,7 +194,7 @@ flowchart TD
 
 ### D1 按事务职责拆分（依赖 B/C）
 
-- [x] 对 `generation/repository.ts`、`authoring/repository.ts` 先画事务边界，将读查询、任务状态转换与写事务逐项拆出，保持现有公共 API；清单见 [`docs/architecture/authoring-transaction-boundaries.md`](../../architecture/authoring-transaction-boundaries.md)。现有方法已按短事务状态转换与事务外 provider 调用组织，后续只做逐批重构。
+- [x] 对 `generation/repository.ts`、`authoring/repository.ts` 先画事务边界，将读查询、任务状态转换与写事务逐项拆出，保持现有公共 API；清单见 [`docs/architecture/authoring-transaction-boundaries.md`](../../../architecture/authoring-transaction-boundaries.md)。现有方法已按短事务状态转换与事务外 provider 调用组织，后续只做逐批重构。
 - [x] 为历史会话列表增加有界分页和摘要查询，避免逐条加载完整正文；前端默认 50 条、服务端单页上限 100 条，恢复时按 ID 读取完整正文。
 - [x] 为摘要查询增加 v13 复合索引 `(project_id, updated_at, id)`；回归通过 `EXPLAIN QUERY PLAN` 确认 SQLite 采用该索引，并覆盖迁移幂等、旧库升级、空/非法游标和删除当前页后仍可继续分页。
 - [x] 运行 `npm run db:interactive:benchmark`：最新一次 100/16 场景完整读取 14.18ms、201 条估算 SQL，摘要分页全量读取 1.05ms、2 条估算 SQL，首屏 0.66ms；1000/40 场景完整读取 116.09ms、2001 条估算 SQL，摘要分页全量读取 4.73ms、20 条估算 SQL，首屏 0.23ms。结果为当前机器基线，不替代多平台压测。
