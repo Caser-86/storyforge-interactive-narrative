@@ -8,6 +8,10 @@ All notable changes to StoryForge are documented here.
 
 - 对齐项目说明、GitHub 元数据和当前发布状态；归档历史计划与审计记录，保留正式版本标签及发布证据。
 
+### Security
+
+- 将 Next.js 与 `eslint-config-next` 更新至 `16.3.8`，包含 [GHSA-vcvr-r3jv-pc5j](https://github.com/advisories/GHSA-vcvr-r3jv-pc5j) 修复及 Next.js 9 月 30 日安全更新；同时更新审计发现的易受影响传递依赖，完整 `npm audit` 结果为 0 vulnerabilities。
+
 ## [0.1.8] - 2026-09-18
 
 > 已从 canonical `master` 提交 `f2fec8b` 发布为 [GitHub Release v0.1.8](https://github.com/Caser-86/storyforge-interactive-narrative/releases/tag/v0.1.8)。后续验证和文档状态同步通过 PR [#4](https://github.com/Caser-86/storyforge-interactive-narrative/pull/4) 至 [#9](https://github.com/Caser-86/storyforge-interactive-narrative/pull/9) 合并，未移动或重建 `v0.1.8` 标签。
