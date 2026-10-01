@@ -5,7 +5,7 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "description": "StoryForge - 基于 LLM 的互动叙事生成器",
+  "description": "StoryForge - Local-first, author-driven AI interactive fiction studio",
   "repository": {
     "type": "git",
     "url": "https://github.com/Caser-86/storyforge-interactive-narrative.git"

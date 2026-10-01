@@ -37,6 +37,10 @@ yarn-error.log*
 .*.log
 /dev-server*.log
 
+# local agent metadata
+/.agents/
+/.superpowers/
+
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example

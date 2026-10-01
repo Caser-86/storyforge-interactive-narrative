@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.1, React 19, TypeScript, Zod, SQLite, Vitest, Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-09-06-author-driven-generation-flow.md`
+**Spec:** `../specs/2026-09-06-author-driven-generation-flow.md`
 
 ## Global Constraints
 
@@ -162,7 +162,7 @@ Expected: PASS with the default flow covering opening, choices, ending, material
 - Modify: `src/lib/interactive/schemas.ts`
 - Modify: `docs/authoring-user-guide.md`
 - Modify: `docs/authoring-recovery.md`
-- Modify: `docs/superpowers/specs/2026-08-24-storyforge-branch-writing-design.md`
+- Modify: `../specs/2026-08-24-storyforge-branch-writing-design.md`
 - Test: `src/__tests__/interactive/generator.test.ts`
 
 **Interfaces:**

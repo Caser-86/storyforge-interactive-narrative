@@ -1,5 +1,7 @@
 # 互动真实模型审阅表
 
+> **当前状态（2026-10-02）**：作者已完成实际项目测试并批准发布 `v0.1.8`。本表中三套评测材料的四维语义评分及悬疑样本结尾意图仍未确认；发布确认不代表这些评分已完成。当前门槛以 [`TODO.md`](../../TODO.md) 为准。
+
 本文档用于补充离线互动评测的人工质量门槛。它不替代 `npm run interactive:evaluate -- --provider fake`，也不把结构契约通过误认为真实模型叙事质量通过。
 
 ## 使用边界
@@ -84,7 +86,7 @@ npm run interactive:evaluate -- --provider live --allow-network --approve-paid-c
 - 最终计划幕新增“不得以未来继续/以后揭示代替收尾”的检查；命中时最多发起一次有界 ending repair，修复后仍不满足则失败，不会伪造结局或自动补写作者内容。
 - 时间线提示要求同日午后使用无歧义的 24 小时制，并明确标注闪回或其他日期；这是减少时间表达回退的生成约束，不能替代作者逐幕事实审阅。
 - 使用进程级 `OPENAI_MODEL=deepseek-v4-flash` 覆盖重跑三份人工材料后，`zh-contemporary-6`、`zh-fantasy-8`、`zh-suspense-16` 分别为 `6/6`、`8/8`、`16/16`，ending、choice contract、risk coverage、consequence 检查均通过且 `issueCodes=[]`；`.env.local` 默认模型仍为 `doubao-seed-evolving`。
-- 本节仍只证明结构和可读审阅材料已生成；四个维度的 1–5 分、真实读屏/移动端验收和作者发布确认仍未完成。
+- 截至本节记录日期，结构与可读审阅材料已生成；四个维度的 1–5 分、真实读屏/移动端验收和作者发布确认仍未完成。后续作者发布确认状态见文首当前状态。
 
 ## 2026-09-16 同模型审阅材料索引
 

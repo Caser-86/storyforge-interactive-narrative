@@ -3,7 +3,7 @@
 - 日期：2026-09-08；代码基线：`11e4580`，分支 `codex/branch-writing-v0.1.5`。
 - 产品边界：私人本地使用、无需登录、文字优先；作者逐幕选择，模型续写并负责有限收尾。
 - 本轮交付：代码审核、隔离复现、阶段 A 核心修复、回归验证、优化路线与计划图。
-- [执行计划与依赖图](superpowers/plans/2026-09-08-storyforge-reliability-roadmap.md)。
+- [执行计划与依赖图](../superpowers/plans/2026-09-08-storyforge-reliability-roadmap.md)。
 
 ## 结论与审核范围
 
